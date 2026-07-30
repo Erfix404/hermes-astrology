@@ -1,90 +1,143 @@
-# astrology — engine internals
+# 🔮 Hermes Astrology
 
-The deterministic ephemeris engine and its interpretation rulesets. For install
-instructions, cloud hosting, and env vars, see the [root README](../../README.md)
-and [AGENTS.md](../../AGENTS.md).
+**Deterministic multi-tradition astrology engine** — Western tropical, Vedic/Jyotisha sidereal, Chinese BaZi (Four Pillars). Zero‑dependency pure‑Python ephemeris. 19 modes. CLI + API + MCP.
 
-## Architecture
+| Tradition | System | Basis |
+|-----------|--------|-------|
+| ♈ Western | Tropical (seasons) | Psychological, archetypal, personality‑focused |
+| ☪ Vedic / Jyotisha | Sidereal (Lahiri ~24°) | Karma, dasha timing, life events, nakshatras |
+| 木 Chinese BaZi | Four Pillars (solar terms) | Elemental balance, luck cycles, Ten Gods |
 
-```
-astrology/
-├── SKILL.md                       # orchestration + anti-Barnum trust discipline (v2.0)
-├── scripts/astro_engine.py        # deterministic ephemeris engine (~2930 lines, 19 modes)
-├── scripts/mcp_server.py          # MCP server (18 tools, stdio + SSE)
-├── scripts/api.py                 # FastAPI REST server (31 endpoints, auth + billing headers)
-├── references/                    # grounded classical rulesets (the meaning layer)
-│   ├── western.md                 # Big Three, planets, houses, aspects, medical
-│   ├── vedic.md                   # Lagna, dasha, yogas, remedies, Namakaran, Guna Milan
-│   ├── bazi.md                    # Day Master, useful god, Ten Gods, luck pillars, Tai Sui
-│   ├── tibetan.md                 # Losar, Mewa, Parkha, Kalachakra, Dharma frame
-│   ├── health.md                  # medical astrology & surgical timing
-│   ├── synastry-and-timing.md     # synastry, transits, electional, muhurta
-│   ├── specialty-systems.md       # astrocartography, horary, electional, rectification, etc.
-│   └── consultation.md            # the human counseling craft + ethics
-└── assets/profile-template.md     # how a saved birth profile is remembered
-```
+## ✨ Features
 
-## The engine (`scripts/astro_engine.py`)
+- **Zero‑dependency** — pure Python geocentric ephemeris (Schlyter + perturbations). Only `math` / `datetime` / `json`. Works out‑of‑the‑box.
+- **14‑function CLI** — `astro --json`, `astro --file`, `astro --summary`
+- **19 chart modes** — natal, transit, synastry, compatibility, composite, solar/lunar/planetary return, navamsa, varga (D2–D60), panchang, moon phase, numerology, progressions, planetary hours, transit‑natal aspects, horary, astrocartography
+- **Auto‑enriched** — aspect patterns (Grand Trine, T‑Square, Yod, Kite, Grand Cross), Arabic Parts, fixed stars, Black Moon Lilith, dignities, Mangal Dosha, Kaalsarpa Dosha
+- **Swiss Ephemeris upgrade** — `pip install pyswisseph` → arcsecond precision + Placidus houses. No code change.
+- **8 reference rulesets** — grounded classical interpretation, no hallucinated Barnum fluff
+- **FastAPI REST** (19 routes + pricing/auth/rate‑limiting) + **MCP server** (18 tools, Claude Desktop / Cursor / Devin)
 
-- **Zero dependencies** — pure-Python geocentric ephemeris (Schlyter algorithms + perturbation terms). Python 3.10+.
-- **Auto-upgrades** to Swiss Ephemeris arcsecond precision if `pyswisseph` is installed — no code change needed.
-- **19 modes** — see [SKILL.md](SKILL.md) for the full list with parameters.
-- **Auto-enriched natal** — aspect patterns, 10 Arabic Parts, 23 fixed stars, Black Moon Lilith, dignities, chart ruler, Descendant, IC, equal houses, navamsa D9, panchang, Mangal Dosha, Kaalsarpa Dosha.
-
-### API surface
-
-| Layer | File | Endpoints/Tools | Transport |
-|-------|------|-----------------|-----------|
-| CLI | `astro_engine.py --json` | 19 modes | stdin |
-| MCP | `mcp_server.py` | 18 tools | stdio / SSE |
-| REST | `api.py` | 31 endpoints | HTTP |
-| Skill | `SKILL.md` | Agent integration | Claude/Cursor/Copilot |
-
-### Mode examples
+## 🚀 Quick start
 
 ```bash
-# Natal chart
-python3 scripts/astro_engine.py --json '{"year":1990,"month":6,"day":15,
-  "hour":14,"minute":30,"lat":40.71,"lng":-74.0,"tz":"America/New_York",
+# Clone
+git clone https://github.com/Erfix404/hermes-astrology.git
+cd hermes-astrology
+
+# CLI — natal chart for Tehran
+python scripts/astro_engine.py --json '{"year":1995,"month":4,"day":15,
+  "hour":14,"minute":30,"lat":35.6892,"lng":51.3890,
+  "tz":"Asia/Tehran","time_known":true,
   "systems":["western","vedic","bazi"]}'
 
-# Transit (current sky vs natal)
-python3 scripts/astro_engine.py --json '{...natal data...,
-  "mode":"transit","transit_date":"2026-12-01"}'
-
-# Synastry (relationship)
-python3 scripts/astro_engine.py --json '{...personA...,
-  "mode":"synastry","partner":{...personB...}}'
-
-# Vedic divisional chart
-python3 scripts/astro_engine.py --json '{...natal data...,
-  "mode":"varga","varga":"D10","systems":["vedic"]}'
-
-# Horary (chart of the moment)
-python3 scripts/astro_engine.py --json '{...location data...,
-  "mode":"horary","question_time":"2026-06-07 12:30",
-  "question":"Will my ex come back?"}'
+# Convenience CLI
+python scripts/astro_cli.py --json '...' --summary
 ```
 
-### Specialty lookups
+### Daily astrology fetch
 
-```python
-from astro_engine import (
-    namakaran,         # name syllables from birth nakshatra
-    anatomy_chart,     # body regions + afflicted systems
-    horary,            # cast + basic signals of a horary chart
-    astrocartography,  # planet lines for relocation
-)
+```bash
+python scripts/daily-astrology-fetch.py
+# → JSON with today's planet positions, signs, degrees, retrograde status
 ```
 
-## What it reads
+## 📦 Installation as library
 
-The reference rulesets cover the global astrologer catalog:
-love/marriage/heartbreak, career/wealth, timing/crisis/health, soul
-purpose/karma, family/children, astrocartography, horary, electional,
-medical, corporate, pet, Namakaran, past lives, twin problem, curse, taboo,
-lost objects — with a hard ethical frame (no death predictions, real crisis
-overrides the chart, no fear-based upsell) and anti-Barnum discipline
-(cite the specific placement, no generic fluff).
+```bash
+pip install .
+# or for development:
+cd hermes-astrology
+python -m unittest tests.test_engine -v
+```
 
-Full trust discipline in [SKILL.md](SKILL.md).
+## 🔧 API modes
+
+| Mode | Endpoint | Description |
+|------|----------|-------------|
+| `natal` | `/chart/natal` | Full natal chart(s) per tradition |
+| `transit` | `/chart/transit` | Current sky vs natal chart |
+| `synastry` | `/chart/synastry` | Relationship comparison |
+| `compatibility` | `/chart/compatibility` | 0‑100 scoring + 5 subscores |
+| `composite` | `/chart/composite` | Midpoint relationship chart |
+| `solar_return` | `/chart/solar-return` | Annual birthday forecast |
+| `lunar_return` | `/chart/lunar-return` | Monthly lunar return |
+| `planetary_return` | `/chart/planetary-return` | Jupiter/Saturn/Mercury etc. |
+| `navamsa` | `/chart/navamsa` | Vedic D9 soul chart |
+| `varga` | `/chart/varga` | D2–D60 divisional charts |
+| `panchang` | `/chart/panchang` | Tithi, Nakshatra, Yoga, Karana |
+| `moon_phase` | `/chart/moon-phase` | Lunar phase + upcoming events |
+| `numerology` | `/chart/numerology` | Life Path, Personal Year |
+| `progressions` | `/chart/progressions` | Secondary progressions |
+| `planetary_hours` | `/chart/planetary-hours` | Chaldean hours for electional |
+| `transit_aspects` | `/chart/transit-aspects` | Detailed transit‑to‑natal aspects |
+| `horary` | `/horary` | Chart of the moment (question) |
+| `astrocartography` | `/astrocartography` | Relocation planet lines |
+| `event` | `/chart/event` | Any inception moment |
+
+## 📁 Project structure
+
+```
+hermes-astrology/
+├── scripts/
+│   ├── astro_engine.py        # ~2960 lines, zero-dep ephemeris engine
+│   ├── astro_cli.py           # CLI entry point
+│   ├── daily-astrology-fetch.py  # Daily planet data fetcher
+│   ├── api.py                 # FastAPI REST server (841 lines)
+│   └── mcp_server.py          # MCP server (18 tools)
+├── references/
+│   ├── western.md             # Western interpretation ruleset
+│   ├── vedic.md               # Vedic/Jyotisha ruleset
+│   ├── bazi.md                # Chinese BaZi ruleset
+│   ├── tibetan.md             # Tibetan Buddhist astrology
+│   ├── health.md              # Medical astrology
+│   ├── synastry-and-timing.md # Compatibility + forecasting
+│   ├── specialty-systems.md   # 14+ niche branches
+│   └── consultation.md        # Counseling craft + ethics
+├── tests/
+│   └── test_engine.py         # 66 tests, stdlib unittest
+├── SKILL.md                   # Agent integration skill
+├── pyproject.toml
+├── Dockerfile
+└── LICENSE (MIT)
+```
+
+## 🧪 Tests
+
+```bash
+python -m unittest tests.test_engine -v
+# → 66/66 pass
+```
+
+CI runs on Python 3.10–3.13 via GitHub Actions.
+
+## 🐳 Docker
+
+```bash
+docker build -t hermes-astrology .
+docker run -p 8000:8000 hermes-astrology
+# → FastAPI at http://localhost:8000/docs
+```
+
+## 🌐 MCP for Claude Desktop
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "astrology": {
+      "command": "python",
+      "args": ["/path/to/hermes-astrology/scripts/mcp_server.py"],
+      "env": { "ASTRO_MCP_TRANSPORT": "stdio" }
+    }
+  }
+}
+```
+
+18 tools — get astrology charts, solar returns, compatibility, planetary hours, and more, directly from Claude.
+
+---
+
+**MIT License** — free to use, modify, and distribute.
+Built with ❤️ for Erfan (Erfix404).
