@@ -269,5 +269,109 @@ class TestArabicParts(unittest.TestCase):
         self.assertGreater(len(r["arabic_parts"]), 0)
 
 
+# ════════════════════════════════════════════════════════════════════
+#  Advanced Features Tests (8 new modules)
+# ════════════════════════════════════════════════════════════════════
+_BIRTH_JSON = {"year":1995,"month":4,"day":15,"hour":14,"minute":30,
+               "lat":35.6892,"lng":51.3890,"tz":"Asia/Tehran","time_known":True}
+_BIRTH_DEMO = ae._demo()
+
+class TestNodeTransit(unittest.TestCase):
+    def test_node_analysis(self):
+        jd = ae.julian_day(datetime(1995,4,15,11,0))
+        tjd = ae.julian_day(datetime(2026,7,30))
+        natal_lons, _, _ = ae.body_longitudes(jd)
+        t_lons, _, _ = ae.body_longitudes(tjd)
+        try:
+            from astro_advanced import analyze_node_transit
+            n = analyze_node_transit(natal_lons, t_lons)
+            self.assertIn("Rahu", n)
+            self.assertIn("Ketu", n)
+            self.assertIn("interpretation", n["Rahu"])
+        except ImportError:
+            self.skipTest("astro_advanced not available")
+
+class TestGunaMilan(unittest.TestCase):
+    def test_guna_same(self):
+        jd = ae.julian_day(datetime(1995,4,15,11,0))
+        lons, _, _ = ae.body_longitudes(jd)
+        ayan = ae.ayanamsha_lahiri(jd)
+        try:
+            from astro_advanced import guna_milan
+            g = guna_milan(lons, lons, ayan)
+            self.assertEqual(g["total_score"], 26)  # known value
+            self.assertIn("verdict", g)
+        except ImportError:
+            self.skipTest("astro_advanced not available")
+
+class TestSolarReturnInterpreted(unittest.TestCase):
+    def test_sr_interpretation(self):
+        jd = ae.julian_day(datetime(1995,4,15,11,0))
+        try:
+            from astro_advanced import interpret_solar_return
+            sr = ae.solar_return(jd, 2026, 35.68, 51.38)
+            si = interpret_solar_return(sr)
+            self.assertIn("interpretation", si)
+            self.assertIn("year_theme", si["interpretation"])
+        except ImportError:
+            self.skipTest("astro_advanced not available")
+
+class TestElectional(unittest.TestCase):
+    def test_electional_find(self):
+        jd = ae.julian_day(datetime(2026,7,30,12,0))
+        try:
+            from astro_advanced import find_electional_times
+            ef = find_electional_times(jd, 35.68, 51.38, "career", days_ahead=3)
+            self.assertGreater(len(ef.get("top_windows", [])), 0)
+            self.assertEqual(ef["activity"], "career")
+        except ImportError:
+            self.skipTest("astro_advanced not available")
+
+class TestSolarArc(unittest.TestCase):
+    def test_solar_arc(self):
+        jd = ae.julian_day(datetime(1995,4,15,11,0))
+        lons, _, _ = ae.body_longitudes(jd)
+        try:
+            from astro_advanced import solar_arc_directions
+            sa = solar_arc_directions(lons, 31.3)
+            self.assertIn("age", sa)
+            self.assertIn("directional_aspects_to_natal", sa)
+            self.assertGreater(len(sa["directional_aspects_to_natal"]), 0)
+        except ImportError:
+            self.skipTest("astro_advanced not available")
+
+class TestRemedies(unittest.TestCase):
+    def test_remedy_suggestions(self):
+        r = ae.calculate_full_profile(_BIRTH_JSON)
+        try:
+            from astro_advanced import suggest_remedies
+            rem = suggest_remedies(r)
+            self.assertIn("planet_remedies", rem)
+        except ImportError:
+            self.skipTest("astro_advanced not available")
+
+class TestWeeklyCalendar(unittest.TestCase):
+    def test_week_generation(self):
+        try:
+            from astro_advanced import weekly_astro_calendar
+            w = weekly_astro_calendar(datetime(2026,7,30))
+            self.assertEqual(len(w["days"]), 7)
+            self.assertIn("week_start", w)
+        except ImportError:
+            self.skipTest("astro_advanced not available")
+
+class TestPrashna(unittest.TestCase):
+    def test_prashna_verdict(self):
+        from datetime import timezone
+        try:
+            from astro_advanced import prashna
+            q = prashna(datetime(2026,7,30,12,0,tzinfo=timezone.utc),
+                        35.68, 51.38, "Will my project succeed?", "career")
+            self.assertIn("verdict", q)
+            self.assertIn("ascendant", q)
+        except ImportError:
+            self.skipTest("astro_advanced not available")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

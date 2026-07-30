@@ -2899,7 +2899,88 @@ def calculate_full_profile(data):
         result["transit_natal_aspects"]=transit_to_natal_aspects(jd, tjd)
         return result
 
-    # natal (default)
+    # ── New advanced modes ─────────────────────────────────────────
+    if mode=="node_transit":
+        from astro_advanced import analyze_node_transit
+        natal_lons, _, _ = body_longitudes(jd)
+        tjd = julian_day(datetime.utcnow())
+        t_lons, _, _ = body_longitudes(tjd)
+        result["node_transit"] = analyze_node_transit(natal_lons, t_lons)
+        return result
+
+    if mode=="guna_milan":
+        from astro_advanced import guna_milan
+        p=data.get("partner", {})
+        p_utc,_=to_utc(p); jdB=julian_day(p_utc)
+        natal_lons, _, _ = body_longitudes(jd)
+        p_lons, _, _ = body_longitudes(jdB)
+        ayan_here = ayanamsha_lahiri(jd)
+        result["guna_milan"] = guna_milan(natal_lons, p_lons, ayan_here)
+        result["personA_big3"] = western_chart(jd,lat,lng,time_known)["big_three"]
+        result["personB_big3"] = western_chart(jdB,p.get("lat",0),p.get("lng",0),
+                                               p.get("time_known",True))["big_three"]
+        return result
+
+    if mode=="solar_return_interpreted":
+        from astro_advanced import interpret_solar_return
+        target_year=data.get("target_year", birth_local.year+1)
+        sr = solar_return(jd, target_year, lat, lng)
+        result["solar_return"] = interpret_solar_return(sr)
+        return result
+
+    if mode=="electional":
+        from astro_advanced import find_electional_times
+        activity=data.get("activity","general")
+        days_ahead=data.get("days_ahead", 14)
+        result["electional"] = find_electional_times(jd, lat, lng, activity, days_ahead)
+        return result
+
+    if mode=="solar_arc":
+        from astro_advanced import solar_arc_directions
+        age=data.get("age", (TODAY - birth_local).days / 365.25)
+        natal_lons, _, _ = body_longitudes(jd)
+        if time_known:
+            asc_lon_full, _ = ascendant_mc(jd, lat, lng)
+            natal_lons["Ascendant"] = asc_lon_full
+        result["solar_arc"] = solar_arc_directions(natal_lons, age)
+        return result
+
+    if mode=="remedies":
+        from astro_advanced import suggest_remedies
+        # compute natal first — strip mode to avoid recursion
+        natal_data = dict(data)
+        natal_data.pop("mode", None)
+        nat = calculate_full_profile(natal_data)
+        result["remedies"] = suggest_remedies(nat)
+        return result
+
+    if mode=="weekly_calendar":
+        from astro_advanced import weekly_astro_calendar
+        start_str = data.get("start_date")
+        sd = datetime.strptime(start_str, "%Y-%m-%d") if start_str else None
+        result["weekly_calendar"] = weekly_astro_calendar(sd)
+        return result
+
+    if mode=="prashna":
+        from astro_advanced import prashna
+        from datetime import timezone as _tz
+        qtext = data.get("question","")
+        qdt = datetime.strptime(data["question_time"], "%Y-%m-%d %H:%M") if data.get("question_time") else datetime.utcnow()
+        if data.get("tz") and _HAS_TZDB:
+            try:
+                local = qdt.replace(tzinfo=ZoneInfo(data["tz"]))
+                qdt_utc = local.astimezone(timezone.utc).replace(tzinfo=None)
+            except Exception:
+                qdt_utc = qdt
+        else:
+            qdt_utc = qdt
+        qdt_utc = qdt_utc.replace(tzinfo=_tz.utc)
+        qtype = data.get("question_type","general")
+        result["prashna"] = prashna(qdt_utc, lat, lng, qtext, qtype)
+        return result
+
+    # ── Natal with advanced features ────────────────────────────────
+    do_advanced = data.get("advanced", False)
     result["charts"]={}
     if "western" in systems:
         try: result["charts"]["western"]=western_chart(jd,lat,lng,time_known)
@@ -2945,6 +3026,37 @@ def calculate_full_profile(data):
                                               data.get("full_name",""))
         except Exception:
             pass
+
+    # ── Advanced features bundle ─────────────────────────────────────
+    if do_advanced:
+        try:
+            from astro_advanced import (analyze_node_transit, interpret_solar_return,
+                                        solar_arc_directions, suggest_remedies,
+                                        weekly_astro_calendar)
+
+            natal_lons, _, _ = body_longitudes(jd)
+            tjd = julian_day(datetime.utcnow())
+            t_lons, _, _ = body_longitudes(tjd)
+            result["node_transit"] = analyze_node_transit(natal_lons, t_lons)
+
+            # Solar return interpreted
+            sr = solar_return(jd, TODAY.year, lat, lng)
+            result["solar_return_interp"] = interpret_solar_return(sr)
+
+            # Solar arc
+            age = (TODAY - birth_local).days / 365.25
+            if time_known:
+                asc_full, _ = ascendant_mc(jd, lat, lng)
+                natal_lons["Ascendant"] = asc_full
+            result["solar_arc"] = solar_arc_directions(natal_lons, age)
+
+            # Remedies
+            result["remedies"] = suggest_remedies(result)
+
+            # Weekly calendar
+            result["weekly_calendar"] = weekly_astro_calendar()
+        except Exception as e:
+            result["_advanced_error"] = repr(e)
 
     return result
 

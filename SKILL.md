@@ -119,14 +119,21 @@ python3 "${SKILL_DIR%%/SKILL.md}/scripts/daily-astrology-fetch.py"
 | `panchang` | — | Tithi, Nakshatra, Yoga, Karana |
 | `moon_phase` | — | Current lunar phase + upcoming 4 events |
 | `numerology` | `full_name` (optional) | Life Path, Personal Year, Expression |
-| `progressions` | `target_age` | Secondary progressions (1 day = 1 year) |
-| `planetary_hours` | — | Chaldean hours for electional timing |
-| `transit_natal_aspects` | `transit_date` | Detailed transit-to-natal aspects |
-| `horary` | `question_time`, `question` | Chart of the moment |
-| `astrocartography` | — | Planet lines for relocation |
-| `event` | — | Any inception moment |
+| `Progressions` | `target_age` | Secondary progressions (1 day = 1 year) |
+| `Planetary_hours` | — | Chaldean hours for electional timing |
+| `Transit_natal_aspects` | `transit_date` | Detailed transit-to-natal aspects |
+| `Horary` | `question_time`, `question` | Chart of the moment |
+| `Astrocartography` | — | Planet lines for relocation |
+| **`Node_transit`** | — | Rahu/Ketu through natal houses — interpretation |
+| **`Guna_milan`** | `partner` {} | Vedic Ashtakoota — 36-guna marriage compatibility |
+| **`Solar_return_interpreted`** | `target_year` | Solar return with human-readable year theme |
+| **`Electional`** | `activity`, `days_ahead` | Best planetary hours for any activity |
+| **`Solar_arc`** | `age` | Solar Arc Directions (~1°/year) |
+| **`Remedies`** | — | Gemstone, color & practice suggestions from chart |
+| **`Weekly_calendar`** | `start_date` | 7-day astrological weather forecast |
+| **`Prashna`** | `question`, `question_time` | Vedic horary — chart of the moment |
 
-**Extra options:** `"include_numerology": true`, `"house_system": "equal"`
+| Mode | Extra params | What it does |
 
 The engine returns `_meta.engine_backend` (`builtin` or `swisseph`). Builtin is exact to sign/house/nakshatra/dasha. For arcsecond/Placidus → `pip install pyswisseph`.
 
