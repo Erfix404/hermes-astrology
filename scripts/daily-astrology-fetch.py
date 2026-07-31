@@ -7,11 +7,30 @@ ENGINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "astro_engine.
 
 def run_engine(json_input):
     """Run the astrology engine and return parsed JSON."""
-    result = subprocess.run(
-        ["python3", ENGINE, "--json", json.dumps(json_input)],
-        capture_output=True, text=True, timeout=30
-    )
-    return json.loads(result.stdout)
+    # Prefer the venv python with swisseph for arcsecond precision
+    candidates = [
+        "/opt/data/.venv/bin/python",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".venv", "bin", "python"),
+        "python3",
+    ]
+    for py in candidates:
+        if py != "python3" and not os.path.exists(py):
+            continue
+        try:
+            result = subprocess.run(
+                [py, ENGINE, "--json", json.dumps(json_input)],
+                capture_output=True, text=True, timeout=30
+            )
+            data = json.loads(result.stdout)
+            # verify swisseph backend actually engaged
+            meta = data.get("_meta", {})
+            if meta.get("engine_backend") == "swisseph":
+                return data
+            if py == "python3":
+                return data  # last resort, accept whatever backend
+        except Exception:
+            continue
+    return {"error": "engine failed"}
 
 def get_current_planets(collected, key, data):
     """Extract planet info from chart data."""

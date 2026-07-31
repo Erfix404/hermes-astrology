@@ -373,5 +373,34 @@ class TestPrashna(unittest.TestCase):
             self.skipTest("astro_advanced not available")
 
 
+class TestPlacidus(unittest.TestCase):
+    """Placidus houses — active when swisseph is available."""
+
+    @unittest.skipUnless(ae._HAS_SWE, "swisseph not installed")
+    def test_cusps_align_with_asc(self):
+        jd = ae.julian_day(datetime(1995, 4, 15, 11, 0))
+        cusps = ae.placidus_cusps(jd, 35.6892, 51.3890)
+        asc_lon, _ = ae.ascendant_mc(jd, 35.6892, 51.3890)
+        self.assertEqual(len(cusps), 12)
+        self.assertLess(abs(cusps[0] - asc_lon), 1.0)
+
+    @unittest.skipUnless(ae._HAS_SWE, "swisseph not installed")
+    def test_house_of_all_planets(self):
+        jd = ae.julian_day(datetime(1995, 4, 15, 11, 0))
+        cusps = ae.placidus_cusps(jd, 35.6892, 51.3890)
+        lons, _, _ = ae.body_longitudes(jd)
+        for b in ("Sun","Moon","Mercury","Venus","Mars","Jupiter",
+                  "Saturn","Uranus","Neptune","Pluto"):
+            lon = lons[b]
+            h = ae.placidus_house_of(lon, cusps)
+            self.assertIn(h, range(1, 13))
+
+    @unittest.skipUnless(ae._HAS_SWE, "swisseph not installed")
+    def test_western_chart_uses_placidus(self):
+        r = ae.calculate_full_profile(BIRTH_WEST)
+        self.assertIn("Placidus", r["charts"]["western"]["system"])
+        self.assertIn("cusp_lon", r["charts"]["western"]["houses"][1])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

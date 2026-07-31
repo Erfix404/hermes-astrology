@@ -100,6 +100,7 @@ from __future__ import annotations
 import json
 import sys
 import math
+import os
 import argparse
 from datetime import datetime, timedelta, timezone
 
@@ -107,9 +108,16 @@ from datetime import datetime, timedelta, timezone
 try:
     import swisseph as swe  # type: ignore
     _HAS_SWE = True
+    # Absolute ephemeris path — never relative (CWD-dependent)
+    _EPHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ephe")
+    if not os.path.isdir(_EPHE_DIR):
+        _EPHE_DIR = "/opt/data/astro/ephe"  # fallback known install
+    if os.path.isdir(_EPHE_DIR):
+        swe.set_ephe_path(_EPHE_DIR)
 except Exception:
     swe = None  # type: ignore
     _HAS_SWE = False
+    _EPHE_DIR = None
 
 try:
     from zoneinfo import ZoneInfo
@@ -645,7 +653,13 @@ def tropical_longitudes(jd):
 
 def longitudes_swe(jd):
     """High-precision longitudes if swisseph present (tropical)."""
-    swe.set_ephe_path(None)
+    # Never reset the ephe path here — that kills ephemeris files and breaks
+    # Chiron/outers, forcing fallback to the builtin backend.
+    if _EPHE_DIR and os.path.isdir(_EPHE_DIR):
+        try:
+            swe.set_ephe_path(_EPHE_DIR)
+        except Exception:
+            pass
     ids = {"Sun":swe.SUN,"Moon":swe.MOON,"Mercury":swe.MERCURY,"Venus":swe.VENUS,
            "Mars":swe.MARS,"Jupiter":swe.JUPITER,"Saturn":swe.SATURN,"Uranus":swe.URANUS,
            "Neptune":swe.NEPTUNE,"Pluto":swe.PLUTO,"North Node":swe.TRUE_NODE,
@@ -716,6 +730,38 @@ def whole_sign_house(planet_lon, asc_lon):
     p_sign = int(norm360(planet_lon)//30)
     return ((p_sign - asc_sign) % 12) + 1
 
+def placidus_cusps(jd, lat, lng):
+    """Placidus house cusps via Swiss Ephemeris (if available).
+    Returns list of 12 cusps (index 0 = cusp 12, per Swiss Ephemeris).
+    Falls back to whole-sign (Asc-based) if no swisseph."""
+    if _HAS_SWE:
+        try:
+            # swe.houses returns 13-element list (index 0 = cusp 1); we keep all 12
+            cusps, ascmc = swe.houses(jd, lat, lng, b'P')
+            # Swiss Ephemeris: cusps[0..11] = cusps 1..12, but index 0 is cusp 12
+            # per common usage; normalize to cusp 1..12 list
+            return [norm360(c) for c in cusps[:12]]
+        except Exception:
+            pass
+    # fallback: whole-sign from Asc
+    asc_lon, _ = ascendant_mc(jd, lat, lng)
+    asc_idx = int(asc_lon // 30)
+    return [norm360((asc_idx + i - 1) * 30) for i in range(1, 13)]
+
+def placidus_house_of(planet_lon, cusps):
+    """Return 1-12 house number for a planet longitude given Placidus cusps.
+    Handles cusp pairs that wrap through 0°."""
+    for h in range(12):
+        c1 = cusps[h]
+        c2 = cusps[(h + 1) % 12]
+        if c1 < c2:
+            if c1 <= planet_lon < c2:
+                return h + 1
+        else:  # house spans the 0° wrap
+            if planet_lon >= c1 or planet_lon < c2:
+                return h + 1
+    return 1
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  SECTION E — TIME / INPUT NORMALISATION
 # ═════════════════════════════════════════════════════════════════════════════
@@ -751,7 +797,7 @@ def to_utc(data):
 #  SECTION F — CHART BUILDERS
 # ═════════════════════════════════════════════════════════════════════════════
 
-def _planet_block(lons, speed, asc_lon, names, ayan=0.0, vedic=False):
+def _planet_block(lons, speed, asc_lon, names, ayan=0.0, vedic=False, cusps=None):
     out = {}
     for nm in names:
         lon = norm360(lons[nm] - ayan)
@@ -759,9 +805,11 @@ def _planet_block(lons, speed, asc_lon, names, ayan=0.0, vedic=False):
         retro = speed.get(nm, 0) < 0 if nm not in ("South Node",) else (speed.get("North Node",0) < 0)
         if nm in ("North Node","South Node"):
             retro = True  # nodes are always retrograde by mean motion
+        house = (placidus_house_of(lon, cusps) if cusps is not None
+                 else whole_sign_house(lon, asc_lon))
         block = {
             "sign": sign, "deg_in_sign": deg, "abs_lon": round(lon,3),
-            "house": whole_sign_house(lon, asc_lon),
+            "house": house,
             "retrograde": retro,
         }
         if vedic:
@@ -819,7 +867,9 @@ def western_chart(jd, lat, lng, time_known=True):
     asc_lon, mc_lon = ascendant_mc(jd, lat, lng) if time_known else (lons["Sun"], norm360(lons["Sun"]+270))
     names = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn",
              "Uranus","Neptune","Pluto","North Node","South Node","Chiron"]
-    planets = _planet_block(lons, speed, asc_lon, names, vedic=False)
+    use_placidus = _HAS_SWE and time_known
+    cusps = placidus_cusps(jd, lat, lng) if use_placidus else None
+    planets = _planet_block(lons, speed, asc_lon, names, vedic=False, cusps=cusps)
     asc_sign,_,asc_deg = sign_of(asc_lon)
     mc_sign,_,mc_deg = sign_of(mc_lon)
     # element / modality balance over the 10 planets + Asc
@@ -827,18 +877,28 @@ def western_chart(jd, lat, lng, time_known=True):
     for nm in ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","Uranus","Neptune","Pluto"]:
         sd=SIGN_DATA[planets[nm]["sign"]]; elem[sd["element"]]+=1; mod[sd["modality"]]+=1
     sd=SIGN_DATA[asc_sign]; elem[sd["element"]]+=1; mod[sd["modality"]]+=1
-    # whole-sign house cusps
-    houses={}
-    asc_idx=int(asc_lon//30)
-    for hnum in range(1,13):
-        s=SIGNS[(asc_idx+hnum-1)%12]
-        houses[hnum]={"sign":s,"ruler":SIGN_DATA[s]["ruler"],"meaning":HOUSE_MEANINGS[hnum]}
+    # house cusps — Placidus when available, whole-sign fallback
+    if cusps is not None:
+        houses={}
+        for hnum in range(1,13):
+            c = cusps[hnum-1]
+            s,_,_ = sign_of(c)
+            houses[hnum]={"sign":s,"cusp_lon":round(c,3),"ruler":SIGN_DATA[s]["ruler"],
+                          "meaning":HOUSE_MEANINGS[hnum]}
+        house_system = "Placidus (Swiss Ephemeris)"
+    else:
+        houses={}
+        asc_idx=int(asc_lon//30)
+        for hnum in range(1,13):
+            s=SIGNS[(asc_idx+hnum-1)%12]
+            houses[hnum]={"sign":s,"ruler":SIGN_DATA[s]["ruler"],"meaning":HOUSE_MEANINGS[hnum]}
+        house_system = "Western Tropical (whole-sign houses)"
     return {
-        "system":"Western Tropical (whole-sign houses)",
+        "system":house_system,
         "big_three":{"sun":planets["Sun"]["sign"],"moon":planets["Moon"]["sign"],"rising":asc_sign},
         "ascendant":{"sign":asc_sign,"deg_in_sign":asc_deg,"abs_lon":round(asc_lon,3)},
         "midheaven":{"sign":mc_sign,"deg_in_sign":mc_deg,"abs_lon":round(mc_lon,3)},
-        "descendant":{"sign":SIGNS[(asc_idx+6)%12],"deg_in_sign":round(asc_deg,2),
+        "descendant":{"sign":SIGNS[(int(asc_lon//30)+6)%12],"deg_in_sign":round(asc_deg,2),
                       "abs_lon":round(norm360(asc_lon+180),3)},
         "imum_coeli":{"sign":SIGNS[(int(mc_lon//30)+6)%12],"deg_in_sign":round(mc_deg,2),
                       "abs_lon":round(norm360(mc_lon+180),3)},
@@ -2760,7 +2820,7 @@ def calculate_full_profile(data):
     result={"_meta":{"engine_backend":backend,"swisseph_available":_HAS_SWE,
                      "birth_utc":birth_utc.strftime("%Y-%m-%d %H:%M"),"julian_day":round(jd,5),
                      "computed_on":TODAY.strftime("%Y-%m-%d"),
-                     "house_system":"whole-sign (Placidus requires swisseph)",
+                     "house_system":"Placidus (Swiss Ephemeris)" if _HAS_SWE else "whole-sign",
                      "node_type":"true" if _HAS_SWE else "mean",
                      "precision_note":("arcsecond (Swiss Ephemeris)" if backend=="swisseph"
                                        else "~1-2 arcmin (builtin) — exact to sign/house/nakshatra/dasha")},
