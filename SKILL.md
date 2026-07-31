@@ -43,17 +43,29 @@ Three living traditions: **Western tropical**, **Vedic / Jyotisha** (sidereal),
 ## 🏃 The workflow
 
 ```
-1. GATHER birth data — date (required), time, place/city, timezone
-2. RUN the engine → real chart as JSON
-3. GROUND interpretation in the reference rulesets
-4. SYNTHESISE — hold contradictions; find the central paradox
-5. COUNSEL — answer the real human question; give agency, never doom
-6. OFFER to save the profile for future instant readings
+1. GET TODAY'S DATE from the system (date / datetime.now()) — never memory
+2. GATHER birth data — date (required), time, place/city, timezone
+3. RUN the engine → real chart as JSON (MANDATORY — no engine run, no answer)
+4. PICK the fixed template from references/templates.md for the topic
+5. FILL template with engine output (never guessed numbers)
+6. SYNTHESISE — hold contradictions; find the central paradox
+7. COUNSEL — answer the real human question; give agency, never doom
+8. OFFER to save the profile for future instant readings
 ```
 
-Never skip step 2. If describing a chart you didn't compute → stop.
+**Never skip step 1 or 3.** If describing a chart you didn't compute → stop.
+**Every answer must state the computation date** — transparency, freshness.
+If the user asks for a different date than today, say so explicitly: *"Computing for [date], not today."*
 
-### 1 — Gather birth data
+### 1 — Get today's date (MANDATORY)
+
+```bash
+date +"%Y-%m-%d %H:%M %A"
+```
+
+Never take today's date from memory, prior conversation, or intuition — always read it fresh from the system clock. A wrong date = a wrong chart = bad advice.
+
+### 2 — Gather birth data
 
 | Field | Why | If missing |
 |-------|-----|-----------|
@@ -66,6 +78,8 @@ Never skip step 2. If describing a chart you didn't compute → stop.
 Check memory first before re-asking. Batch questions — don't interrogate.
 
 ### 2 — Run the engine
+
+> **MANDATORY: every answer requires a fresh engine run for today's date. No run → no answer.**
 
 **Local (zero latency):**
 ```bash
@@ -191,10 +205,12 @@ Offer to save birth profile after a real reading. Save to memory or local file.
 
 ## Output style
 
-Lead with the human answer, then the evidence. **Spine** (one through-line), **paradox**, **timing** when asked, **one thing to do** at the end. Markdown, warm, scannable.
+**FIXED TEMPLATES — mandatory.** Load `references/templates.md` and follow the exact structure for the topic (daily, personal, compatibility, direct question, weekly). Fill values from engine output. Keep the skeleton identical every time; only the values change. If the user asks for extras → append sections after the standard ones.
+
+Lead with the human answer, then the evidence. **Spine** (one through-line), **paradox**, **timing** when asked, **one thing to do** at the end. Markdown, warm, scannable. Always close with `📌 Source: engine — [computation date]`.
 
 Deep dive report structure: Big Three → mind & heart → love → vocation & money → current chapter (dasha/transits/luck) → year ahead → the life-lesson.
 
 ## If the engine errors
 
-Report honestly. Common fixes: bad timezone (use IANA), missing fields, pre-1800/post-2050 date. Degrade gracefully — drop to Sun-sign level if time unknown; say what you did.
+Report honestly — never guess numbers. Common fixes: bad timezone (use IANA), missing fields, pre-1800/post-2050 date. Degrade gracefully — drop to Sun-sign level if time unknown; say what you did.
