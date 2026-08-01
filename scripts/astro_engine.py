@@ -202,14 +202,26 @@ HOUSE_MEANINGS = {
     12:"The unconscious, solitude, spirituality, self-undoing, institutions, the hidden",
 }
 
-ASPECTS = {  # name: (exact angle, default orb degrees, nature)
-    "conjunction":(0,8,"fusion — energies merge, amplified, unified"),
-    "opposition":(180,8,"tension & awareness through the other; need for balance"),
-    "trine":(120,7,"natural flow, ease, talent, harmony — can be lazy"),
-    "square":(90,7,"friction, drive, growth forced through struggle"),
-    "sextile":(60,5,"opportunity, cooperation if acted on"),
+# Traditional per-planet orbs (Lilly, Christian Astrology Bk.1):
+# Saturn 9°, Jupiter 9°, Mars 7°, Sun 15°, Venus 7°, Mercury 7°, Moon 12°
+PLANET_ORBS = {
+    "Saturn": 9, "Jupiter": 9, "Mars": 7, "Sun": 15,
+    "Venus": 7, "Mercury": 7, "Moon": 12,
+    "Uranus": 5, "Neptune": 5, "Pluto": 4,  # modern additions (tight)
+    "North Node": 3, "South Node": 3,
+}
+# Average orb used when planet is not in table (fallback)
+DEFAULT_ORB = 8
+_PIH = None  # lazy-loaded planet-in-house readings (data/planet_in_house.json)
+
+ASPECTS = {  # name: (exact angle, default orb degrees, nature) — orbs per Woolfolk 2008
+    "conjunction":(0,10,"fusion — energies merge, amplified, unified"),
+    "opposition":(180,9,"tension & awareness through the other; need for balance"),
+    "trine":(120,9,"natural flow, ease, talent, harmony — can be lazy"),
+    "square":(90,9,"friction, drive, growth forced through struggle"),
+    "sextile":(60,6,"opportunity, cooperation if acted on"),
     "quincunx":(150,3,"awkward adjustment, unrelated energies needing constant tuning"),
-    # minor aspects (harmonic families)
+    # minor aspects (harmonic families) — Kepler/Morin, 2° orbs per Woolfolk
     "semisextile":(30,2,"subtle adjacency, gradual integration"),
     "semisquare":(45,2,"irritation, friction half-hidden"),
     "sesquiquadrate":(135,2,"internal tension demanding release"),
@@ -841,43 +853,110 @@ def _jd_to_dt(jd):
     from datetime import datetime, timedelta
     return datetime(2000, 1, 1) + timedelta(days=jd - 2451545.0)
 
+def vimsopaka_strength(jd):
+    """Vimsopaka strength (BPHS Ch.7 slokas 17-19): 20-point planetary strength
+    from varga occupancy. Shadvarga weights: Rasi 6, Hora 2, Decanate 4,
+    Navamsa 5, Dvadasamsa 2, Trimsamsa 1. A planet scores full weight when
+    in own sign in that varga, half in exaltation, zero otherwise."""
+    lons, _, _ = body_longitudes(jd)
+    ayan = ayanamsha_lahiri(jd)
+    weights = {"D1": 6, "D2": 2, "D3": 4, "D9": 5, "D12": 2, "D30": 1}
+    names = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn"]
+    out = {}
+    for nm in names:
+        sid = norm360(lons[nm] - ayan)
+        score = 0.0
+        for v, w in weights.items():
+            vc = varga_chart(jd, v)
+            v_sign = vc["planets"][nm]["sign"]
+            # own sign in varga → full; exaltation → half
+            if v_sign in DIGNITY.get(nm, {}).get("rule", []):
+                score += w
+            elif v_sign in DIGNITY.get(nm, {}).get("exalt", []):
+                score += w / 2.0
+        out[nm] = round(score, 1)
+    return {"scheme": "Shadvarga (Rasi 6, Hora 2, Decanate 4, Navamsa 5, Dvadasamsa 2, Trimsamsa 1)",
+            "strength_20": out,
+            "max": 20.0,
+            "note": "Vimsopaka per BPHS Ch.7 — 20-point scale. 13+ = strong, 10-13 = medium, <10 = weak."}
+
 def ashtakavarga(jd, lat, lng, time_known=True):
     """Bhinnashtakavarga (per-planet bindu counts) + Sarvashtakavarga.
-    Simplified standard table: each planet contributes bindus to signs
-    based on its own position + reference positions (7 classical planets)."""
+    Exact benefic-bindu tables from Phala Deepika Ch.23 (Mantreswara),
+    matching BPHS Ch.66. Each row = the planet whose chart it is; each
+    significator (Sun..Saturn, Lagna) contributes +1 bindu to the listed
+    houses counted from ITS OWN position. Standard totals: Sun 48, Moon 49,
+    Mars 39, Mercury 54, Jupiter 56, Venus 52, Saturn 39; Sarva 337."""
     lons, _, _ = body_longitudes(jd)
-    # Classic contribution table: which signs get +1 from each reference planet
-    # Keyed: reference planet → list of signs (0-11) where it adds a bindu
-    CONTRIB = {
-        "Sun":    [0, 2, 4, 6, 8, 11],       # Aries, Gemini, Leo, Libra, Sag, Pisces
-        "Moon":   [0, 1, 3, 5, 6, 8, 9, 10],
-        "Mars":   [0, 2, 4, 5, 8, 9, 11],
-        "Mercury":[0, 2, 4, 6, 8, 10],
-        "Jupiter":[0, 2, 5, 7, 9, 11],
-        "Venus":  [0, 1, 2, 3, 4, 5, 8, 9, 11],
-        "Saturn": [0, 1, 2, 4, 6, 9, 10, 11],
+    ayan = ayanamsha_lahiri(jd)
+    asc_lon = ascendant_mc(jd, lat, lng, ayan)[0] if time_known else norm360(lons["Sun"] - ayan)
+    positions = {}
+    for p in ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"]:
+        positions[p] = norm360(lons[p] - ayan)
+    positions["Lagna"] = norm360(asc_lon)
+
+    def _houses(sig_pos, from_pos):
+        """Houses from from_pos to each house occupied by sig_pos."""
+        return [int(((norm360(sig_pos - from_pos)) % 360) // 30) + 1]
+
+    # Benefic bindu tables (Phala Deepika Ch.23, verified totals)
+    BAV_TABLES = {
+        "Sun": {
+            "Sun": [1,2,4,7,8,9,10,11], "Moon": [3,6,10,11], "Mars": [1,2,4,7,8,9,10,11],
+            "Mercury": [6,9,10,11,12], "Jupiter": [5,6,9,11], "Venus": [6,7,12],
+            "Saturn": [1,2,4,7,8,9,10,11], "Lagna": [3,4,6,10,11,12],
+        },
+        "Moon": {
+            "Sun": [3,6,7,8,10,11], "Moon": [1,3,6,7,10,11], "Mars": [2,3,5,6,9,10,11],
+            "Mercury": [3,4,5,7,8,10,11], "Jupiter": [1,2,4,7,8,10,11], "Venus": [3,4,5,7,9,10,11],
+            "Saturn": [3,5,6,11], "Lagna": [3,6,10,11],
+        },
+        "Mars": {
+            "Sun": [3,5,6,10,11], "Moon": [3,6,11], "Mars": [1,2,4,7,8,10,11],
+            "Mercury": [3,5,6,11], "Jupiter": [6,8,11,12], "Venus": [6,8,11,12],
+            "Saturn": [1,4,7,8,9,10,11], "Lagna": [1,3,6,10,11],
+        },
+        "Mercury": {
+            "Sun": [5,6,9,11,12], "Moon": [2,4,6,8,10,11], "Mars": [1,2,4,7,8,9,10,11],
+            "Mercury": [1,3,5,6,7,10,11,12], "Jupiter": [6,8,11,12], "Venus": [1,2,3,4,5,8,9,11],
+            "Saturn": [1,2,4,7,8,9,10,11], "Lagna": [1,2,4,6,8,10,11],
+        },
+        "Jupiter": {
+            "Sun": [1,2,3,4,7,8,9,10,11], "Moon": [2,5,7,9,11], "Mars": [1,2,4,7,8,10,11],
+            "Mercury": [1,2,4,5,6,9,10,11], "Jupiter": [1,2,4,5,6,9,10,11], "Venus": [2,5,6,9,10,11],
+            "Saturn": [3,5,6,12], "Lagna": [1,2,4,5,6,7,9,10,11],
+        },
+        "Venus": {
+            "Sun": [8,11,12], "Moon": [1,2,3,4,5,8,9,11,12], "Mars": [3,4,6,9,11,12],
+            "Mercury": [3,5,6,9,11], "Jupiter": [5,8,9,10,11], "Venus": [1,2,3,4,5,8,9,10,11],
+            "Saturn": [3,4,5,8,9,10,11], "Lagna": [2,3,4,5,8,9,11],
+        },
+        "Saturn": {
+            "Sun": [1,2,4,7,8,10,11], "Moon": [3,6,11], "Mars": [3,5,6,10,11,12],
+            "Mercury": [6,8,9,10,11,12], "Jupiter": [5,6,11,12], "Venus": [6,11,12],
+            "Saturn": [3,5,6,11], "Lagna": [1,3,4,6,10,11],
+        },
     }
-    planets = ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"]
+
     bhinnas = {}
-    sarva = [0]*12
-    for p in planets:
-        lon = lons.get(p, 0)
-        sign_idx = int(norm360(lon) // 30)
+    for p in BAV_TABLES:
         counts = [0]*12
-        for ref_p in planets:
-            ref_lon = lons.get(ref_p, 0)
-            ref_sign = int(norm360(ref_lon) // 30)
-            # each reference planet adds bindus to its OWN signs (simplified)
-            for s in CONTRIB[ref_p]:
-                counts[s] += 1
-        # plus the planet's own position signs
-        for s in CONTRIB[p]:
-            counts[s] += 1
+        for sig, houses in BAV_TABLES[p].items():
+            sig_pos = positions[sig]
+            # Each house h in the list is counted FROM the significator's own
+            # position (Phala Deepika: "from the Sun 8" = Sun places bindus in
+            # 8 houses measured from itself); map to the corresponding house of P.
+            for h in houses:
+                abs_lon = norm360(sig_pos + (h - 1) * 30.0)
+                house_in_p = int(((abs_lon - positions[p]) % 360) // 30)
+                counts[house_in_p] += 1
         bhinnas[p] = counts
-        sarva = [a + b for a, b in zip(sarva, counts)]
+    sarva = [0]*12
+    for p in BAV_TABLES:
+        sarva = [a + b for a, b in zip(sarva, bhinnas[p])]
     return {"bhinnashtakavarga": {p: counts for p, counts in bhinnas.items()},
             "sarvashtakavarga": sarva,
-            "note": "simplified bindu contributions — classical tables per Parashara"}
+            "note": "Benefic bindu tables from Phala Deepika Ch.23 / BPHS Ch.66. Standard totals: Sun 48, Moon 49, Mars 39, Mercury 54, Jupiter 56, Venus 52, Saturn 39 (Sarva 337)."}
 
 def void_of_course_moon(jd, lat, lng, time_known=True):
     """Void-of-course Moon: Moon makes no major aspect to any planet
@@ -1112,8 +1191,28 @@ def _planet_block(lons, speed, asc_lon, names, ayan=0.0, vedic=False, cusps=None
         else:
             block["archetype"] = PLANET_ARCHETYPES.get(nm,"")
             block["dignity"] = dignity_western(nm, sign, deg)
+            block["in_house_reading"] = _planet_in_house_reading(nm, house)
         out[nm] = block
     return out
+
+def _planet_in_house_reading(planet, house):
+    """Interpretive text for a planet in a house (Woolfolk 2008, 120 readings)."""
+    global _PIH
+    if _PIH is None:
+        _PIH = {}
+        try:
+            import json as _json, os as _os
+            _p = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                               "..", "data", "planet_in_house.json")
+            with open(_p) as _f:
+                _PIH = _json.load(_f)
+        except Exception:
+            _PIH = {}
+    key = {1:"FIRST",2:"SECOND",3:"THIRD",4:"FOURTH",5:"FIFTH",6:"SIXTH",
+           7:"SEVENTH",8:"EIGHTH",9:"NINTH",10:"TENTH",11:"ELEVENTH",12:"TWELFTH"}.get(house)
+    if key:
+        return _PIH.get(key, {}).get(planet.upper(), "")
+    return ""
 
 def _vedic_name(nm):
     return {"North Node":"Rahu","South Node":"Ketu"}.get(nm, nm)
@@ -1189,8 +1288,13 @@ def compute_aspects(lons, ayan=0.0, bodies=None):
             a,b = keys[i],keys[j]
             sep = abs(norm180(L[a]-L[b]))
             for asp,(ang,orb,desc) in ASPECTS.items():
+                # per-planet orb: average of the two planets' traditional orbs,
+                # clamped to the aspect's default orb (Lilly system)
+                oa = PLANET_ORBS.get(a, DEFAULT_ORB)
+                ob = PLANET_ORBS.get(b, DEFAULT_ORB)
+                eff_orb = min((oa+ob)/2.0, orb)
                 d = abs(sep-ang)
-                if d <= orb:
+                if d <= eff_orb:
                     res.append({"a":a,"b":b,"aspect":asp,"orb":round(d,2),
                                 "exact_sep":round(sep,2),"meaning":desc,
                                 "applying": None})
@@ -2753,8 +2857,13 @@ def kaalsarpa_dosha(jd, lat, lng, time_known=True):
 # ═════════════════════════════════════════════════════════════════════════════
 
 def varga_chart(jd, varga, lat=0, lng=0, time_known=True):
-    """Compute a Vedic divisional chart (Varga).
-    D2=Hora (wealth), D3=Drekkana (siblings), D10=Dasamsa (career), D12=Dwadashamsa (parents)."""
+    """Compute a Vedic divisional chart (Varga) per Phala Deepika Ch.3 / BPHS.
+    Each varga has its own classical rule (odd/even sign dependent):
+    D2 Hora: Sun/Moon halves; D3 Drekkana: sign, 5th, 9th lords;
+    D7 Saptamsa: self/7th; D9 Navamsa: Aries/Capricorn/Libra/Cancer start;
+    D10 Dasamsa: self/9th; D12 Dwadasamsa: from sign; D30 Trimsamsa:
+    Mars 5° Saturn 5° Jupiter 8° Mercury 7° Venus 5° (odd, reversed even);
+    D60 Shashtiamsa: Krura/Saumya pattern."""
     lons, _, backend = body_longitudes(jd)
     ayan = ayanamsha_lahiri(jd)
     if time_known:
@@ -2763,6 +2872,7 @@ def varga_chart(jd, varga, lat=0, lng=0, time_known=True):
         asc_lon = norm360(lons["Sun"] - ayan)
 
     varga_info = {
+        "D1":  {"divisions": 1,  "name": "Rasi", "meaning": "The natal chart itself"},
         "D2":  {"divisions": 2,  "name": "Hora", "meaning": "Wealth, resources, financial patterns"},
         "D3":  {"divisions": 3,  "name": "Drekkana", "meaning": "Siblings, courage, self-effort"},
         "D4":  {"divisions": 4,  "name": "Chaturthamsa", "meaning": "Property, fixed assets, fortune"},
@@ -2788,38 +2898,131 @@ def varga_chart(jd, varga, lat=0, lng=0, time_known=True):
         return {"error": f"Varga {v} not supported. Available: {list(varga_info.keys())}"}
     info = varga_info[v]
     d = info["divisions"]
-    pada_arc = 30.0 / d
-    elements = ["Fire", "Earth", "Air", "Water"]
-    element_starts = {"Fire": "Aries", "Earth": "Capricorn", "Air": "Libra", "Water": "Cancer"}
-    sign_idx_map = {s: i for i, s in enumerate(SIGNS)}
+
+    def _varga_sign(sid_lon):
+        """Return varga sign index per classical rule for this varga."""
+        sign_idx = int(sid_lon // 30)
+        deg_in_sign = sid_lon % 30
+        odd = (sign_idx % 2 == 0)  # Aries(0) odd, Taurus(1) even...
+        if v == "D1":
+            return sign_idx
+        if v == "D2":
+            # Hora: odd sign → first half Sun, second Moon; even → reversed
+            half = 0 if deg_in_sign < 15 else 1
+            if odd:
+                return (sign_idx // 2) * 2 + (0 if half == 0 else 1)
+            else:
+                return (sign_idx // 2) * 2 + (1 if half == 0 else 0)
+        if v == "D3":
+            # Drekkana: 1st → sign, 2nd → 5th from sign, 3rd → 9th from sign
+            drek = int(deg_in_sign // 10)
+            offset = [0, 4, 8][drek]
+            return (sign_idx + offset) % 12
+        if v == "D9":
+            # Navamsa: starts Aries/Capricorn/Libra/Cancer from Aries onward
+            start_map = {0: 0, 1: 9, 2: 6, 3: 3}  # sign%4 → base sign idx
+            nav = int(deg_in_sign // (30 / 9))
+            base = start_map[sign_idx % 4]
+            return (base + nav) % 12
+        if v == "D7":
+            # Saptamsa: odd → from sign, even → from 7th
+            sap = int(deg_in_sign // (30 / 7))
+            start = sign_idx if odd else (sign_idx + 6) % 12
+            return (start + sap) % 12
+        if v == "D10":
+            # Dasamsa: odd → from sign, even → from 9th
+            das = int(deg_in_sign // 3)
+            start = sign_idx if odd else (sign_idx + 8) % 12
+            return (start + das) % 12
+        if v == "D12":
+            # Dwadasamsa: counted from the sign itself
+            dwa = int(deg_in_sign // 2.5)
+            return (sign_idx + dwa) % 12
+        if v == "D4":
+            # Chaturthamsa (BPHS 9): 1st→sign, 2nd→4th, 3rd→7th, 4th→10th
+            chat = int(deg_in_sign // 7.5)
+            return (sign_idx + [0, 3, 6, 9][chat]) % 12
+        if v == "D40":
+            # Chatvarimsamsa (BPHS 29-30): odd→Aries, even→Libra
+            khav = int(deg_in_sign // 0.75)
+            base = 0 if odd else 6
+            return (base + khav) % 12
+        if v == "D45":
+            # Akshavedamsa (BPHS 31-32): odd→Aries, even→Libra
+            aksh = int(deg_in_sign // (30.0 / 45))
+            base = 0 if odd else 6
+            return (base + aksh) % 12
+        if v in ("D27",):
+            # Bhamsa (BPHS 26-27): counted from Aries, Cancer or Libra
+            # for odd/fixed/dual respectively (nakshatra-based)
+            bham = int(deg_in_sign // (30.0 / 27))
+            if sign_idx % 3 == 0: base = 0   # movable → Aries
+            elif sign_idx % 3 == 1: base = 3 # fixed → Cancer
+            else: base = 6                   # dual → Libra
+            return (base + bham) % 12
+        if v == "D30":
+            # Trimsamsa: odd → Mars 5, Saturn 5, Jupiter 8, Mercury 7, Venus 5;
+            # even → reversed (Venus 5, Mercury 7, Jupiter 8, Saturn 5, Mars 5)
+            if odd:
+                seq = [("Mars",5),("Saturn",5),("Jupiter",8),("Mercury",7),("Venus",5)]
+            else:
+                seq = [("Venus",5),("Mercury",7),("Jupiter",8),("Saturn",5),("Mars",5)]
+            acc = 0
+            for ruler, span in seq:
+                if deg_in_sign < acc + span:
+                    ruler_idx = {"Mars":0,"Saturn":5,"Jupiter":6,"Mercury":2,"Venus":3}[ruler]
+                    return ruler_idx
+                acc += span
+            return 0
+        if v == "D60":
+            # Shashtiamsa (BPHS 33-41): degrees ×2, divide by 12, remainder+1 = sign
+            deg_trav = sid_lon % 30
+            sh = int((deg_trav * 2) // 12)
+            return (sh + 1) % 12
+        if v in ("D16", "D20", "D24"):
+            # BPHS: movable → Aries, fixed → Leo(16)/Sagittarius(20), dual → Sag(16)/Leo(20)
+            # D16: movable→Aries, fixed→Leo, dual→Sagittarius
+            # D20: movable→Aries, fixed→Sagittarius, dual→Leo
+            # D24 (Siddhamsa): odd→Leo, even→Cancer
+            if v == "D24":
+                return (4 if odd else 3 + 0) % 12  # Leo for odd, Cancer for even
+            starts = {16: [0, 4, 8], 20: [0, 8, 4]}  # [movable, fixed, dual]
+            if sign_idx % 3 == 0:  # movable: Aries, Cancer, Libra, Capricorn
+                base = starts[v][0]
+            elif sign_idx % 3 == 1:  # fixed: Taurus, Leo, Scorpio, Aquarius
+                base = starts[v][1]
+            else:  # dual
+                base = starts[v][2]
+            part = int(deg_in_sign // (30.0 / d))
+            return (base + part) % 12
+        # Generic element-based fallback for other vargas
+        elements = ["Fire", "Earth", "Air", "Water"]
+        element_starts = {"Fire": "Aries", "Earth": "Capricorn", "Air": "Libra", "Water": "Cancer"}
+        sign_idx_map = {s: i for i, s in enumerate(SIGNS)}
+        pada_arc = 30.0 / d
+        pada = int(deg_in_sign / pada_arc)
+        elem_idx = sign_idx % 4
+        elem = elements[elem_idx]
+        base_sign_idx = sign_idx_map[element_starts[elem]]
+        return (base_sign_idx + pada) % 12
 
     varga_lons = {}
     names = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn","North Node","South Node"]
     for nm in names:
         sid_lon = norm360(lons[nm] - ayan)
-        sign_idx = int(sid_lon // 30)
+        v_sign_idx = _varga_sign(sid_lon)
         deg_in_sign = sid_lon % 30
-        pada = int(deg_in_sign / pada_arc)
-        elem_idx = sign_idx % 4
-        elem = elements[elem_idx]
-        base_sign_idx = sign_idx_map[element_starts[elem]]
-        varga_sign_idx = (base_sign_idx + pada) % 12
-        varga_lon = varga_sign_idx * 30 + (deg_in_sign % pada_arc)
-        sign = SIGNS[varga_sign_idx]
-        varga_lons[nm] = {"longitude": round(varga_lon, 3), "sign": sign,
+        pada_arc = 30.0 / d
+        varga_lon = v_sign_idx * 30 + (deg_in_sign % pada_arc)
+        varga_lons[nm] = {"longitude": round(varga_lon, 3), "sign": SIGNS[v_sign_idx],
                           "degree_in_sign": round(deg_in_sign % pada_arc, 2)}
 
-    asc_pada = int((asc_lon % 30) / pada_arc)
-    asc_elem_idx = int(asc_lon // 30) % 4
-    asc_elem = elements[asc_elem_idx]
-    asc_base = sign_idx_map[element_starts[asc_elem]]
-    varga_asc_idx = (asc_base + asc_pada) % 12
-    varga_asc_sign = SIGNS[varga_asc_idx]
+    v_asc = _varga_sign(asc_lon)
 
     return {"system": f"Varga {v} ({info['name']})",
             "note": info["meaning"],
             "varga": v, "divisions": d,
-            "varga_lagna": varga_asc_sign,
+            "varga_lagna": SIGNS[v_asc],
             "planets": varga_lons,
             "backend": backend}
 
@@ -3523,6 +3726,10 @@ def calculate_full_profile(data):
 
     if mode=="ashtakavarga":
         result["ashtakavarga"] = ashtakavarga(jd, lat, lng, time_known)
+        return result
+
+    if mode=="vimsopaka":
+        result["vimsopaka"] = vimsopaka_strength(jd)
         return result
 
     if mode=="void_of_course":

@@ -154,7 +154,8 @@ python3 "${SKILL_DIR%%/SKILL.md}/scripts/daily-astrology-fetch.py"
 | **`Ashtottari`** | — | 108-year alternative dasha |
 | **`Tajika`** | — | Vedic annual (solar return) horoscope |
 | **`Muhurta`** | `activity`, `days_ahead` | Panchang-based electional timing |
-| **`Shadbala`** | — | Planetary strength (Sthana + Dig) |
+| **`Shadbala`** | — | Planetary strength (Sthana + Dig + Kala; BPHS weights) |
+| **`Vimsopaka`** | — | BPHS Ch.7 shadvarga/saptavarga strength (20-point scale) |
 
 | Mode | Extra params | What it does |
 

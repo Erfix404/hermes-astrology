@@ -517,6 +517,49 @@ class TestNewFeatures(unittest.TestCase):
         self.assertIn("shadbala", r)
         self.assertIn("sthana_bala", r["shadbala"])
 
+    def test_oprah_winfrey_chart(self):
+        """Validation against The Only Astrology Book You'll Ever Need (Woolfolk 2008),
+        page 337 — Oprah Winfrey, Jan 29 1954, 4:30am CST, Kosciusko MS."""
+        r = ae.calculate_full_profile({
+            'year':1954,'month':1,'day':29,'hour':4,'minute':30,
+            'lat':33.05,'lng':-89.58,'tz':'America/Chicago',
+            'systems':['western'],'time_known':True
+        })
+        w = r['charts']['western']
+        self.assertEqual(w['ascendant']['sign'], 'Sagittarius')
+        self.assertLess(abs(w['ascendant']['deg_in_sign'] - 29.7), 1.0)
+        expected = {
+            'Sun': ('Aquarius', 2), 'Moon': ('Sagittarius', 11),
+            'Mercury': ('Aquarius', 2), 'Venus': ('Aquarius', 2),
+            'Mars': ('Scorpio', 11), 'Jupiter': ('Gemini', 6),
+            'Saturn': ('Scorpio', 10), 'Uranus': ('Cancer', 7),
+            'Neptune': ('Libra', 10), 'Pluto': ('Leo', 8),
+        }
+        for p, (sign, house) in expected.items():
+            planet = w['planets'][p]
+            self.assertEqual(planet['sign'], sign, f"{p} sign")
+            self.assertEqual(planet['house'], house, f"{p} house")
+
+    def test_planet_in_house_readings(self):
+        """120 interpretive readings (Woolfolk 2008) load from data/planet_in_house.json."""
+        import json, os
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "..", "data", "planet_in_house.json")
+        self.assertTrue(os.path.exists(p), "planet_in_house.json missing")
+        with open(p) as f:
+            d = json.load(f)
+        self.assertEqual(len(d), 12)
+        for house in d.values():
+            self.assertEqual(len(house), 10)
+        r = ae.calculate_full_profile({
+            'year':1995,'month':4,'day':15,'hour':14,'minute':30,
+            'lat':35.6892,'lng':51.3890,'tz':'Asia/Tehran',
+            'systems':['western'],'time_known':True
+        })
+        sun = r['charts']['western']['planets']['Sun']
+        self.assertTrue(sun.get('in_house_reading', ""), "Sun reading empty")
+        self.assertGreater(len(sun['in_house_reading']), 40)
+
     def test_dignity_with_degree(self):
         # Jupiter in Leo 5° — triplicity night ruler + Jupiter term (0-6)
         d = ae.dignity_western("Jupiter", "Leo", 5)

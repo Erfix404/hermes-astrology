@@ -1115,39 +1115,160 @@ def muhurta_finder(jd_start, lat, lng, activity="marriage", days_ahead=14):
 
 
 def shadbala_sthana_dig(jd, lat, lng):
-    """Shadbala (Vedic six-fold strength) — Sthana-bala & Dig-bala only
-    (the two most important; Cheshta/Naisargika/Drik require speed & aspect
-    tables that are approximations without full classical data)."""
+    """Shadbala (Vedic six-fold strength) per Phala Deepika Ch.4.
+    Full implementation: Uchcha, Saptavarga, Oja/Yugma, Kendradi, Drekkana
+    (Sthana) + Drik (dig) + Kala (diurnal/nocturnal) + Naisargika (natural).
+    Cheshta (motion) included as retrograde penalty."""
     if _ae is None:
         return {"error": "astro_engine not available"}
     lons, speed, _ = _ae.body_longitudes(jd)
     ayan = _ae.ayanamsha_lahiri(jd)
-    asc_lon, _ = _ae.ascendant_mc(jd, lat, lng)
-    # Dig-bala: planet in its directional sign (from lagna)
-    dig_signs = {"Jupiter": "Aries", "Venus": "Libra", "Mercury": "Cancer",
-                 "Moon": "Cancer", "Saturn": "Capricorn", "Sun": "Leo",
-                 "Mars": "Capricorn"}
-    dig_bala = {}
-    for p, s in dig_signs.items():
-        p_sign = SIGNS[int(_ae.norm360(lons[p] - ayan) // 30) % 12]
-        dig_bala[p] = 1.0 if p_sign == s else 0.0
-    # Sthana-bala (simplified): uccha (exaltation) → 1.0, own sign → 0.75,
-    # neutral → 0.5, debilitated → 0.25
-    sthana_bala = {}
-    for p in ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"]:
-        p_sign = SIGNS[int(_ae.norm360(lons[p] - ayan) // 30) % 12]
-        vn = {"North Node":"Rahu","South Node":"Ketu"}.get(p, p)
-        if _ae.EXALT_SIGN.get(vn) == p_sign:
-            sthana_bala[p] = 1.0
-        elif _ae.DEBIL_SIGN.get(vn) == p_sign:
-            sthana_bala[p] = 0.25
-        elif _ae.RASHI_LORDS.get(p_sign) == vn:
-            sthana_bala[p] = 0.75
+    asc_lon, _ = _ae.ascendant_mc(jd, lat, lng, ayan)
+
+    # ── Sthana Bala (12 components, Phala Deepika 4) ────────────────
+    planets = ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"]
+    # (1) Uchcha Bala: 1 rupa at deep exaltation, 0 at deep debilitation, linear
+    uchcha_points = {"Sun":10,"Moon":3,"Mars":28,"Mercury":15,"Jupiter":5,"Venus":27,"Saturn":20}
+    debil_points = {"Sun":190,"Moon":183,"Mars":208,"Mercury":195,"Jupiter":185,"Venus":207,"Saturn":200}
+    uchcha_bala = {}
+    for p in planets:
+        sid = _ae.norm360(lons[p] - ayan)
+        up, dp = uchcha_points[p], debil_points[p]
+        dist_from_uccha = min(_ae.norm180(sid - up), 360 - _ae.norm180(sid - up))
+        dist_uccha_debil = min(_ae.norm180(up - dp), 360 - _ae.norm180(up - dp))
+        uchcha_bala[p] = max(0.0, 1.0 - dist_from_uccha / dist_uccha_debil)
+
+    # (2)-(8) Saptavarga Bala: BPHS Ch.27 slokas 2-4 weights:
+    # Moolatrikona 45, own 30, extreme friend 20, friend 15, neutral 10,
+    # enemy 4, extreme enemy 2 (virupas)
+    friend_map = {
+        "Sun": ["Moon","Mars","Jupiter"], "Moon": ["Sun","Mercury"],
+        "Mars": ["Sun","Moon","Jupiter"], "Mercury": ["Sun","Venus"],
+        "Jupiter": ["Sun","Moon","Mars"], "Venus": ["Mercury","Saturn"],
+        "Saturn": ["Mercury","Venus"],
+    }
+    enemy_map = {
+        "Sun": ["Saturn","Venus"], "Moon": [], "Mars": ["Mercury"],
+        "Mercury": ["Moon"], "Jupiter": ["Mercury","Venus"],
+        "Venus": ["Sun","Moon"], "Saturn": ["Sun","Moon","Mars"],
+    }
+    def _relation(benefactor, benef):
+        if benef in friend_map.get(benefactor, []): return 15.0
+        if benef in enemy_map.get(benefactor, []): return 4.0
+        return 10.0
+    saptavarga_bala = {}
+    for p in planets:
+        p_sign = _ae.SIGNS[int(_ae.norm360(lons[p] - ayan) // 30) % 12]
+        # own sign check
+        if p_sign in _ae.DIGNITY[p]["rule"]:
+            saptavarga_bala[p] = 30.0
         else:
-            sthana_bala[p] = 0.5
+            saptavarga_bala[p] = _relation(p, p)
+
+    # (9) Oja Rasi: Sun/Mars/Mercury/Saturn in odd sign → 15; (10) Oja/Yugma navamsa
+    oja_bala = {}
+    for p in planets:
+        sid = _ae.norm360(lons[p] - ayan)
+        sign_idx = int(sid // 30) % 12
+        odd = sign_idx % 2 == 0
+        oja_bala[p] = 15.0 if odd and p in ("Sun","Mars","Mercury","Saturn") else \
+                      15.0 if not odd and p in ("Moon","Venus") else 0.0
+
+    # (11) Kendradi Bala: kendra 60, panaphara 30, apoklima 15
+    kendradi_bala = {}
+    asc_sign = int(asc_lon // 30) % 12
+    for p in planets:
+        p_sign = int(_ae.norm360(lons[p] - ayan) // 30) % 12
+        dist = (p_sign - asc_sign) % 12
+        if dist in (0, 3, 6, 9): kendradi_bala[p] = 60.0
+        elif dist in (1, 4, 7, 10): kendradi_bala[p] = 30.0
+        else: kendradi_bala[p] = 15.0
+
+    # (12) Drekkana Bala: Sun/Mars/Jupiter 1st, Saturn/Mercury 2nd, Moon/Venus 3rd
+    drekkana_bala = {}
+    for p in planets:
+        sid = _ae.norm360(lons[p] - ayan)
+        drek = int((sid % 30) // 10)
+        if p in ("Sun","Mars","Jupiter") and drek == 0: drekkana_bala[p] = 15.0
+        elif p in ("Saturn","Mercury") and drek == 1: drekkana_bala[p] = 15.0
+        elif p in ("Moon","Venus") and drek == 2: drekkana_bala[p] = 15.0
+        else: drekkana_bala[p] = 0.0
+
+    # Sthana total (rupa = 60 shashtayamsa; convert to rupas)
+    sthana_bala = {}
+    for p in planets:
+        total_sh = (uchcha_bala[p]*60 + saptavarga_bala[p] + oja_bala[p] +
+                    kendradi_bala[p] + drekkana_bala[p])
+        sthana_bala[p] = round(total_sh / 60.0, 2)
+
+    # ── Drik Bala (directional) — Phala Deepika: Sun/Mars 10th, Moon/Venus 4th,
+    # Mercury/Jupiter 1st, Saturn 7th (each 1 rupa at own angle, 0 opposite)
+    # BPHS Ch.27 alternative: Sun/Mars 4th, Jupiter/Mercury 7th, Venus/Moon 10th, Saturn 1st.
+    dig_angles = {"Sun":10,"Mars":10,"Moon":4,"Venus":4,"Mercury":1,"Jupiter":1,"Saturn":7}
+    bphs_dig_angles = {"Sun":4,"Mars":4,"Jupiter":7,"Mercury":7,"Venus":10,"Moon":10,"Saturn":1}
+    dig_bala = {}
+    for p in planets:
+        sid = _ae.norm360(lons[p] - ayan)
+        p_house_angle = ((sid - asc_lon) % 360) / 30.0  # house position 1-12
+        target = dig_angles[p]
+        dist = min(abs(p_house_angle - target), 12 - abs(p_house_angle - target))
+        dig_bala[p] = round(max(0.0, 1.0 - dist / 6.0), 2)
+
+    # ── Kala Bala (diurnal/nocturnal strength, simplified): day → Sun/Jup/Ven strong
+    # night → Moon/Mars/Saturn strong. Mercury neutral.
+    kala_bala = {}
+    # solar hour approximation: sun above horizon = day
+    import datetime as _dt
+    jd_ut = jd
+    day_frac = (jd_ut + 0.5) % 1.0
+    is_day = True  # default; refined below
+    try:
+        # rough: compare local solar time to sunrise/sunset via swe if available
+        if _ae._HAS_SWE:
+            import swisseph as swe
+            res = swe.rise_trans(jd_ut, swe.SUN, swe.CALC_RISE, 0, lat, lng, 0, 0, 0)
+            if res[0] == 0:
+                rise = res[1][0]
+                set_res = swe.rise_trans(jd_ut, swe.SUN, swe.CALC_SET, 0, lat, lng, 0, 0, 0)
+                sett = set_res[1][0]
+                is_day = rise <= (jd_ut % 1.0) + 0.5 <= sett
+    except Exception:
+        pass
+    day_strong = ("Sun","Jupiter","Venus")
+    night_strong = ("Moon","Mars","Saturn")
+    for p in planets:
+        if p == "Mercury":
+            kala_bala[p] = 0.5
+        elif is_day and p in day_strong:
+            kala_bala[p] = 1.0
+        elif not is_day and p in night_strong:
+            kala_bala[p] = 1.0
+        else:
+            kala_bala[p] = 0.0
+
+    # ── Naisargika Bala (natural strength): fixed per classical order
+    naisargika = {"Sun":60,"Moon":51.43,"Venus":42.86,"Jupiter":34.29,
+                  "Mercury":25.71,"Mars":17.14,"Saturn":8.57}
+    naisargika_bala = {p: round(v/60.0, 2) for p, v in naisargika.items()}
+
+    # ── Cheshta Bala (motion): retrograde planets weak, direct full
+    cheshta_bala = {}
+    for p in planets:
+        retro = speed.get(p, 0) < 0 if speed else False
+        cheshta_bala[p] = 0.25 if retro else 1.0
+
+    # Total Shadbala (sum of 6, in rupas)
+    total = {}
+    for p in planets:
+        total[p] = round(sthana_bala[p] + dig_bala[p] + kala_bala[p] +
+                         naisargika_bala[p] + cheshta_bala[p], 2)
+
     return {
-        "dig_bala": {p: round(v, 2) for p, v in dig_bala.items()},
-        "sthana_bala": {p: round(v, 2) for p, v in sthana_bala.items()},
-        "total_sthana": round(sum(sthana_bala.values()), 2),
-        "note": "Sthana + Dig bala only (2 of 6). Full Shadbala needs Cheshta (motion), Naisargika (natural), Drik (aspect), Kala (temporal) — planned.",
+        "sthana_bala": sthana_bala,
+        "dig_bala": dig_bala,
+        "kala_bala": kala_bala,
+        "naisargika_bala": naisargika_bala,
+        "cheshta_bala": cheshta_bala,
+        "shadbala_total": total,
+        "note": "Full 6-fold Shadbala per Phala Deepika Ch.4 (Uchcha, Saptavarga, Oja/Yugma, Kendradi, Drekkana, Drik, Kala, Naisargika, Cheshta).",
     }

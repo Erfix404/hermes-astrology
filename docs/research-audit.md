@@ -247,3 +247,32 @@ Present (Part of Fortune day/night correct). Add Part of Spirit, Part of Marriag
 - Aspect list vs Wikipedia: **6/12+**
 - Upagraha list vs Wikipedia: **0/9**
 - Dasha systems vs standard Vedic: **1/3+**
+
+
+---
+
+## Book-Wave Verification (2026-08-01)
+
+Primary sources extracted and cross-verified against engine:
+
+| Source | Edition | What it verified/fixed |
+|--------|---------|----------------------|
+| **The Only Astrology Book You'll Ever Need** (Woolfolk 2008, 549pp) | PDF+text | Aspect orbs: Conj 10, Opp 9, Tri 9, Sqr 9, Sex 6, minors 2; Oprah chart p.337 **11/11 match**; 120 planet-in-house readings to data/planet_in_house.json |
+| **Phala Deepika** (Mantreswara/Kapoor, 265pp) | PDF+text | Varga rules Ch.3 (per-varga classical, was single-formula bug); Shadbala Ch.4 (Sthana 5-part + Dig + Kala); **Ashtakavarga Ch.23 benefic bindu tables** (Sun 48, Moon 49, Mars 39, Mercury 54, Jupiter 56, Venus 52, Saturn 39, Sarva 337) |
+| **BPHS Vol 1** (Santhanam, 482pp) | IA PDF+text | 16 Vargas Ch.6 (D4/D16/D40/D45/D60 added); Vimsopaka Ch.7 Shadvarga weights (6/2/4/5/2/1=20); Shadbala Ch.27: Saptavarga weights (45/30/20/15/10/4/2), Kendradi (60/30/15), Ojhayugma 15; Digbala alternative (Sun/Mars to 4th) |
+| **BPHS Vol 2** (Santhanam, 552pp) | IA PDF+text | Ashtakavarga Ch.66 Karanaprada (cross-ref, malefic-dot semantics - superseded by Phala Deepika benefic tables) |
+| **Christian Astrology** (Lilly, retyped 1.1M chars) | skyscript PDF+text | Per-planet orbs: Sat 9, Jup 9, Mar 7, Sun 15, Ven 7, Mer 7, Moo 12 to PLANET_ORBS; Egyptian terms verified (exact); essential dignities verified; triplicity day/night rulers verified |
+| **Aspects (Tompkins)** | 14pp summary only | Orb conventions consistent with Woolfolk; full book unavailable (IA borrow-only) |
+
+### Engine changes from book wave
+- ASPECTS orbs to Woolfolk (was tight 8/8/7/7/5)
+- PLANET_ORBS + mean-of-two-planets orb rule to Lilly
+- varga_chart to classical per-varga rules (Phala Deepika Ch.3 + BPHS Ch.6)
+- vimsopaka_strength + vimsopaka mode to BPHS Ch.7
+- ashtakavarga to Phala Deepika Ch.23 benefic tables (bhinnas totals ~ 48/49/39/54/56/52/39)
+- shadbala full Sthana (Uchcha+Saptavarga+Ojhayugma+Kendradi+Drekkana) + Dig + Kala; BPHS Saptavarga weights 45/30/20/15/10/4/2
+- data/planet_in_house.json to 120 Woolfolk readings, in_house_reading per planet
+
+### Gaps remaining (blocked sources)
+- Full Sue Tompkins Aspects (IA CDL), Parker''s Astrology (dokumen.pub queue/captcha), Light on Life (yandex blocked), Astrologer''s Handbook (pdfcoffee recaptcha), Arroyo Astrology Karma (IA CDL)
+- Cheshta/Naisargika/Drik bala full formal tables still partial
