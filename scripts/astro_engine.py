@@ -697,7 +697,7 @@ def longitudes_swe(jd):
     out = {}
     speed = {}
     for name, pid in ids.items():
-        res = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SPEED)[0]
+        res = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS)[0]
         out[name] = res[0] % 360.0
         speed[name] = res[3]
     out["South Node"] = (out["North Node"]+180) % 360.0
@@ -731,7 +731,7 @@ def body_declinations(jd):
                    "Neptune":swe.NEPTUNE,"Pluto":swe.PLUTO,"North Node":swe.TRUE_NODE,
                    "Chiron":swe.CHIRON}
             for name, pid in ids.items():
-                res = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SPEED)
+                res = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS)
                 # pyswisseph 2.10.x: res[0] is a 6-tuple (lon, lat, dist, ...)
                 out[name] = res[0][1]  # ecliptic latitude
             out["South Node"] = -out["North Node"]
@@ -785,7 +785,7 @@ def station_dates(jd_start, jd_end, planet="Mercury", step=0.5):
     prev_lon = None
     t = jd_start
     while t < jd_end:
-        res = swe.calc_ut(t, pid, swe.FLG_SWIEPH | swe.FLG_SPEED)
+        res = swe.calc_ut(t, pid, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS)
         speed = res[0][3]
         lon = res[0][0] % 360
         if prev_speed is not None and (prev_speed * speed < 0 or abs(speed) < 0.0001):

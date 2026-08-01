@@ -29,7 +29,7 @@ allowed-tools: Bash(python3 *)
 argument-hint: "[birth details, or a question like 'am I compatible with…']"
 metadata:
   author: Erfix404
-  version: "2.5.0"
+  version: "2.7.0"
   category: divination
 ---
 
