@@ -733,7 +733,10 @@ def body_declinations(jd):
             for name, pid in ids.items():
                 res = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS)
                 # pyswisseph 2.10.x: res[0] is a 6-tuple (lon, lat, dist, ...)
-                out[name] = res[0][1]  # ecliptic latitude
+                lon, lat = res[0][0], res[0][1]
+                # declination from ecliptic lon/lat (NOT ecliptic latitude — that's
+                # distance from the ecliptic plane; declination is from the equator)
+                out[name] = _asin(_sin(lat) * _cos(eps) + _cos(lat) * _sin(eps) * _sin(lon))
             out["South Node"] = -out["North Node"]
             return out
         except Exception:

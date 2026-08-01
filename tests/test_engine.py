@@ -422,7 +422,11 @@ class TestNewFeatures(unittest.TestCase):
     def test_declinations(self):
         decls = ae.body_declinations(self.jd)
         self.assertIn("Sun", decls)
-        self.assertLess(abs(decls["Sun"]), 1.0)  # Sun near ecliptic
+        # Sun mid-April sits ~+9.7° declination (not ecliptic latitude ≈ 0).
+        # This guards the SWE branch against returning ecliptic latitude
+        # instead of true declination (regression from the old res[0][1] bug).
+        self.assertGreater(abs(decls["Sun"]), 5.0)
+        self.assertLess(abs(decls["Sun"]), 12.0)
 
     def test_declination_aspects(self):
         lons, _, _ = ae.body_longitudes(self.jd)
@@ -517,6 +521,7 @@ class TestNewFeatures(unittest.TestCase):
         self.assertIn("shadbala", r)
         self.assertIn("sthana_bala", r["shadbala"])
 
+    @unittest.skipUnless(ae._HAS_SWE, "house numbers are Placidus (Woolfolk); builtin uses whole-sign")
     def test_oprah_winfrey_chart(self):
         """Validation against The Only Astrology Book You'll Ever Need (Woolfolk 2008),
         page 337 — Oprah Winfrey, Jan 29 1954, 4:30am CST, Kosciusko MS."""
@@ -571,6 +576,48 @@ class TestNewFeatures(unittest.TestCase):
 
     def test_aspects_table_expanded(self):
         self.assertGreaterEqual(len(ae.ASPECTS), 12)
+
+
+class TestJPLValidation(unittest.TestCase):
+    """Cross-check engine positions against NASA JPL Horizons reference values.
+
+    Reference: apparent geocentric ecliptic longitudes (IAU76/80 of-date),
+    2026-08-01 08:30 UTC — fetched from ssd.jpl.nasa.gov (DE441).
+    Tolerance 0.35° (1260″) — this validates the *whole pipeline*
+    (JD conversion, timezone, ephemeris, sign boundaries) against an
+    independent source, without requiring swisseph.
+    """
+
+    JPL_REF = {
+        # body: (ecliptic_lon_deg, tolerance_deg)
+        "Sun":      (128.958, 0.35),
+        "Moon":     (340.649, 0.35),
+        "Mercury":  (109.667, 0.35),
+        "Venus":    (174.243, 0.35),
+        "Mars":     (83.188,  0.35),
+        "Jupiter":  (127.001, 0.35),
+    }
+
+    def test_jpl_2026_08_01(self):
+        d = {"year": 2026, "month": 8, "day": 1, "hour": 12, "minute": 0,
+             "lat": 35.6892, "lng": 51.3890, "tz": "Asia/Tehran", "time_known": True,
+             "systems": ["western"]}
+        r = ae.calculate_full_profile(d)
+        planets = r["charts"]["western"]["planets"]
+        for body, (ref_lon, tol) in self.JPL_REF.items():
+            lon = planets[body]["abs_lon"]
+            diff = abs((lon - ref_lon) % 360)
+            if diff > 180:
+                diff = 360 - diff
+            self.assertLess(diff, tol,
+                            f"{body}: engine {lon:.3f}° vs JPL {ref_lon:.3f}° "
+                            f"(Δ {diff*3600:.0f}″)")
+
+    def test_jpl_sign_consistency(self):
+        # Sun at 128.958° = Leo 9°; Moon at 340.649° = Pisces 10° — sign
+        # boundaries must match the JPL reference exactly.
+        self.assertEqual(_sign_str(128.958), "Leo")
+        self.assertEqual(_sign_str(340.649), "Pisces")
 
 
 if __name__ == "__main__":
