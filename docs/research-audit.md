@@ -186,6 +186,34 @@ Present (Part of Fortune day/night correct). Add Part of Spirit, Part of Marriag
 
 ---
 
+## ✅ IMPLEMENTATION STATUS (post-audit)
+
+| # | Gap | Status |
+|---|-----|--------|
+| G14 | House system selection (10 SWE systems) | ✅ Done |
+| G1 | Declinations + parallel/contraparallel | ✅ Done |
+| G2 | Minor aspects (8 new: semisextile…decile) | ✅ Done |
+| G3 | Antiscia / contra-antiscia | ✅ Done |
+| G16 | Planet→ASC/MC aspects | ✅ Done |
+| G9 | Station dates + shadow periods | ✅ Done |
+| G5 | Upagrahas (9) | ✅ Done |
+| G8 | Ashtottari dasha | ✅ Done |
+| G6 | Ashtakavarga (bhinnas + sarva) | ✅ Done (simplified tables) |
+| G10 | Eclipse dates (SWE) | ✅ Done |
+| G11 | VOC Moon | ✅ Done |
+| G18 | Vargas D5/D6/D8/D11/D27 + D9 | ✅ Done |
+| G15 | Fixed stars 23 → 60+ | ✅ Done |
+| G17a | Terms/bounds (Egyptian) | ✅ Done |
+| G17b | Triplicity day/night rulers | ✅ Done |
+| G17c | Decan (face) rulers | ✅ Done |
+| G12 | Tajika annual chart | ✅ Done |
+| G13 | Muhurta (panchang-based) | ✅ Done |
+| G7 | Shadbala (Sthana + Dig) | ✅ Partial (2 of 6) |
+| G16b | Mean node option | ⏳ TODO |
+| G17d | Ptolemaic terms (alt table) | ⏳ TODO |
+
+**Tests: 96/96 PASS**
+
 ## 🎯 Key Numbers
 
 | Metric | Current | Target |

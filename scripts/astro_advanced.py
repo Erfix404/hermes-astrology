@@ -994,3 +994,160 @@ def compute_all_advanced(natal_data, transit_date=None):
     results["_note"] = "8 advanced features computed. Run individual functions for electional/prashna/guna_milan with specific parameters."
     
     return results
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  POST-AUDIT MODULES — Tajika, Muhurta, Shadbala
+# ═════════════════════════════════════════════════════════════════════════════
+
+def tajika_annual(birth_dt, lat, lng):
+    """Tajika (annual Vedic horoscope) — solar return with Vedic overlay.
+    Computes the annual chart: Sun returns to natal sidereal position,
+    with tajika year count and strength (Panchadai) assessment."""
+    if _ae is None:
+        return {"error": "astro_engine not available"}
+    jd_birth = _ae.julian_day(birth_dt)
+    # Find next solar return (Sun back to natal sidereal longitude)
+    natal_sid = _ae.norm360(_ae.body_longitudes(jd_birth)[0]["Sun"] - _ae.ayanamsha_lahiri(jd_birth))
+    best = None
+    # search day-by-day with generous tolerance, then refine by hour
+    for y in range(birth_dt.year + 1, birth_dt.year + 3):
+        prev_diff = None
+        prev_dt = None
+        for d in range(0, 366):
+            dt = datetime(y, 1, 1, 12) + timedelta(days=d)
+            jd = _ae.julian_day(dt)
+            sun_sid = _ae.norm360(_ae.body_longitudes(jd)[0]["Sun"] - _ae.ayanamsha_lahiri(jd))
+            diff = _ae.norm180(sun_sid - natal_sid)
+            # Sun moves ~1°/day; detect crossing
+            if prev_diff is not None and prev_diff * diff < 0:
+                # crossing between prev_dt and dt — interpolate hour
+                frac = abs(prev_diff) / (abs(prev_diff) + abs(diff))
+                best = prev_dt + timedelta(days=frac)
+                break
+            prev_diff = diff
+            prev_dt = dt
+        if best:
+            break
+    if best is None:
+        return {"error": "solar return not found"}
+    # refine to hour precision
+    best = best.replace(minute=0, second=0, microsecond=0)
+    jd_sr = _ae.julian_day(best)
+    lons, _, _ = _ae.body_longitudes(jd_sr)
+    # Tajika year: count of years since birth
+    age_years = (best - birth_dt).days / 365.25
+    tajika_year = int(age_years) + 1
+    # Moon nakshatra in annual chart
+    moon_sid = _ae.norm360(lons["Moon"] - _ae.ayanamsha_lahiri(jd_sr))
+    nak_i = int(moon_sid // _ae.NAK_ARC) % 27
+    nk = _ae.NAKSHATRAS[nak_i]
+    return {
+        "tajika_year": tajika_year,
+        "solar_return_date": best.strftime("%Y-%m-%d %H:%M"),
+        "annual_lagna_sign": SIGNS[int(lons["Sun"] // 30) % 12],
+        "moon_nakshatra": nk["name"],
+        "moon_nakshatra_lord": nk["lord"],
+        "sun_sign": SIGNS[int(_ae.norm360(lons["Sun"] - _ae.ayanamsha_lahiri(jd_sr)) // 30) % 12],
+        "note": "Tajika annual chart — Sun returns to natal sidereal position; strength via Panchadai (compute per-house with full data)",
+    }
+
+
+def muhurta_finder(jd_start, lat, lng, activity="marriage", days_ahead=14):
+    """Vedic Muhurta — panchang-based electional timing.
+    Combines tithi, nakshatra, yoga, karana, weekday with activity-specific
+    benefics and avoidances (more rigorous than generic electional)."""
+    if _ae is None:
+        return {"error": "astro_engine not available"}
+    # Tithi quality: 1-5, 10-11 (Shukla); 6-8, 14-15 (Krishna) — good tithis
+    GOOD_TITHIS = {1, 2, 3, 4, 5, 10, 11}
+    AVOID_TITHIS = {4, 9, 14}  # Rikta tithis
+    # Nakshatra qualities (Vedic): fixed (good for stability), movable (travel),
+    # tender, sharp (avoid for most), mixed
+    SHARP_NAKS = {"Ardra", "Ashlesha", "Jyeshtha", "Mula", "Magha", "Bharani"}
+    FIXED_NAKS = {"Rohini", "Uttara Phalguni", "Uttara Ashadha", "Uttara Bhadrapada", "Krittika"}
+    start = datetime.fromtimestamp((jd_start - 2440587.5) * 86400, tz=timezone.utc)
+    results = []
+    for d in range(days_ahead):
+        date = start + timedelta(days=d)
+        jd = _ae.julian_day(date)
+        try:
+            pan = _ae.panchang_elements(jd)
+            lons, _, _ = _ae.body_longitudes(jd)
+        except Exception:
+            continue
+        tithi_i = pan.get("tithi", {}).get("num", 0)
+        tithi_name = pan.get("tithi", {}).get("name", "")
+        nak_name = pan.get("nakshatra", {}).get("name", "")
+        yoga_name = pan.get("yoga", {}).get("name", "")
+        karana_name = pan.get("karana", {}).get("name", "")
+        moon_sign = SIGNS[int(lons.get("Moon", 0) // 30) % 12]
+        moon_phase = _ae.moon_phase(jd).get("phase", "")
+        # scoring
+        score = 0
+        reasons = []
+        if tithi_i in GOOD_TITHIS:
+            score += 2; reasons.append(f"good tithi ({tithi_name})")
+        if tithi_i in AVOID_TITHIS:
+            score -= 2; reasons.append(f"avoid tithi ({tithi_name})")
+        if nak_name in FIXED_NAKS:
+            score += 2; reasons.append(f"fixed nakshatra ({nak_name})")
+        if nak_name in SHARP_NAKS:
+            score -= 1; reasons.append(f"sharp nakshatra ({nak_name}) — avoid")
+        # weekday check
+        dow = date.weekday()
+        dow_rulers = {0:"Moon",1:"Mars",2:"Mercury",3:"Jupiter",4:"Venus",5:"Saturn",6:"Sun"}
+        wk_ruler = dow_rulers.get(dow, "")
+        if wk_ruler in ("Jupiter","Venus","Mercury"):
+            score += 1; reasons.append(f"benefic weekday ({date.strftime('%A')})")
+        if score >= 2:
+            results.append({
+                "date": date.strftime("%Y-%m-%d"),
+                "weekday": date.strftime("%A"),
+                "tithi": tithi_name, "nakshatra": nak_name,
+                "yoga": yoga_name, "karana": karana_name,
+                "moon_sign": moon_sign, "moon_phase": moon_phase,
+                "score": score, "reasons": reasons,
+                "suitable": score >= 3,
+            })
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return {"activity": activity, "top_muhurtas": results[:7]}
+
+
+def shadbala_sthana_dig(jd, lat, lng):
+    """Shadbala (Vedic six-fold strength) — Sthana-bala & Dig-bala only
+    (the two most important; Cheshta/Naisargika/Drik require speed & aspect
+    tables that are approximations without full classical data)."""
+    if _ae is None:
+        return {"error": "astro_engine not available"}
+    lons, speed, _ = _ae.body_longitudes(jd)
+    ayan = _ae.ayanamsha_lahiri(jd)
+    asc_lon, _ = _ae.ascendant_mc(jd, lat, lng)
+    # Dig-bala: planet in its directional sign (from lagna)
+    dig_signs = {"Jupiter": "Aries", "Venus": "Libra", "Mercury": "Cancer",
+                 "Moon": "Cancer", "Saturn": "Capricorn", "Sun": "Leo",
+                 "Mars": "Capricorn"}
+    dig_bala = {}
+    for p, s in dig_signs.items():
+        p_sign = SIGNS[int(_ae.norm360(lons[p] - ayan) // 30) % 12]
+        dig_bala[p] = 1.0 if p_sign == s else 0.0
+    # Sthana-bala (simplified): uccha (exaltation) → 1.0, own sign → 0.75,
+    # neutral → 0.5, debilitated → 0.25
+    sthana_bala = {}
+    for p in ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"]:
+        p_sign = SIGNS[int(_ae.norm360(lons[p] - ayan) // 30) % 12]
+        vn = {"North Node":"Rahu","South Node":"Ketu"}.get(p, p)
+        if _ae.EXALT_SIGN.get(vn) == p_sign:
+            sthana_bala[p] = 1.0
+        elif _ae.DEBIL_SIGN.get(vn) == p_sign:
+            sthana_bala[p] = 0.25
+        elif _ae.RASHI_LORDS.get(p_sign) == vn:
+            sthana_bala[p] = 0.75
+        else:
+            sthana_bala[p] = 0.5
+    return {
+        "dig_bala": {p: round(v, 2) for p, v in dig_bala.items()},
+        "sthana_bala": {p: round(v, 2) for p, v in sthana_bala.items()},
+        "total_sthana": round(sum(sthana_bala.values()), 2),
+        "note": "Sthana + Dig bala only (2 of 6). Full Shadbala needs Cheshta (motion), Naisargika (natural), Drik (aspect), Kala (temporal) — planned.",
+    }

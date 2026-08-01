@@ -12,9 +12,9 @@
 
 - **Zero‑dependency** — pure Python geocentric ephemeris (Schlyter + perturbations). Only `math` / `datetime` / `json`. Works out‑of‑the‑box.
 - **14‑function CLI** — `astro --json`, `astro --file`, `astro --summary`
-- **19 chart modes** — natal, transit, synastry, compatibility, composite, solar/lunar/planetary return, navamsa, varga (D2–D60), panchang, moon phase, numerology, progressions, planetary hours, transit‑natal aspects, horary, astrocartography
-- **Auto‑enriched** — aspect patterns (Grand Trine, T‑Square, Yod, Kite, Grand Cross), Arabic Parts, fixed stars, Black Moon Lilith, dignities, Mangal Dosha, Kaalsarpa Dosha
-- **Swiss Ephemeris upgrade** — `pip install pyswisseph` → arcsecond precision + Placidus houses. No code change.
+- **19 chart modes + 11 advanced** — natal, transit, synastry, compatibility, composite, solar/lunar/planetary return, navamsa, varga (D2–D60), panchang, moon phase, numerology, progressions, planetary hours, transit‑natal aspects, horary, astrocartography + eclipses, stations, upagrahas, ashtakavarga, VOC Moon, ashtottari, tajika, muhurta, shadbala
+- **Auto‑enriched** — aspect patterns (Grand Trine, T‑Square, Yod, Kite, Grand Cross), Arabic Parts, fixed stars (60+), Black Moon Lilith, dignities (domicile/exalt + triplicity/term/decan), declination aspects, antiscia, Mangal Dosha, Kaalsarpa Dosha
+- **Swiss Ephemeris upgrade** — `pip install pyswisseph` → arcsecond precision + Placidus/Koch/Equal/Regiomontanus houses. No code change.
 - **8 reference rulesets** — grounded classical interpretation, no hallucinated Barnum fluff
 - **FastAPI REST** (19 routes + pricing/auth/rate‑limiting) + **MCP server** (18 tools, Claude Desktop / Cursor / Devin)
 

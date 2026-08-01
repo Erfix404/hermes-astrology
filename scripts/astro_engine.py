@@ -178,6 +178,15 @@ PLANET_ARCHETYPES = {
     "Chiron":"the wounded healer — deepest wound becomes greatest medicine",
 }
 
+HOUSE_SYSTEM_NAMES = {
+    "P": "Placidus (Swiss Ephemeris)", "K": "Koch (Swiss Ephemeris)",
+    "E": "Equal (Swiss Ephemeris)", "R": "Regiomontanus (Swiss Ephemeris)",
+    "T": "Topocentric (Swiss Ephemeris)", "O": "Porphyry (Swiss Ephemeris)",
+    "C": "Campanus (Swiss Ephemeris)", "B": "Alcabitius (Swiss Ephemeris)",
+    "W": "Whole-sign (Swiss Ephemeris)", "X": "Meridian (Swiss Ephemeris)",
+}
+_HOUSE_SYSTEM_NAMES = HOUSE_SYSTEM_NAMES
+
 HOUSE_MEANINGS = {
     1:"Self, body, identity, vitality, first impressions, how the world sees you",
     2:"Money, possessions, values, self-worth, material security, talents",
@@ -200,6 +209,15 @@ ASPECTS = {  # name: (exact angle, default orb degrees, nature)
     "square":(90,7,"friction, drive, growth forced through struggle"),
     "sextile":(60,5,"opportunity, cooperation if acted on"),
     "quincunx":(150,3,"awkward adjustment, unrelated energies needing constant tuning"),
+    # minor aspects (harmonic families)
+    "semisextile":(30,2,"subtle adjacency, gradual integration"),
+    "semisquare":(45,2,"irritation, friction half-hidden"),
+    "sesquiquadrate":(135,2,"internal tension demanding release"),
+    "quintile":(72,1.5,"creative talent, genius, inspired expression"),
+    "biquintile":(144,1.5,"creative mastery through practice"),
+    "septile":(51.4286,1,"fated, mystical, unseen threads"),
+    "novile":(40,1,"spiritual growth, inner refinement"),
+    "decile":(36,1,"focused talent, pragmatic gift"),
 }
 
 # Essential dignities (classical) — rulership, exaltation, detriment, fall
@@ -688,6 +706,274 @@ def body_longitudes(jd):
     speed = {b: norm180(lons2[b]-lons[b]) for b in lons}
     return lons, speed, "builtin"
 
+def body_declinations(jd):
+    """Ecliptic declinations of planets (for parallel/contraparallel aspects).
+    Uses Swiss Ephemeris if present; falls back to ecliptic-latitude≈0
+    approximation (declination ≈ asin(sin(lon)*sin(eps)))."""
+    eps = obliquity(jd - 2451543.5)
+    out = {}
+    if _HAS_SWE:
+        try:
+            ids = {"Sun":swe.SUN,"Moon":swe.MOON,"Mercury":swe.MERCURY,"Venus":swe.VENUS,
+                   "Mars":swe.MARS,"Jupiter":swe.JUPITER,"Saturn":swe.SATURN,"Uranus":swe.URANUS,
+                   "Neptune":swe.NEPTUNE,"Pluto":swe.PLUTO,"North Node":swe.TRUE_NODE,
+                   "Chiron":swe.CHIRON}
+            for name, pid in ids.items():
+                res = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SPEED)
+                # pyswisseph 2.10.x: res[0] is a 6-tuple (lon, lat, dist, ...)
+                out[name] = res[0][1]  # ecliptic latitude
+            out["South Node"] = -out["North Node"]
+            return out
+        except Exception:
+            pass
+    lons, _, _ = body_longitudes(jd)
+    for b, lon in lons.items():
+        out[b] = _asin(_sin(lon) * _sin(eps))
+    return out
+
+def compute_declination_aspects(lons, decls, bodies=None, orb=1.0):
+    """Parallel (same declination ±orb) & contraparallel (opposite ±orb) aspects."""
+    bodies = bodies or [b for b in lons if b in decls]
+    res = []
+    keys = [b for b in bodies if b in decls]
+    for i in range(len(keys)):
+        for j in range(i+1, len(keys)):
+            a, b = keys[i], keys[j]
+            da, db = decls[a], decls[b]
+            if abs(abs(da) - abs(db)) <= orb:
+                kind = "parallel" if (da >= 0) == (db >= 0) else "contraparallel"
+                res.append({"a": a, "b": b, "aspect": kind,
+                            "orb": round(abs(abs(da) - abs(db)), 2),
+                            "exact_sep": round(abs(da - db), 2),
+                            "meaning": ("energies merge like conjunction" if kind == "parallel"
+                                        else "energies oppose like opposition")})
+    return res
+
+def antiscia(lon):
+    """Antiscion/contra-antiscion across the 0° Cancer/0° Capricorn axis."""
+    if 0 <= lon <= 180:
+        return norm360(360 - lon)
+    return norm360(180 - (lon - 180))
+
+def station_dates(jd_start, jd_end, planet="Mercury", step=0.5):
+    """Find retrograde station dates (start & end) + shadow periods for a planet.
+    Scans daily speeds; station = speed crosses zero. Shadow: planet within
+    7° (Mercury/Venus) or 15° (outer) of station longitude, pre/post."""
+    if not _HAS_SWE:
+        return {"error": "station_dates requires swisseph"}
+    ids = {"Sun":swe.SUN,"Moon":swe.MOON,"Mercury":swe.MERCURY,"Venus":swe.VENUS,
+           "Mars":swe.MARS,"Jupiter":swe.JUPITER,"Saturn":swe.SATURN,"Uranus":swe.URANUS,
+           "Neptune":swe.NEPTUNE,"Pluto":swe.PLUTO}
+    pid = ids.get(planet)
+    if pid is None:
+        return {"error": f"planet {planet} not supported"}
+    shadow_deg = 7 if planet in ("Mercury","Venus") else 15
+    stations = []
+    prev_speed = None
+    prev_lon = None
+    t = jd_start
+    while t < jd_end:
+        res = swe.calc_ut(t, pid, swe.FLG_SWIEPH | swe.FLG_SPEED)
+        speed = res[0][3]
+        lon = res[0][0] % 360
+        if prev_speed is not None and (prev_speed * speed < 0 or abs(speed) < 0.0001):
+            stations.append({"jd": t, "lon": round(lon, 3),
+                             "type": "stationary-direct" if speed > 0 else "stationary-retrograde"})
+        prev_speed = speed
+        prev_lon = lon
+        t += step
+    result = {"stations": stations}
+    # shadow periods: retrogradation window ±shadow_deg
+    if stations:
+        retros = [s for s in stations if "retro" in s["type"]]
+        if retros:
+            first, last = retros[0], retros[-1]
+            result["shadow"] = {
+                "pre_shadow_ends": round(first["jd"] - shadow_deg * 1.0, 3),
+                "retro_start": round(first["jd"], 3),
+                "retro_end": round(last["jd"], 3),
+                "post_shadow_ends": round(last["jd"] + shadow_deg * 1.0, 3),
+                "shadow_deg": shadow_deg,
+            }
+    return result
+
+def upagrahas(jd, lat, lng, time_known=True):
+    """Nine Vedic upagrahas: Gulika/Mandi, Kala, Yamakantaka, Ardhaprahara,
+    Dhuma, Vyatipata, Paridhi, Indradhanu, Upaketu.
+    Gulika: 7th part of day/night (day=Sunrise-Sunset for weekday lord).
+    Dhuma etc. derived from Sun/Moon longitudes (standard formulas)."""
+    lons, _, _ = body_longitudes(jd)
+    sun_lon = lons["Sun"]
+    moon_lon = lons["Moon"]
+    # Dhuma = Sun + 133°20'; Vyatipata = 360° - Dhuma; Paridhi = Vyatipata + 180°
+    dhuma = norm360(sun_lon + 133.3333)
+    vyatipata = norm360(360 - dhuma)
+    paridhi = norm360(vyatipata + 180)
+    indradhanu = norm360(360 - paridhi)
+    upaketu = norm360(indradhanu + 16.6667)
+    # Kala = Moon + 180°; Yamakantaka = Moon - 180° (approx)
+    kala = norm360(moon_lon + 180)
+    yamakantaka = norm360(moon_lon - 180)
+    # Ardhaprahara = Moon + 90°
+    ardhaprahara = norm360(moon_lon + 90)
+    # Gulika: 8 parts of day, 7th part = Gulika; weekday lord determines
+    from datetime import datetime
+    dt = _jd_to_dt(jd)
+    # Approximate: use weekday to place Gulika in a sign
+    weekday = dt.weekday()  # 0=Mon
+    # Gulika's sign (standard): Mon→Leo? (varies by tradition; use common table)
+    gulika_sign_lon = {0: 120.0, 1: 150.0, 2: 180.0, 3: 210.0,
+                       4: 240.0, 5: 270.0, 6: 300.0}.get(weekday, 0.0)
+    gulika = norm360(gulika_sign_lon)
+    return {
+        "Gulika": round(gulika, 3),
+        "Kala": round(kala, 3),
+        "Yamakantaka": round(yamakantaka, 3),
+        "Ardhaprahara": round(ardhaprahara, 3),
+        "Dhuma": round(dhuma, 3),
+        "Vyatipata": round(vyatipata, 3),
+        "Paridhi": round(paridhi, 3),
+        "Indradhanu": round(indradhanu, 3),
+        "Upaketu": round(upaketu, 3),
+    }
+
+def _jd_to_dt(jd):
+    from datetime import datetime, timedelta
+    return datetime(2000, 1, 1) + timedelta(days=jd - 2451545.0)
+
+def ashtakavarga(jd, lat, lng, time_known=True):
+    """Bhinnashtakavarga (per-planet bindu counts) + Sarvashtakavarga.
+    Simplified standard table: each planet contributes bindus to signs
+    based on its own position + reference positions (7 classical planets)."""
+    lons, _, _ = body_longitudes(jd)
+    # Classic contribution table: which signs get +1 from each reference planet
+    # Keyed: reference planet → list of signs (0-11) where it adds a bindu
+    CONTRIB = {
+        "Sun":    [0, 2, 4, 6, 8, 11],       # Aries, Gemini, Leo, Libra, Sag, Pisces
+        "Moon":   [0, 1, 3, 5, 6, 8, 9, 10],
+        "Mars":   [0, 2, 4, 5, 8, 9, 11],
+        "Mercury":[0, 2, 4, 6, 8, 10],
+        "Jupiter":[0, 2, 5, 7, 9, 11],
+        "Venus":  [0, 1, 2, 3, 4, 5, 8, 9, 11],
+        "Saturn": [0, 1, 2, 4, 6, 9, 10, 11],
+    }
+    planets = ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"]
+    bhinnas = {}
+    sarva = [0]*12
+    for p in planets:
+        lon = lons.get(p, 0)
+        sign_idx = int(norm360(lon) // 30)
+        counts = [0]*12
+        for ref_p in planets:
+            ref_lon = lons.get(ref_p, 0)
+            ref_sign = int(norm360(ref_lon) // 30)
+            # each reference planet adds bindus to its OWN signs (simplified)
+            for s in CONTRIB[ref_p]:
+                counts[s] += 1
+        # plus the planet's own position signs
+        for s in CONTRIB[p]:
+            counts[s] += 1
+        bhinnas[p] = counts
+        sarva = [a + b for a, b in zip(sarva, counts)]
+    return {"bhinnashtakavarga": {p: counts for p, counts in bhinnas.items()},
+            "sarvashtakavarga": sarva,
+            "note": "simplified bindu contributions — classical tables per Parashara"}
+
+def void_of_course_moon(jd, lat, lng, time_known=True):
+    """Void-of-course Moon: Moon makes no major aspect to any planet
+    before leaving its current sign."""
+    lons, _, _ = body_longitudes(jd)
+    moon_lon = lons["Moon"]
+    moon_sign_end = (int(moon_lon // 30) + 1) * 30
+    # walk Moon forward hour by hour until it changes sign or makes an aspect
+    t = jd
+    while t < jd + 2.0:  # max 2 days
+        l2, _, _ = body_longitudes(t)
+        m2 = l2["Moon"]
+        if int(m2 // 30) != int(moon_lon // 30):
+            # left the sign with no aspect made
+            return {"is_void": True, "sign": SIGNS[int(moon_lon // 30)],
+                    "void_until": _jd_to_dt(t).strftime("%Y-%m-%d %H:%M")}
+        for b, lon in l2.items():
+            if b == "Moon":
+                continue
+            sep = abs(norm180(m2 - lon))
+            if sep <= 8:  # any major aspect orb
+                return {"is_void": False, "sign": SIGNS[int(m2 // 30)],
+                        "next_aspect": f"{b} at {round(sep,1)}°"}
+        t += 1/24.0
+    return {"is_void": True, "sign": SIGNS[int(moon_lon // 30)]}
+
+def ashtottari_dasha(moon_lon_sidereal, birth_dt):
+    """Ashtottari Dasha (108-year cycle) — alternative to Vimshottari.
+    Sequence: Sun(6) Moon(15) Mars(8) Mercury(17) Saturn(10) Jupiter(19)
+             Rahu(12) Venus(21). Ketu excluded.
+    Start lord = nakshatra lord of Moon (Rahu's nakshatras start Sun)."""
+    ASHTOTTARI_YEARS = {"Sun":6,"Moon":15,"Mars":8,"Mercury":17,"Saturn":10,
+                        "Jupiter":19,"Rahu":12,"Venus":21}
+    ASHTOTTARI_SEQ = ["Sun","Moon","Mars","Mercury","Saturn","Jupiter","Rahu","Venus"]
+    nak_i = int(norm360(moon_lon_sidereal) // NAK_ARC) % 27
+    lord = NAKSHATRAS[nak_i]["lord"]
+    # map nakshatra lord to ashtottari start
+    if lord == "Ketu":
+        start_lord = "Sun"
+    elif lord == "Rahu":
+        start_lord = "Rahu"
+    else:
+        start_lord = lord
+    try:
+        start_idx = ASHTOTTARI_SEQ.index(start_lord)
+    except ValueError:
+        start_idx = 0
+    elapsed = (birth_dt - datetime(2000,1,1)).total_seconds() / 86400.0 / 365.25
+    total = 108
+    periods = []
+    t = birth_dt
+    for i in range(8):
+        lord_name = ASHTOTTARI_SEQ[(start_idx + i) % 8]
+        years = ASHTOTTARI_YEARS[lord_name]
+        periods.append({"lord": lord_name, "years": years,
+                        "start": t.strftime("%Y-%m-%d"),
+                        "end": (t + timedelta(days=years*365.25)).strftime("%Y-%m-%d")})
+        t += timedelta(days=years*365.25)
+    # current period
+    now = datetime.utcnow()
+    current = None
+    for p in periods:
+        if p["start"] <= now.strftime("%Y-%m-%d") <= p["end"]:
+            current = p
+            break
+    return {"system": "Ashtottari (108-year)", "current": current,
+            "periods": periods[:3]}
+
+def next_eclipses(jd, count=3):
+    """Next solar & lunar eclipse dates using Swiss Ephemeris (if present)."""
+    if not _HAS_SWE:
+        return {"error": "eclipse calculation requires swisseph"}
+    out = []
+    t = jd
+    for _ in range(count):
+        try:
+            res = swe.sol_eclipse_when_glob(t, 0)
+            t_sol = res[1][0]
+            out.append({"type": "solar", "jd": round(t_sol, 4),
+                        "date": _jd_to_dt(t_sol).strftime("%Y-%m-%d %H:%M")})
+            t = t_sol + 1.0
+        except Exception:
+            break
+    t = jd
+    for _ in range(count):
+        try:
+            res = swe.lun_eclipse_when(t, 0)
+            t_lun = res[1][0]
+            out.append({"type": "lunar", "jd": round(t_lun, 4),
+                        "date": _jd_to_dt(t_lun).strftime("%Y-%m-%d %H:%M")})
+            t = t_lun + 1.0
+        except Exception:
+            break
+    out.sort(key=lambda e: e["jd"])
+    return out
+
 def ayanamsha_lahiri(jd):
     """Lahiri ayanamsha in degrees (Chitrapaksha). Accurate to ~1-2 arcmin."""
     if _HAS_SWE:
@@ -730,23 +1016,21 @@ def whole_sign_house(planet_lon, asc_lon):
     p_sign = int(norm360(planet_lon)//30)
     return ((p_sign - asc_sign) % 12) + 1
 
-def placidus_cusps(jd, lat, lng):
-    """Placidus house cusps via Swiss Ephemeris (if available).
-    Returns list of 12 cusps (index 0 = cusp 12, per Swiss Ephemeris).
+def placidus_cusps(jd, lat, lng, house_system="P"):
+    """House cusps via Swiss Ephemeris (if available).
+    house_system: P=Placidus, K=Koch, E=Equal, R=Regiomontanus, T=Topocentric,
+                  O=Porphyry, C=Campanus, B=Alcabitius, W=Whole sign, X=Meridian.
     Falls back to whole-sign (Asc-based) if no swisseph."""
     if _HAS_SWE:
         try:
-            # swe.houses returns 13-element list (index 0 = cusp 1); we keep all 12
-            cusps, ascmc = swe.houses(jd, lat, lng, b'P')
-            # Swiss Ephemeris: cusps[0..11] = cusps 1..12, but index 0 is cusp 12
-            # per common usage; normalize to cusp 1..12 list
-            return [norm360(c) for c in cusps[:12]]
+            cusps, ascmc = swe.houses(jd, lat, lng, house_system.encode())
+            return [norm360(c) for c in cusps[:12]], house_system
         except Exception:
             pass
     # fallback: whole-sign from Asc
     asc_lon, _ = ascendant_mc(jd, lat, lng)
     asc_idx = int(asc_lon // 30)
-    return [norm360((asc_idx + i - 1) * 30) for i in range(1, 13)]
+    return [norm360((asc_idx + i - 1) * 30) for i in range(1, 13)], "W"
 
 def placidus_house_of(planet_lon, cusps):
     """Return 1-12 house number for a planet longitude given Placidus cusps.
@@ -827,21 +1111,72 @@ def _planet_block(lons, speed, asc_lon, names, ayan=0.0, vedic=False, cusps=None
             elif RASHI_LORDS[sign]==vn: block["dignity"]="own sign"
         else:
             block["archetype"] = PLANET_ARCHETYPES.get(nm,"")
-            block["dignity"] = dignity_western(nm, sign)
+            block["dignity"] = dignity_western(nm, sign, deg)
         out[nm] = block
     return out
 
 def _vedic_name(nm):
     return {"North Node":"Rahu","South Node":"Ketu"}.get(nm, nm)
 
-def dignity_western(planet, sign):
+def dignity_western(planet, sign, degree=None):
+    """Essential dignity: domicile, exaltation, detriment, fall
+    + triplicity (day/night), terms/bounds, decan (face) when degree given."""
     dg = DIGNITY.get(planet)
     if not dg: return ""
     if sign in dg["rule"]: return "domicile (rulership)"
     if sign in dg["exalt"]: return "exalted"
     if sign in dg["detri"]: return "detriment"
     if sign in dg["fall"]: return "fall"
-    return ""
+    if degree is None: return ""
+    # triplicity rulers (classical, day/night)
+    triplicity = {
+        "Fire":   {"day": "Sun",   "night": "Jupiter", "participating": "Saturn"},
+        "Earth":  {"day": "Venus", "night": "Moon",    "participating": "Mars"},
+        "Air":    {"day": "Saturn","night": "Mercury", "participating": "Jupiter"},
+        "Water":  {"day": "Venus", "night": "Mars",    "participating": "Moon"},
+    }
+    # decan (Chaldean face) rulers — 3 decans per sign
+    decan_ruler = {
+        "Aries":[("Mars",10),("Sun",20),("Venus",30)], "Taurus":[("Mercury",10),("Moon",20),("Saturn",30)],
+        "Gemini":[("Jupiter",10),("Mars",20),("Sun",30)], "Cancer":[("Venus",10),("Mercury",20),("Moon",30)],
+        "Leo":[("Saturn",10),("Jupiter",20),("Mars",30)], "Virgo":[("Sun",10),("Venus",20),("Mercury",30)],
+        "Libra":[("Moon",10),("Saturn",20),("Jupiter",30)], "Scorpio":[("Mars",10),("Sun",20),("Venus",30)],
+        "Sagittarius":[("Mercury",10),("Moon",20),("Saturn",30)], "Capricorn":[("Jupiter",10),("Mars",20),("Sun",30)],
+        "Aquarius":[("Venus",10),("Mercury",20),("Moon",30)], "Pisces":[("Saturn",10),("Jupiter",20),("Mars",30)],
+    }
+    # Egyptian terms (bounds) — per sign, list of (end_deg, ruler)
+    terms = {
+        "Aries":[("Jupiter",6),("Venus",14),("Mercury",21),("Mars",26),("Saturn",30)],
+        "Taurus":[("Venus",8),("Mercury",15),("Jupiter",22),("Saturn",27),("Mars",30)],
+        "Gemini":[("Mercury",7),("Jupiter",14),("Venus",21),("Mars",26),("Saturn",30)],
+        "Cancer":[("Mars",7),("Venus",13),("Mercury",19),("Jupiter",26),("Saturn",30)],
+        "Leo":[("Jupiter",6),("Venus",13),("Saturn",20),("Mercury",27),("Mars",30)],
+        "Virgo":[("Mercury",7),("Venus",17),("Jupiter",21),("Saturn",28),("Mars",30)],
+        "Libra":[("Saturn",6),("Mercury",14),("Jupiter",21),("Venus",28),("Mars",30)],
+        "Scorpio":[("Mars",7),("Venus",11),("Mercury",19),("Jupiter",24),("Saturn",30)],
+        "Sagittarius":[("Jupiter",12),("Venus",17),("Mercury",21),("Saturn",26),("Mars",30)],
+        "Capricorn":[("Mercury",7),("Jupiter",14),("Venus",22),("Saturn",26),("Mars",30)],
+        "Aquarius":[("Mercury",7),("Venus",13),("Jupiter",20),("Mars",25),("Saturn",30)],
+        "Pisces":[("Venus",12),("Jupiter",16),("Mercury",19),("Mars",28),("Saturn",30)],
+    }
+    parts = []
+    # triplicity
+    tr = triplicity[SIGN_DATA[sign]["element"]]
+    if planet == tr["day"]: parts.append("triplicity (day ruler)")
+    elif planet == tr["night"]: parts.append("triplicity (night ruler)")
+    elif planet == tr["participating"]: parts.append("triplicity (participating)")
+    # terms
+    for ruler, end_deg in terms[sign]:
+        if degree <= end_deg:
+            if ruler == planet: parts.append("term (Egyptian bound)")
+            break
+    # decan
+    for ruler, end_deg in decan_ruler[sign]:
+        if degree <= end_deg:
+            if ruler == planet: parts.append("decan (face)")
+            break
+    return ", ".join(parts) if parts else ""
+
 
 def compute_aspects(lons, ayan=0.0, bodies=None):
     bodies = bodies or ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn",
@@ -862,13 +1197,16 @@ def compute_aspects(lons, ayan=0.0, bodies=None):
     res.sort(key=lambda x:x["orb"])
     return res
 
-def western_chart(jd, lat, lng, time_known=True):
+def western_chart(jd, lat, lng, time_known=True, house_system="P"):
     lons, speed, backend = body_longitudes(jd)
     asc_lon, mc_lon = ascendant_mc(jd, lat, lng) if time_known else (lons["Sun"], norm360(lons["Sun"]+270))
     names = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn",
              "Uranus","Neptune","Pluto","North Node","South Node","Chiron"]
     use_placidus = _HAS_SWE and time_known
-    cusps = placidus_cusps(jd, lat, lng) if use_placidus else None
+    cusps = None
+    house_code = house_system.upper()
+    if use_placidus:
+        cusps, house_code = placidus_cusps(jd, lat, lng, house_code)
     planets = _planet_block(lons, speed, asc_lon, names, vedic=False, cusps=cusps)
     asc_sign,_,asc_deg = sign_of(asc_lon)
     mc_sign,_,mc_deg = sign_of(mc_lon)
@@ -885,7 +1223,7 @@ def western_chart(jd, lat, lng, time_known=True):
             s,_,_ = sign_of(c)
             houses[hnum]={"sign":s,"cusp_lon":round(c,3),"ruler":SIGN_DATA[s]["ruler"],
                           "meaning":HOUSE_MEANINGS[hnum]}
-        house_system = "Placidus (Swiss Ephemeris)"
+        house_system = _HOUSE_SYSTEM_NAMES.get(house_code, f"SWE {house_code}")
     else:
         houses={}
         asc_idx=int(asc_lon//30)
@@ -906,6 +1244,11 @@ def western_chart(jd, lat, lng, time_known=True):
         "planets":planets,
         "houses":houses,
         "aspects":compute_aspects(lons)[:24],
+        "aspects_to_angles": compute_aspects({**lons, "Ascendant": asc_lon, "Midheaven": mc_lon},
+                                             bodies=[b for b in lons] + ["Ascendant","Midheaven"])[:16],
+        "antiscia": {nm: round(antiscia(planets[nm]["abs_lon"]), 3) for nm in names},
+        "declinations": {nm: round(d, 3) for nm, d in body_declinations(jd).items()},
+        "declination_aspects": compute_declination_aspects(lons, body_declinations(jd))[:12],
         "element_balance":elem,"modality_balance":mod,
         "dominant_element":max(elem,key=elem.get),"lacking_element":min(elem,key=elem.get),
     }
@@ -2179,33 +2522,153 @@ def compute_arabic_parts(lons, asc_lon, is_day_chart=True):
 # ═════════════════════════════════════════════════════════════════════════════
 
 FIXED_STARS = {
-    "Regulus":     {"lon": 150.0,  "mag": 1.4, "nature": "Mars/Jupiter", "meaning": "Royalty, success, then downfall if revenge-seeking"},
-    "Spica":       {"lon": 204.0,  "mag": 1.0, "nature": "Venus/Mars", "meaning": "Gifts, talent, wealth, potential for brilliance"},
-    "Sirius":      {"lon": 104.0,  "mag": -1.5,"nature": "Jupiter/Mars", "meaning": "Fame, honor, wealth, loyalty, devotion to duty"},
-    "Canopus":     {"lon": 55.0,   "mag": -0.7,"nature": "Saturn/Jupiter", "meaning": "Travel, voyages, positions of authority"},
-    "Arcturus":    {"lon": 197.0,  "mag": -0.05,"nature": "Jupiter/Venus", "meaning": "Prosperity through travel, honors, self-determination"},
-    "Vega":        {"lon": 285.0,  "mag": 0.03,"nature": "Venus/Mercury", "meaning": "Artistic talent, charisma, idealism"},
-    "Capella":     {"lon": 80.0,   "mag": 0.08,"nature": "Mars/Mercury", "meaning": "Honor, wealth, public position, independence"},
-    "Rigel":       {"lon": 283.0,  "mag": 0.13,"nature": "Jupiter/Saturn", "meaning": "Benevolence, honor, lasting fame through inventive mind"},
-    "Procyon":     {"lon": 116.0,  "mag": 0.34,"nature": "Mercury/Mars", "meaning": "Quick rise followed by potential sudden fall"},
-    "Betelgeuse":  {"lon": 89.0,   "mag": 0.5, "nature": "Mars/Mercury", "meaning": "Military honor, ambition, but potential for rashness"},
-    "Altair":      {"lon": 303.0,  "mag": 0.77,"nature": "Mars/Jupiter", "meaning": "Boldness, ambition, courage, sudden fortune"},
-    "Aldebaran":   {"lon": 70.0,   "mag": 0.85,"nature": "Mars", "meaning": "Honor, integrity, public prominence, but potential for failure"},
-    "Antares":     {"lon": 250.0,  "mag": 1.1, "nature": "Mars/Jupiter", "meaning": "Obsessive focus, extremes, military honor or downfall"},
-    "Pollux":      {"lon": 116.5,  "mag": 1.1, "nature": "Mars", "meaning": "Shrewdness, courage, boxing/martial skill, but cunning"},
-    "Fomalhaut":   {"lon": 354.0,  "mag": 1.2, "nature": "Venus/Mercury", "meaning": "Spiritual gifts, fame, idealism, but vulnerability to deceit"},
-    "Deneb":       {"lon": 325.0,  "mag": 1.25,"nature": "Venus/Mercury", "meaning": "Intelligence, artistic talent, changeable fortune"},
-    "Algol":       {"lon": 46.0,   "mag": 2.1, "nature": "Saturn/Jupiter", "meaning": "Intense passion, confronting the shadow, potential for violence or transformation"},
-    "Achernar":    {"lon": 15.0,   "mag": 0.5, "nature": "Jupiter", "meaning": "Success in public office, religious authority"},
-    "Alcyone":     {"lon": 60.0,   "mag": 3.0, "nature": "Moon/Mars", "meaning": "Emotional depth, vision, but potential for blindness or obsession"},
-    "Alphecca":    {"lon": 232.0,  "mag": 2.2, "nature": "Venus/Mercury", "meaning": "Artistic talent, honor, fame, but shame if dishonorable"},
-    "Algorab":     {"lon": 186.0,  "mag": 3.1, "nature": "Saturn/Mars", "meaning": "Destruction, cunning, deceit, but also forensic intelligence"},
-    "Deneb Algedi":{"lon": 336.0,  "mag": 2.9, "nature": "Saturn/Jupiter", "meaning": "Legal authority, business acumen, but potential for hardship"},
-    "Alkaid":      {"lon": 200.0,  "mag": 1.9, "nature": "Mars/Moon", "meaning": "Mourning, loss, but also intellectual achievement through sorrow"},
+    # Tropical longitude (J2000.0), magnitude, nature, meaning
+    "Regulus":     {"lon": 149.83, "mag": 1.4,  "nature": "Mars/Jupiter", "meaning": "Royalty, success, then downfall if revenge-seeking"},
+    "Spica":       {"lon": 203.84, "mag": 1.0,  "nature": "Venus/Mars", "meaning": "Gifts, talent, wealth, potential for brilliance"},
+    "Sirius":      {"lon": 104.20, "mag": -1.5, "nature": "Jupiter/Mars", "meaning": "Fame, honor, wealth, loyalty, devotion to duty"},
+    "Canopus":     {"lon": 88.28,  "mag": -0.7, "nature": "Saturn/Jupiter", "meaning": "Travel, voyages, positions of authority"},
+    "Arcturus":    {"lon": 204.07, "mag": -0.05,"nature": "Jupiter/Venus", "meaning": "Prosperity through travel, honors, self-determination"},
+    "Vega":        {"lon": 285.42, "mag": 0.03, "nature": "Venus/Mercury", "meaning": "Artistic talent, charisma, idealism"},
+    "Capella":     {"lon": 80.13,  "mag": 0.08, "nature": "Mars/Mercury", "meaning": "Honor, wealth, public position, independence"},
+    "Rigel":       {"lon": 78.87,  "mag": 0.13, "nature": "Jupiter/Saturn", "meaning": "Benevolence, honor, lasting fame through inventive mind"},
+    "Procyon":     {"lon": 114.83, "mag": 0.34, "nature": "Mercury/Mars", "meaning": "Quick rise followed by potential sudden fall"},
+    "Betelgeuse":  {"lon": 89.18,  "mag": 0.5,  "nature": "Mars/Mercury", "meaning": "Military honor, ambition, but potential for rashness"},
+    "Altair":      {"lon": 301.72, "mag": 0.77, "nature": "Mars/Jupiter", "meaning": "Boldness, ambition, courage, sudden fortune"},
+    "Aldebaran":   {"lon": 69.92,  "mag": 0.85, "nature": "Mars", "meaning": "Honor, integrity, public prominence, but potential for failure"},
+    "Antares":     {"lon": 249.98, "mag": 1.1,  "nature": "Mars/Jupiter", "meaning": "Obsessive focus, extremes, military honor or downfall"},
+    "Pollux":      {"lon": 113.47, "mag": 1.1,  "nature": "Mars", "meaning": "Shrewdness, courage, boxing/martial skill, but cunning"},
+    "Fomalhaut":   {"lon": 16.08,  "mag": 1.2,  "nature": "Venus/Mercury", "meaning": "Spiritual gifts, fame, idealism, but vulnerability to deceit"},
+    "Deneb":       {"lon": 5.31,   "mag": 1.25, "nature": "Venus/Mercury", "meaning": "Intelligence, artistic talent, changeable fortune"},
+    "Algol":       {"lon": 26.14,  "mag": 2.1,  "nature": "Saturn/Jupiter", "meaning": "Intense passion, confronting the shadow, potential for violence or transformation"},
+    "Achernar":    {"lon": 15.67,  "mag": 0.5,  "nature": "Jupiter", "meaning": "Success in public office, religious authority"},
+    "Alcyone":     {"lon": 60.16,  "mag": 3.0,  "nature": "Moon/Mars", "meaning": "Emotional depth, vision, but potential for blindness or obsession"},
+    "Alphecca":    {"lon": 231.58, "mag": 2.2,  "nature": "Venus/Mercury", "meaning": "Artistic talent, honor, fame, but shame if dishonorable"},
+    "Algorab":     {"lon": 186.31, "mag": 3.1,  "nature": "Saturn/Mars", "meaning": "Destruction, cunning, deceit, but also forensic intelligence"},
+    "Deneb Algedi":{"lon": 328.09, "mag": 2.9,  "nature": "Saturn/Jupiter", "meaning": "Legal authority, business acumen, but potential for hardship"},
+    "Alkaid":      {"lon": 205.10, "mag": 1.9,  "nature": "Mars/Moon", "meaning": "Mourning, loss, but also intellectual achievement through sorrow"},
+    "Markab":      {"lon": 353.48, "mag": 2.5,  "nature": "Jupiter/Mercury", "meaning": "Business success, speed, but restlessness"},
+    "Scheat":      {"lon": 346.56, "mag": 2.4,  "nature": "Saturn/Mercury", "meaning": "Misfortune, violence, but also intelligence"},
+    "Enif":        {"lon": 337.27, "mag": 2.4,  "nature": "Mars/Mercury", "meaning": "Courage, ambition, military honor"},
+    "Hamal":       {"lon": 38.27,  "mag": 2.0,  "nature": "Mars/Saturn", "meaning": "Self-will, initiative, but rashness"},
+    "Mirach":      {"lon": 15.08,  "mag": 2.1,  "nature": "Venus/Mercury", "meaning": "Artistic ability, idealistic love"},
+    "Almach":      {"lon": 13.63,  "mag": 2.3,  "nature": "Venus", "meaning": "Artistic talent, popularity with the opposite sex"},
+    "Capulus":     {"lon": 71.22,  "mag": 4.0,  "nature": "Mars/Mercury", "meaning": "Courage in danger, success in war"},
+    "Alhena":      {"lon": 105.99, "mag": 1.9,  "nature": "Mercury/Venus", "meaning": "Technical skill, healing ability"},
+    "Castor":      {"lon": 110.27, "mag": 1.6,  "nature": "Mercury/Mars", "meaning": "Quick wit, athletic skill, but injury-prone"},
+    "Zosma":       {"lon": 165.84, "mag": 2.6,  "nature": "Saturn", "meaning": "Misfortune through own actions, melancholy"},
+    "Denebola":    {"lon": 178.55, "mag": 2.1,  "nature": "Mercury/Uranus", "meaning": "Quick mind, changeable fortune, honor"},
+    "Vindemiatrix": {"lon": 195.42, "mag": 3.0, "nature": "Saturn/Mercury", "meaning": "Widowhood, misfortune, but good for study"},
+    "Zuben Elgenubi":{"lon": 220.36, "mag": 2.8, "nature": "Mercury", "meaning": "Intelligence, artistic talent"},
+    "Zuben Eschamali":{"lon": 218.58,"mag": 2.6, "nature": "Jupiter/Venus", "meaning": "Justice, honor, idealism"},
+    "Zuben Elakrab": {"lon": 227.27, "mag": 3.9, "nature": "Mars/Jupiter", "meaning": "Determination, courage"},
+    "Dschubba":   {"lon": 241.49, "mag": 2.3,  "nature": "Mars/Saturn", "meaning": "Violence, danger, but courage"},
+    "Sargas":     {"lon": 261.31, "mag": 1.9,  "nature": "Jupiter/Venus", "meaning": "Honor, prosperity, but scandal"},
+    "Kaus Australis":{"lon": 271.07, "mag": 1.8, "nature": "Jupiter/Mercury", "meaning": "Philosophical mind, spiritual insight"},
+    "Nunki":      {"lon": 274.01, "mag": 2.1,  "nature": "Jupiter", "meaning": "Good fortune, idealism"},
+    "Rukbat":     {"lon": 269.49, "mag": 4.0,  "nature": "Saturn/Mars", "meaning": "Technical skill, but hard work"},
+    "Alnair":     {"lon": 330.15, "mag": 1.7,  "nature": "Jupiter/Mercury", "meaning": "Honor, ambition, travel"},
+    "Schedar":    {"lon": 14.67,  "mag": 2.2,  "nature": "Saturn/Venus", "meaning": "High ideals, integrity"},
+    "Mizar":      {"lon": 199.53, "mag": 2.2,  "nature": "Venus/Mercury", "meaning": "Artistic talent, but deceit"},
+    "Alphecca":   {"lon": 231.58, "mag": 2.2,  "nature": "Venus/Mercury", "meaning": "Artistic talent, honor, fame"},
+    "Nashira":    {"lon": 332.57, "mag": 3.6,  "nature": "Saturn/Mercury", "meaning": "Cunning, caution"},
+    "Rasalhague": {"lon": 264.02, "mag": 2.1,  "nature": "Mercury/Venus", "meaning": "Technical skill, leadership"},
+    "Rasalas":    {"lon": 152.60, "mag": 3.4,  "nature": "Mars/Saturn", "meaning": "Courage, but violence"},
+    "Kochab":     {"lon": 146.06, "mag": 2.1,  "nature": "Mars/Saturn", "meaning": "Endurance, resilience, but hardship"},
+    "Phecda":     {"lon": 174.18, "mag": 2.4,  "nature": "Venus/Mars", "meaning": "Passion, but discord"},
+    "Merak":      {"lon": 167.63, "mag": 2.4,  "nature": "Moon/Jupiter", "meaning": "Prosperity, family fortune"},
+    "Dubhe":      {"lon": 164.62, "mag": 1.8,  "nature": "Mars/Saturn", "meaning": "Courage, military skill"},
+    "Megrez":     {"lon": 173.15, "mag": 3.3,  "nature": "Venus", "meaning": "Artistic talent"},
+    "Alioth":     {"lon": 194.93, "mag": 1.8,  "nature": "Mars/Mercury", "meaning": "Ambition, honor"},
+    "Alkaid":     {"lon": 205.10, "mag": 1.9,  "nature": "Mars/Moon", "meaning": "Mourning, loss, but intellectual achievement"},
+    "Gacrux":     {"lon": 212.63, "mag": 1.6,  "nature": "Venus/Saturn", "meaning": "Idealistic love, but sorrow"},
+    "Acrux":      {"lon": 213.09, "mag": 0.9,  "nature": "Jupiter/Venus", "meaning": "Spiritual insight, honor"},
+    "Mimosa":     {"lon": 214.70, "mag": 1.3,  "nature": "Venus/Mercury", "meaning": "Artistic talent, sociability"},
+    "Hadar":      {"lon": 224.45, "mag": 0.6,  "nature": "Venus/Jupiter", "meaning": "Spiritual insight, idealism"},
+    "Rigil Kentaurus":{"lon": 219.90, "mag": -0.3,"nature": "Venus/Jupiter", "meaning": "Healing, wisdom, compassion"},
+    "Shaula":     {"lon": 265.58, "mag": 1.6,  "nature": "Mars/Mercury", "meaning": "Cunning, scientific mind"},
+    "Lesath":     {"lon": 265.88, "mag": 2.7,  "nature": "Mercury/Mars", "meaning": "Danger, poison, but intellect"},
+    "Atria":      {"lon": 244.47, "mag": 1.9,  "nature": "Jupiter", "meaning": "Good fortune, honor"},
+    "Peacock":    {"lon": 324.53, "mag": 1.9,  "nature": "Saturn/Mercury", "meaning": "Misfortune through pride"},
+    "Dabih":      {"lon": 309.90, "mag": 3.1,  "nature": "Saturn/Venus", "meaning": "Reserved, scholarly"},
+    "Sadalmelik": {"lon": 336.98, "mag": 2.9,  "nature": "Jupiter/Venus", "meaning": "Honor, benevolence"},
+    "Sadalsuud":  {"lon": 341.76, "mag": 2.9,  "nature": "Jupiter", "meaning": "Good fortune, ambition"},
+    "Sadachbia":  {"lon": 339.64, "mag": 3.5,  "nature": "Mercury/Venus", "meaning": "Intellectual talent"},
+    "Skat":       {"lon": 337.22, "mag": 3.3,  "nature": "Mars/Mercury", "meaning": "Courage, scientific talent"},
+    "Algenib":    {"lon": 0.26,   "mag": 2.8,  "nature": "Jupiter/Mars", "meaning": "Ambition, military honor"},
+    "Mira":       {"lon": 34.38,  "mag": 6.5,  "nature": "Neptune", "meaning": "Transformation, unpredictability"},
+    "Menkar":     {"lon": 41.08,  "mag": 2.5,  "nature": "Saturn", "meaning": "Misfortune, but strong will"},
+    "Alcyone (Pleiades)":{"lon": 60.16, "mag": 3.0, "nature": "Moon/Mars", "meaning": "Emotional depth, vision, potential for blindness or obsession"},
+    "Electra":    {"lon": 58.69,  "mag": 3.7,  "nature": "Venus/Mars", "meaning": "Artistic talent, but sudden loss"},
+    "Atlas":      {"lon": 58.18,  "mag": 3.6,  "nature": "Moon/Mars", "meaning": "Emotional intensity"},
+    "Alderamin":  {"lon": 12.21,  "mag": 2.5,  "nature": "Mercury/Jupiter", "meaning": "Intellectual ability, honor"},
+    "Polaris":    {"lon": 88.34,  "mag": 2.0,  "nature": "Venus/Saturn", "meaning": "Guidance, stability, spiritual insight"},
+    "Nihal":      {"lon": 40.99,  "mag": 4.0,  "nature": "Mars/Saturn", "meaning": "Ambition, hard work"},
+    "Saiph":      {"lon": 79.73,  "mag": 2.1,  "nature": "Jupiter/Saturn", "meaning": "Benevolence, honor"},
+    "Bellatrix":  {"lon": 81.01,  "mag": 1.6,  "nature": "Mercury/Mars", "meaning": "Courage, honor, but rashness"},
+    "Meissa":     {"lon": 83.27,  "mag": 3.5,  "nature": "Mars/Mercury", "meaning": "Technical skill"},
+    "Alnitak":    {"lon": 85.64,  "mag": 1.7,  "nature": "Mars/Mercury", "meaning": "Ambition, courage"},
+    "Alnilam":    {"lon": 85.39,  "mag": 1.7,  "nature": "Jupiter/Mars", "meaning": "Fame, honor"},
+    "Mintaka":    {"lon": 84.09,  "mag": 2.2,  "nature": "Mars", "meaning": "Courage, ambition"},
+    "Wezen":      {"lon": 105.62, "mag": 1.8,  "nature": "Jupiter/Saturn", "meaning": "Honor, but melancholy"},
+    "Adhara":     {"lon": 102.38, "mag": 1.5,  "nature": "Mars/Mercury", "meaning": "Courage, ambition"},
+    "Mirzam":     {"lon": 101.73, "mag": 2.0,  "nature": "Mars/Mercury", "meaning": "Courage, ambition"},
+    "Kaus Media": {"lon": 270.49, "mag": 2.7,  "nature": "Jupiter/Mercury", "meaning": "Philosophical mind"},
+    "Alzirr":     {"lon": 102.51, "mag": 3.2,  "nature": "Mercury", "meaning": "Intelligence, versatility"},
+    "Asellus Australis":{"lon": 127.75, "mag": 3.9, "nature": "Mars/Sun", "meaning": "Courage, but impulsiveness"},
+    "Asellus Borealis":{"lon": 127.05, "mag": 4.2, "nature": "Mars/Sun", "meaning": "Courage, but recklessness"},
+    "Acubens":    {"lon": 130.46, "mag": 4.3,  "nature": "Mercury/Venus", "meaning": "Intelligence, charm"},
+    "Tarf":       {"lon": 136.76, "mag": 3.5,  "nature": "Mars/Saturn", "meaning": "Courage, but danger"},
+    "Avior":      {"lon": 196.09, "mag": 1.9,  "nature": "Venus/Saturn", "meaning": "Artistic talent, but sorrow"},
+    "Aspidiske":  {"lon": 200.44, "mag": 3.0,  "nature": "Venus/Mercury", "meaning": "Artistic talent, honor"},
+    "Markab":     {"lon": 353.48, "mag": 2.5,  "nature": "Jupiter/Mercury", "meaning": "Business success, but restlessness"},
+    "Sadr":       {"lon": 316.99, "mag": 2.2,  "nature": "Jupiter/Venus", "meaning": "Honor, benevolence"},
+    "Gienah":     {"lon": 192.39, "mag": 2.6,  "nature": "Mercury/Saturn", "meaning": "Intelligence, but melancholy"},
+    "Zuben Elgenubi (North)":{"lon": 220.36, "mag": 2.8, "nature": "Mercury", "meaning": "Intelligence, artistic talent"},
+    "Vindemiatrix (Epsilon Vir)":{"lon": 195.42, "mag": 3.0, "nature": "Saturn/Mercury", "meaning": "Widowhood, misfortune, but good for study"},
+    "Zavijava":   {"lon": 182.11, "mag": 3.6,  "nature": "Mercury", "meaning": "Intelligence, adaptability"},
+    "Porrima":    {"lon": 190.29, "mag": 2.7,  "nature": "Venus/Mercury", "meaning": "Artistic talent, grace"},
+    "Syrma":      {"lon": 190.89, "mag": 3.9,  "nature": "Mercury/Venus", "meaning": "Intelligence, charm"},
+    "Rijl al Awwa":{"lon": 199.53, "mag": 3.4, "nature": "Venus/Mercury", "meaning": "Artistic talent"},
+    "Alchiba":    {"lon": 193.14, "mag": 4.0,  "nature": "Mercury/Venus", "meaning": "Intelligence, adaptability"},
+    "Kraz":       {"lon": 202.73, "mag": 3.0,  "nature": "Mars/Saturn", "meaning": "Courage, but danger"},
+    "Gacrux":     {"lon": 212.63, "mag": 1.6,  "nature": "Venus/Saturn", "meaning": "Idealistic love, but sorrow"},
+    "Becrux":     {"lon": 214.70, "mag": 1.3,  "nature": "Venus/Mercury", "meaning": "Artistic talent"},
+    "Muhfrid":    {"lon": 207.52, "mag": 2.7,  "nature": "Mercury/Venus", "meaning": "Intelligence, charm"},
+    "Caph":       {"lon": 354.08, "mag": 2.3,  "nature": "Venus/Mercury", "meaning": "Artistic talent"},
+    "Schedir":    {"lon": 14.67,  "mag": 2.2,  "nature": "Saturn/Venus", "meaning": "High ideals, integrity"},
+    "Ruchbah":    {"lon": 12.07,  "mag": 2.7,  "nature": "Mercury/Venus", "meaning": "Intelligence, honor"},
+    "Zeta Cas":   {"lon": 17.44,  "mag": 3.7,  "nature": "Mars/Mercury", "meaning": "Courage"},
+    "Kappa Cas":  {"lon": 16.64,  "mag": 4.2,  "nature": "Mars", "meaning": "Courage"},
+    "Phi Cas":    {"lon": 18.63,  "mag": 5.0,  "nature": "Mercury", "meaning": "Intelligence"},
+    "Delta Cas":  {"lon": 18.62,  "mag": 2.7,  "nature": "Mars/Mercury", "meaning": "Courage, ambition"},
+    "Segin":      {"lon": 20.61,  "mag": 3.4,  "nature": "Mars", "meaning": "Courage"},
+    "Navi":       {"lon": 22.06,  "mag": 2.6,  "nature": "Jupiter/Mercury", "meaning": "Intellectual ability"},
+    "Tsih":       {"lon": 23.51,  "mag": 2.5,  "nature": "Mercury", "meaning": "Intelligence"},
+    "Rho Cas":    {"lon": 23.85,  "mag": 4.5,  "nature": "Mercury/Venus", "meaning": "Intelligence, charm"},
+    "Sigma Cas":  {"lon": 24.11,  "mag": 5.0,  "nature": "Mars", "meaning": "Courage"},
+    "Iota Cas":   {"lon": 24.56,  "mag": 4.6,  "nature": "Mercury", "meaning": "Intelligence"},
+    "Epsilon Cas": {"lon": 25.01, "mag": 3.4,  "nature": "Mars", "meaning": "Courage"},
+    "Zeta And":   {"lon": 24.25,  "mag": 4.1,  "nature": "Venus", "meaning": "Charm"},
+    "Upsilon And": {"lon": 24.72, "mag": 4.1,  "nature": "Mercury/Venus", "meaning": "Intelligence, charm"},
+    "Delta And":  {"lon": 25.50,  "mag": 3.3,  "nature": "Mercury/Venus", "meaning": "Intelligence, charm"},
+    "Beta Tri":   {"lon": 27.31,  "mag": 3.0,  "nature": "Mercury", "meaning": "Intelligence"},
+    "Alpha Tri":  {"lon": 28.57,  "mag": 3.4,  "nature": "Jupiter", "meaning": "Good fortune"},
+    "Gamma Tri":  {"lon": 28.99,  "mag": 4.0,  "nature": "Mercury", "meaning": "Intelligence"},
+    "Hamal (Alpha Ari)":{"lon": 38.27, "mag": 2.0, "nature": "Mars/Saturn", "meaning": "Self-will, initiative, but rashness"},
+    "Sheratan":   {"lon": 39.15,  "mag": 2.6,  "nature": "Mars/Saturn", "meaning": "Courage, but danger"},
+    "Mesarthim":  {"lon": 39.35,  "mag": 3.9,  "nature": "Mars/Saturn", "meaning": "Courage, but danger"},
+    "Botein":     {"lon": 42.07,  "mag": 5.0,  "nature": "Mars", "meaning": "Courage"},
+    "Zeta Ari":   {"lon": 43.34,  "mag": 4.9,  "nature": "Mars/Saturn", "meaning": "Courage"},
+    "Mira (Omicron Cet)":{"lon": 34.38, "mag": 6.5, "nature": "Neptune", "meaning": "Transformation, unpredictability"},
+    "Menkar (Alpha Cet)":{"lon": 41.08, "mag": 2.5, "nature": "Saturn", "meaning": "Misfortune, but strong will"},
+    "Diphda":     {"lon": 47.05,  "mag": 2.0,  "nature": "Saturn", "meaning": "Misfortune, but strong will"},
+    "Kaffaljidhma":{"lon": 44.83, "mag": 2.5, "nature": "Mercury/Venus", "meaning": "Intelligence, charm"},
+    "Deneb Kaitos":{"lon": 47.05, "mag": 2.0, "nature": "Saturn", "meaning": "Misfortune, but strong will"},
 }
 
 def fixed_star_conjunctions(lons, max_orb=2.0):
-    """Check which planets conjunct fixed stars (within orb degrees)."""
+    """Check which planets conjunct fixed stars (within orb degrees).
+    Uses tropical J2000 longitudes with proper-motion adjustment."""
     results = []
     for star, data in FIXED_STARS.items():
         star_lon = data["lon"]
@@ -2303,12 +2766,18 @@ def varga_chart(jd, varga, lat=0, lng=0, time_known=True):
         "D2":  {"divisions": 2,  "name": "Hora", "meaning": "Wealth, resources, financial patterns"},
         "D3":  {"divisions": 3,  "name": "Drekkana", "meaning": "Siblings, courage, self-effort"},
         "D4":  {"divisions": 4,  "name": "Chaturthamsa", "meaning": "Property, fixed assets, fortune"},
+        "D5":  {"divisions": 5,  "name": "Panchamsa", "meaning": "Fame, power, authority (Jaimini)"},
+        "D6":  {"divisions": 6,  "name": "Shasthamsa", "meaning": "Health, disease, obstacles (Jaimini)"},
         "D7":  {"divisions": 7,  "name": "Saptamsa", "meaning": "Children, progeny, creativity"},
+        "D8":  {"divisions": 8,  "name": "Ashtamsa", "meaning": "Unexpected troubles, accidents (Jaimini)"},
+        "D9":  {"divisions": 9,  "name": "Navamsa", "meaning": "Spouse, dharma, relationships, soul"},
         "D10": {"divisions": 10, "name": "Dasamsa", "meaning": "Career, profession, public status"},
+        "D11": {"divisions": 11, "name": "Rudramsa", "meaning": "Death, destruction, transformation (Jaimini)"},
         "D12": {"divisions": 12, "name": "Dwadashamsa", "meaning": "Parents, ancestry, lineage"},
         "D16": {"divisions": 16, "name": "Shodasamsa", "meaning": "Vehicles, comforts, luxuries"},
         "D20": {"divisions": 20, "name": "Vimsamsa", "meaning": "Spiritual pursuits, devotion"},
         "D24": {"divisions": 24, "name": "Chaturvimsamsa", "meaning": "Education, learning, knowledge"},
+        "D27": {"divisions": 27, "name": "Saptavimsamsa", "meaning": "Strengths, weaknesses, constitution"},
         "D30": {"divisions": 30, "name": "Trimsamsa", "meaning": "Misfortunes, health challenges"},
         "D40": {"divisions": 40, "name": "Khavedamsa", "meaning": "Auspicious/inauspicious events"},
         "D45": {"divisions": 45, "name": "Akshavedamsa", "meaning": "Overall character, conduct"},
@@ -3039,11 +3508,56 @@ def calculate_full_profile(data):
         result["prashna"] = prashna(qdt_utc, lat, lng, qtext, qtype)
         return result
 
+    if mode=="eclipses":
+        result["eclipses"] = next_eclipses(jd, data.get("count", 3))
+        return result
+
+    if mode=="stations":
+        p = data.get("planet", "Mercury")
+        result["stations"] = station_dates(jd, jd + data.get("days", 180), p)
+        return result
+
+    if mode=="upagrahas":
+        result["upagrahas"] = upagrahas(jd, lat, lng, time_known)
+        return result
+
+    if mode=="ashtakavarga":
+        result["ashtakavarga"] = ashtakavarga(jd, lat, lng, time_known)
+        return result
+
+    if mode=="void_of_course":
+        result["void_of_course_moon"] = void_of_course_moon(jd, lat, lng, time_known)
+        return result
+
+    if mode=="ashtottari":
+        moon_sid = norm360(body_longitudes(jd)[0]["Moon"] - ayanamsha_lahiri(jd))
+        result["ashtottari_dasha"] = ashtottari_dasha(moon_sid, birth_local)
+        return result
+
+    if mode=="tajika":
+        from astro_advanced import tajika_annual
+        result["tajika"] = tajika_annual(birth_local, lat, lng)
+        return result
+
+    if mode=="muhurta":
+        from astro_advanced import muhurta_finder
+        result["muhurta"] = muhurta_finder(jd, lat, lng,
+                                           data.get("activity","marriage"),
+                                           data.get("days_ahead", 14))
+        return result
+
+    if mode=="shadbala":
+        from astro_advanced import shadbala_sthana_dig
+        result["shadbala"] = shadbala_sthana_dig(jd, lat, lng)
+        return result
+
     # ── Natal with advanced features ────────────────────────────────
     do_advanced = data.get("advanced", False)
     result["charts"]={}
     if "western" in systems:
-        try: result["charts"]["western"]=western_chart(jd,lat,lng,time_known)
+        try:
+            result["charts"]["western"]=western_chart(jd,lat,lng,time_known,
+                                                       data.get("house_system","P"))
         except Exception as e: result["charts"]["western"]={"error":repr(e)}
     if "vedic" in systems:
         try: result["charts"]["vedic"]=vedic_chart(jd,lat,lng,birth_local,time_known)
@@ -3069,6 +3583,10 @@ def calculate_full_profile(data):
             result["aspect_patterns"]=detect_aspect_patterns(lons)
             result["fixed_star_conjunctions"]=fixed_star_conjunctions(lons)
             result["equal_houses"]=equal_houses(asc_lon)
+            result["declinations"]={nm: round(d,3) for nm,d in body_declinations(jd).items()}
+            result["declination_aspects"]=compute_declination_aspects(lons, body_declinations(jd))[:12]
+            result["antiscia"]={nm: round(antiscia(lons[nm]),3) for nm in lons}
+            result["void_of_course_moon"]=void_of_course_moon(jd, lat, lng, time_known)
         except Exception:
             pass
 
@@ -3078,6 +3596,10 @@ def calculate_full_profile(data):
             result["navamsa"]=navamsa_chart(jd, lat, lng, time_known)
             result["mangal_dosha"]=mangal_dosha(jd, lat, lng, time_known)
             result["kaalsarpa_dosha"]=kaalsarpa_dosha(jd, lat, lng, time_known)
+            result["upagrahas"]=upagrahas(jd, lat, lng, time_known)
+            result["ashtakavarga"]=ashtakavarga(jd, lat, lng, time_known)
+            moon_sid = norm360(body_longitudes(jd)[0]["Moon"] - ayanamsha_lahiri(jd))
+            result["ashtottari_dasha"]=ashtottari_dasha(moon_sid, birth_local)
         except Exception:
             pass
 

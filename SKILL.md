@@ -146,6 +146,15 @@ python3 "${SKILL_DIR%%/SKILL.md}/scripts/daily-astrology-fetch.py"
 | **`Remedies`** | — | Gemstone, color & practice suggestions from chart |
 | **`Weekly_calendar`** | `start_date` | 7-day astrological weather forecast |
 | **`Prashna`** | `question`, `question_time` | Vedic horary — chart of the moment |
+| **`Eclipses`** | `count` | Next solar & lunar eclipse dates (SWE) |
+| **`Stations`** | `planet`, `days` | Retrograde station dates + shadow periods |
+| **`Upagrahas`** | — | 9 Vedic sub-planets (Gulika, Dhuma, …) |
+| **`Ashtakavarga`** | — | Bindu strength charts (Bhinnashtakavarga + Sarvashtakavarga) |
+| **`Void_of_course`** | — | VOC Moon detection |
+| **`Ashtottari`** | — | 108-year alternative dasha |
+| **`Tajika`** | — | Vedic annual (solar return) horoscope |
+| **`Muhurta`** | `activity`, `days_ahead` | Panchang-based electional timing |
+| **`Shadbala`** | — | Planetary strength (Sthana + Dig) |
 
 | Mode | Extra params | What it does |
 

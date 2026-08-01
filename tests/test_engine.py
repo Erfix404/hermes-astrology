@@ -12,6 +12,7 @@ import astro_engine as ae
 BIRTH = {"year": 1995, "month": 4, "day": 15, "hour": 14, "minute": 30,
          "lat": 35.6892, "lng": 51.3890, "tz": "Asia/Tehran", "time_known": True}
 BIRTH_WEST = {**BIRTH, "systems": ["western"]}
+BIRTH_BOTH = {**BIRTH, "systems": ["western", "vedic"]}
 BIRTH_ALL = {**BIRTH, "systems": ["western", "vedic", "bazi"]}
 
 
@@ -379,7 +380,7 @@ class TestPlacidus(unittest.TestCase):
     @unittest.skipUnless(ae._HAS_SWE, "swisseph not installed")
     def test_cusps_align_with_asc(self):
         jd = ae.julian_day(datetime(1995, 4, 15, 11, 0))
-        cusps = ae.placidus_cusps(jd, 35.6892, 51.3890)
+        cusps, _ = ae.placidus_cusps(jd, 35.6892, 51.3890)
         asc_lon, _ = ae.ascendant_mc(jd, 35.6892, 51.3890)
         self.assertEqual(len(cusps), 12)
         self.assertLess(abs(cusps[0] - asc_lon), 1.0)
@@ -387,7 +388,7 @@ class TestPlacidus(unittest.TestCase):
     @unittest.skipUnless(ae._HAS_SWE, "swisseph not installed")
     def test_house_of_all_planets(self):
         jd = ae.julian_day(datetime(1995, 4, 15, 11, 0))
-        cusps = ae.placidus_cusps(jd, 35.6892, 51.3890)
+        cusps, _ = ae.placidus_cusps(jd, 35.6892, 51.3890)
         lons, _, _ = ae.body_longitudes(jd)
         for b in ("Sun","Moon","Mercury","Venus","Mars","Jupiter",
                   "Saturn","Uranus","Neptune","Pluto"):
@@ -400,6 +401,133 @@ class TestPlacidus(unittest.TestCase):
         r = ae.calculate_full_profile(BIRTH_WEST)
         self.assertIn("Placidus", r["charts"]["western"]["system"])
         self.assertIn("cusp_lon", r["charts"]["western"]["houses"][1])
+
+
+class TestNewFeatures(unittest.TestCase):
+    """Post-audit features: declinations, antiscia, minor aspects, VOC,
+    upagrahas, ashtakavarga, ashtottari, eclipses, stations, house systems."""
+
+    def setUp(self):
+        self.jd = ae.julian_day(datetime(1995, 4, 15, 11, 0))
+        self.birth = dict(BIRTH_WEST)
+
+    def test_minor_aspects_present(self):
+        lons, _, _ = ae.body_longitudes(self.jd)
+        aspects = ae.compute_aspects(lons)
+        names = {a["aspect"] for a in aspects}
+        self.assertIn("semisextile", ae.ASPECTS)
+        self.assertIn("quintile", ae.ASPECTS)
+        self.assertIn("septile", ae.ASPECTS)
+
+    def test_declinations(self):
+        decls = ae.body_declinations(self.jd)
+        self.assertIn("Sun", decls)
+        self.assertLess(abs(decls["Sun"]), 1.0)  # Sun near ecliptic
+
+    def test_declination_aspects(self):
+        lons, _, _ = ae.body_longitudes(self.jd)
+        decls = ae.body_declinations(self.jd)
+        da = ae.compute_declination_aspects(lons, decls)
+        for a in da:
+            self.assertIn(a["aspect"], ("parallel", "contraparallel"))
+
+    def test_antiscia(self):
+        self.assertAlmostEqual(ae.antiscia(0), 360.0 % 360)
+        self.assertAlmostEqual(ae.antiscia(100), 260.0)
+
+    def test_void_of_course(self):
+        v = ae.void_of_course_moon(self.jd, 35.6892, 51.3890)
+        self.assertIn("is_void", v)
+
+    def test_upagrahas_nine(self):
+        u = ae.upagrahas(self.jd, 35.6892, 51.3890)
+        self.assertEqual(len(u), 9)
+        self.assertIn("Gulika", u)
+
+    def test_ashtakavarga(self):
+        a = ae.ashtakavarga(self.jd, 35.6892, 51.3890)
+        self.assertEqual(len(a["sarvashtakavarga"]), 12)
+        for counts in a["bhinnashtakavarga"].values():
+            self.assertEqual(len(counts), 12)
+
+    def test_ashtottari(self):
+        moon_sid = ae.norm360(ae.body_longitudes(self.jd)[0]["Moon"] - ae.ayanamsha_lahiri(self.jd))
+        d = ae.ashtottari_dasha(moon_sid, datetime(1995, 4, 15, 11, 0))
+        self.assertEqual(d["system"], "Ashtottari (108-year)")
+        self.assertEqual(len(d["periods"]), 3)
+
+    @unittest.skipUnless(ae._HAS_SWE, "swisseph not installed")
+    def test_eclipses(self):
+        e = ae.next_eclipses(self.jd, count=2)
+        self.assertGreaterEqual(len(e), 1)
+        for x in e:
+            self.assertIn(x["type"], ("solar", "lunar"))
+
+    @unittest.skipUnless(ae._HAS_SWE, "swisseph not installed")
+    def test_stations(self):
+        s = ae.station_dates(self.jd, self.jd + 120, "Mercury", step=2)
+        self.assertIn("stations", s)
+
+    @unittest.skipUnless(ae._HAS_SWE, "swisseph not installed")
+    def test_house_system_selection(self):
+        d = dict(self.birth)
+        d["house_system"] = "K"
+        r = ae.calculate_full_profile(d)
+        self.assertIn("Koch", r["charts"]["western"]["system"])
+
+    def test_new_fields_in_natal(self):
+        r = ae.calculate_full_profile(BIRTH_BOTH)
+        for k in ("declinations", "antiscia", "void_of_course_moon"):
+            self.assertIn(k, r)
+        self.assertIn("upagrahas", r)
+        self.assertIn("ashtakavarga", r)
+        self.assertIn("ashtottari_dasha", r)
+
+    @unittest.skipUnless(ae._HAS_SWE, "swisseph not installed")
+    def test_new_modes(self):
+        for mode in ("eclipses", "upagrahas", "ashtakavarga", "void_of_course", "ashtottari"):
+            d = dict(self.birth)
+            d["mode"] = mode
+            r = ae.calculate_full_profile(d)
+            self.assertNotIn("error", r.get("_meta", {}))
+            self.assertTrue(any(k != "_meta" for k in r.keys()))
+
+    def test_tajika_mode(self):
+        d = dict(self.birth)
+        d["systems"] = ["vedic"]
+        d["mode"] = "tajika"
+        r = ae.calculate_full_profile(d)
+        self.assertIn("tajika", r)
+        self.assertIsNotNone(r["tajika"].get("tajika_year"))
+
+    def test_muhurta_mode(self):
+        d = dict(self.birth)
+        d["systems"] = ["vedic"]
+        d["mode"] = "muhurta"
+        d["days_ahead"] = 3
+        r = ae.calculate_full_profile(d)
+        self.assertIn("muhurta", r)
+        self.assertIn("top_muhurtas", r["muhurta"])
+
+    def test_shadbala_mode(self):
+        d = dict(self.birth)
+        d["systems"] = ["vedic"]
+        d["mode"] = "shadbala"
+        r = ae.calculate_full_profile(d)
+        self.assertIn("shadbala", r)
+        self.assertIn("sthana_bala", r["shadbala"])
+
+    def test_dignity_with_degree(self):
+        # Jupiter in Leo 5° — triplicity night ruler + Jupiter term (0-6)
+        d = ae.dignity_western("Jupiter", "Leo", 5)
+        self.assertIn("triplicity", d)
+        self.assertIn("term", d)
+
+    def test_fixed_stars_expanded(self):
+        self.assertGreaterEqual(len(ae.FIXED_STARS), 60)
+
+    def test_aspects_table_expanded(self):
+        self.assertGreaterEqual(len(ae.ASPECTS), 12)
 
 
 if __name__ == "__main__":
