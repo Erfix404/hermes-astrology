@@ -139,6 +139,7 @@ python3 "${SKILL_DIR%%/SKILL.md}/scripts/daily-astrology-fetch.py"
 | `Horary` | `question_time`, `question` | Chart of the moment |
 | `Astrocartography` | — | Planet lines for relocation |
 | **`Node_transit`** | — | Rahu/Ketu through natal houses — interpretation |
+| **`Node_transit_all_signs`** | — | **Public** — Rahu/Ketu effect on natives of all 12 signs. No birth data needed. |
 | **`Guna_milan`** | `partner` {} | Vedic Ashtakoota — 36-guna marriage compatibility |
 | **`Solar_return_interpreted`** | `target_year` | Solar return with human-readable year theme |
 | **`Electional`** | `activity`, `days_ahead` | Best planetary hours for any activity |

@@ -169,6 +169,93 @@ def analyze_node_transit(natal_lons, transit_lons):
     result["_note"] = "Node transits (Rahu/Ketu) last ~18 months per house. Rahu amplifies the house; Ketu releases it. They always transit opposite houses together."
     return result
 
+
+# Rahu/Ketu effect on natives of each zodiac sign (public, no birth data needed).
+# From references/templates.md — tables ۷. Keyed by zodiac sign index 0-11 (Aries=0).
+RAHU_SIGN_INTERP = {
+    0:  "Career leap, fierce competition — boldness surges, watch for haste.",
+    1:  "Money temptation and spending — wealth comes but managing it is hard.",
+    2:  "Great networking, new connections — ignore the gossip.",
+    3:  "Home and family tension — relocation or moving house.",
+    4:  "Artistic/romantic ambition — lots of showing off, pride.",
+    5:  "Health and work obsession — don't overdo the details.",
+    6:  "Partnership and marriage pressure — don't rush decisions.",
+    7:  "Deep transformation, shared money, secrets — betrayal and trust.",
+    8:  "Travel and study — expand your beliefs.",
+    9:  "Professional ambition — fame and authority.",
+    10: "New networks, fateful friends — hope.",
+    11: "Isolation, dreams, spirituality — letting go and peace.",
+}
+KETU_SIGN_INTERP = {
+    0:  "Less boldness — retreat from competition, calm.",
+    1:  "Disinterest in wealth — simple living.",
+    2:  "Fewer words — silence and introspection.",
+    3:  "Distance from family — emotional independence.",
+    4:  "Avoiding show — humility.",
+    5:  "Letting go of obsession — accepting simplicity.",
+    6:  "Break from relationships — productive solitude.",
+    7:  "Deep spirituality — interest in the unseen.",
+    8:  "Less travel — study and inward focus.",
+    9:  "Letting go of ambition — contentment.",
+    10: "Withdrawal from groups — self-sufficiency.",
+    11: "Moksha, liberation — complete spirituality.",
+}
+
+
+def node_transit_all_signs(transit_lons, jd=None):
+    """Public Rahu/Ketu transit — effect on natives of ALL 12 signs.
+
+    No birth data required. Uses current (or given) node positions:
+    for each zodiac sign, tells how transiting Rahu/Ketu affects
+    natives born under that sign (Rahu house = sign index offset from
+    the node's current sign).
+
+    Returns per-sign interpretation + which sign Rahu/Ketu currently occupy.
+    """
+    import sys
+    _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+    if _SCRIPTS_DIR not in sys.path:
+        sys.path.insert(0, _SCRIPTS_DIR)
+    import astro_engine as _ae
+
+    if jd is None:
+        jd = _ae.julian_day(datetime.utcnow())
+    ayan = _ae.ayanamsha_lahiri(jd)
+
+    rahu_sid = (transit_lons.get("North Node", 0) - ayan) % 360
+    ketu_sid = (transit_lons.get("South Node", 0) - ayan) % 360
+    rahu_sign_idx = int(rahu_sid // 30) % 12
+    ketu_sign_idx = int(ketu_sid // 30) % 12
+
+    signs = _ae.SIGNS  # ["Aries", ..., "Pisces"]
+    out = {
+        "current": {
+            "rahu_sign": signs[rahu_sign_idx],
+            "ketu_sign": signs[ketu_sign_idx],
+            "rahu_sidereal_lon": round(rahu_sid, 3),
+            "ketu_sidereal_lon": round(ketu_sid, 3),
+        },
+        "per_sign": [],
+        "_note": ("Rahu/Ketu each stay ~18 months per sign. "
+                  "Rahu house for a native = offset from their Sun/Moon sign "
+                  "to the node's current sign (whole-sign). Effects below are "
+                  "for natives of each sign, with the node transiting their "
+                  "1st house (their sign itself)."),
+    }
+    for idx in range(12):
+        # House the node occupies relative to native's sign:
+        # native sign = 1st house; node sign offset = house number
+        rahu_house = (rahu_sign_idx - idx) % 12 + 1
+        ketu_house = (ketu_sign_idx - idx) % 12 + 1
+        out["per_sign"].append({
+            "sign": signs[idx],
+            "rahu_house": rahu_house,
+            "rahu_effect": RAHU_SIGN_INTERP.get(idx, ""),
+            "ketu_house": ketu_house,
+            "ketu_effect": KETU_SIGN_INTERP.get(idx, ""),
+        })
+    return out
+
 # ─────────────────────────────────────────────────────────────────────
 #  2  — Guna Milan / Ashtakoota (36-guna Vedic compatibility)
 # ─────────────────────────────────────────────────────────────────────

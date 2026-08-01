@@ -14,7 +14,7 @@
 - **Deterministic** — same input → same output, every time. No randomness, no LLM, no network.
 - **Arcsecond-accurate** — validated against NASA JPL DE421 (via Skyfield): all planets < 30″, Moon 2.3″, outer planets < 2″. Optional Swiss Ephemeris upgrade → arcsecond precision + Placidus/Koch/Equal/Regiomontanus houses.
 - **14‑function CLI** — `astro --json`, `astro --file`, `astro --summary`
-- **19 chart modes + 11 advanced** — natal, transit, synastry, compatibility, composite, solar/lunar/planetary return, navamsa, varga (D2–D60), panchang, moon phase, numerology, progressions, planetary hours, transit‑natal aspects, horary, astrocartography + eclipses, stations, upagrahas, ashtakavarga, VOC Moon, ashtottari, tajika, muhurta, shadbala
+- **19 chart modes + 12 advanced** — natal, transit, synastry, compatibility, composite, solar/lunar/planetary return, navamsa, varga (D2–D60), panchang, moon phase, numerology, progressions, planetary hours, transit‑natal aspects, horary, astrocartography + eclipses, stations, upagrahas, ashtakavarga, VOC Moon, ashtottari, tajika, muhurta, shadbala, **node transit for all 12 signs (public — no birth data needed)**
 - **Auto‑enriched** — aspect patterns (Grand Trine, T‑Square, Yod, Kite, Grand Cross), Arabic Parts, fixed stars (60+), Black Moon Lilith, dignities (domicile/exalt + triplicity/term/decan), declination aspects, antiscia, Mangal Dosha, Kaalsarpa Dosha
 - **Swiss Ephemeris upgrade** — `pip install pyswisseph` → arcsecond precision + Placidus/Koch/Equal/Regiomontanus houses. No code change.
 - **8 reference rulesets** — grounded classical interpretation, no hallucinated Barnum fluff

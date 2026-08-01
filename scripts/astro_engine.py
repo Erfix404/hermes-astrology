@@ -3483,6 +3483,20 @@ def _normalize_birth(d):
 def calculate_full_profile(data):
     data = _normalize_birth(data)
     mode=data.get("mode","natal")
+
+    # Public modes — no birth data required. Handle before to_utc().
+    if mode=="node_transit_all_signs":
+        from astro_advanced import node_transit_all_signs
+        tjd = julian_day(datetime.utcnow())
+        t_lons, _, _ = body_longitudes(tjd)
+        result = {"_meta": {"engine_backend": body_longitudes(tjd)[2],
+                            "swisseph_available": _HAS_SWE,
+                            "computed_on": TODAY.strftime("%Y-%m-%d"),
+                            "node_type": "true" if _HAS_SWE else "mean"},
+                  "mode": mode,
+                  "node_transit_all_signs": node_transit_all_signs(t_lons, jd=tjd)}
+        return result
+
     birth_utc, tinfo = to_utc(data)
     jd=julian_day(birth_utc)
     lat=data.get("lat",0.0); lng=data.get("lng",0.0)
@@ -3641,6 +3655,13 @@ def calculate_full_profile(data):
         tjd = julian_day(datetime.utcnow())
         t_lons, _, _ = body_longitudes(tjd)
         result["node_transit"] = analyze_node_transit(natal_lons, t_lons)
+        return result
+
+    if mode=="node_transit_all_signs":
+        from astro_advanced import node_transit_all_signs
+        tjd = julian_day(datetime.utcnow())
+        t_lons, _, _ = body_longitudes(tjd)
+        result["node_transit_all_signs"] = node_transit_all_signs(t_lons, jd=tjd)
         return result
 
     if mode=="guna_milan":

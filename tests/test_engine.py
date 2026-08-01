@@ -578,6 +578,37 @@ class TestNewFeatures(unittest.TestCase):
         self.assertGreaterEqual(len(ae.ASPECTS), 12)
 
 
+class TestNodeTransitAllSigns(unittest.TestCase):
+    """Public node-transit feature: Rahu/Ketu effect on natives of all 12 signs."""
+
+    def test_all_signs_present(self):
+        d = dict(BIRTH)
+        d["mode"] = "node_transit_all_signs"
+        r = ae.calculate_full_profile(d)
+        nt = r["node_transit_all_signs"]
+        self.assertIn("current", nt)
+        self.assertIn("rahu_sign", nt["current"])
+        self.assertIn("ketu_sign", nt["current"])
+        self.assertEqual(len(nt["per_sign"]), 12)
+        # Rahu and Ketu are always opposite (6 signs apart)
+        ri = ae.SIGNS.index(nt["current"]["rahu_sign"])
+        ki = ae.SIGNS.index(nt["current"]["ketu_sign"])
+        self.assertEqual((ri - ki) % 12, 6)
+
+    def test_effects_not_empty(self):
+        d = dict(BIRTH)
+        d["mode"] = "node_transit_all_signs"
+        r = ae.calculate_full_profile(d)
+        for s in r["node_transit_all_signs"]["per_sign"]:
+            self.assertTrue(s["rahu_effect"], f"{s['sign']} rahu effect empty")
+            self.assertTrue(s["ketu_effect"], f"{s['sign']} ketu effect empty")
+
+    def test_no_birth_data_needed(self):
+        # Works with just mode — no birth details required (public feature)
+        r = ae.calculate_full_profile({"mode": "node_transit_all_signs"})
+        self.assertIn("node_transit_all_signs", r)
+
+
 class TestJPLValidation(unittest.TestCase):
     """Cross-check engine positions against NASA JPL Horizons reference values.
 
