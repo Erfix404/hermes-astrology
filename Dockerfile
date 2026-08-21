@@ -4,6 +4,9 @@ WORKDIR /app
 
 COPY . .
 
+# Runtime deps for the API server (engine itself is zero-dependency)
+RUN pip install --no-cache-dir "fastapi>=0.100,<1.0" "uvicorn>=0.23,<1.0"
+
 # Test
 RUN python -m unittest tests.test_engine -v
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Daily astrology data fetcher - outputs current planetary positions and key transits."""
 import json, subprocess, sys, os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 ENGINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "astro_engine.py")
 
@@ -49,8 +49,10 @@ def get_current_planets(collected, key, data):
     return planets
 
 def main():
-    now = datetime.utcnow()
-    
+    # Tehran-local "now" (UTC+3:30, no DST since 2022) — the engine expects
+    # local wall-clock time at the chart location, not UTC.
+    now = datetime.now(timezone(timedelta(hours=3, minutes=30)))
+
     # Current transit chart for Tehran (or UTC)
     transit_input = {
         "mode": "natal",  # Just get planets for today's date
@@ -65,21 +67,21 @@ def main():
         "time_known": True,
         "systems": ["western"]
     }
-    
+
     try:
         data = run_engine(transit_input)
         planets = get_current_planets(None, "today", data)
-        
+
         result = {
             "date": now.strftime("%Y-%m-%d"),
-            "time_utc": now.strftime("%H:%M UTC"),
+            "time_tehran": now.strftime("%H:%M Tehran"),
             "planets": planets,
             "sunrise": data.get("time_info", {}).get("sunrise"),
             "sunset": data.get("time_info", {}).get("sunset"),
         }
-        
+
         print(json.dumps(result, indent=2))
-        
+
     except Exception as e:
         print(json.dumps({"error": str(e), "date": now.strftime("%Y-%m-%d")}))
         sys.exit(1)
