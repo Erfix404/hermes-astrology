@@ -22,17 +22,35 @@ for line in _pyproject.splitlines():
         break
 
 class TestVersionSync(unittest.TestCase):
-    """api.py must not drift from pyproject.toml."""
+    """api.py must read its version from pyproject.toml (no hardcoded drift)."""
 
     def setUp(self):
         self.api_src = (_SCRIPTS / "api.py").read_text()
 
-    def test_version_matches_pyproject(self):
-        self.assertIsNotNone(_VERSION_LINE, "pyproject.toml has no version")
-        # VERSION = "2.7.0" in api.py
-        marker = f'VERSION = "{_VERSION_LINE}"'
-        self.assertIn(marker, self.api_src,
-                      f"api.py VERSION must be {marker} to match pyproject.toml")
+    def test_no_hardcoded_version(self):
+        # The old bug: VERSION = "2.5.0" hardcoded while pyproject said 2.7.0
+        self.assertNotRegex(self.api_src, r'VERSION\s*=\s*"\d+\.\d+\.\d+"',
+                            "api.py must not hardcode a version string")
+
+    def test_reads_from_pyproject(self):
+        self.assertIn("_read_version", self.api_src,
+                      "api.py must define _read_version()")
+        self.assertIn('VERSION = _read_version()', self.api_src)
+
+    def test_runtime_version_matches_pyproject(self):
+        # Actually import api.py and check the runtime value
+        import importlib.util
+        try:
+            spec = importlib.util.spec_from_file_location(
+                "_api_under_test", _SCRIPTS / "api.py")
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+        except ImportError as e:
+            if "fastapi" in str(e) or "uvicorn" in str(e):
+                self.skipTest(f"fastapi/uvicorn not installed in this env: {e}")
+            raise
+        self.assertEqual(mod.VERSION, _VERSION_LINE,
+                         f"runtime VERSION {mod.VERSION!r} != pyproject {_VERSION_LINE!r}")
 
 class TestCLIInterface(unittest.TestCase):
     """CLI entry point: --version, --help, error handling."""

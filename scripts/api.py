@@ -35,7 +35,21 @@ if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 import astro_engine  # noqa: E402
 
-VERSION = "2.5.0"
+
+def _read_version():
+    """Read version from pyproject.toml (single source of truth)."""
+    pyproject = os.path.join(_SCRIPTS_DIR, "..", "pyproject.toml")
+    try:
+        with open(pyproject) as f:
+            for line in f:
+                if line.startswith("version"):
+                    return line.split('"')[1]
+    except OSError:
+        pass
+    return "0.0.0"
+
+
+VERSION = _read_version()
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(

@@ -4,6 +4,9 @@ WORKDIR /app
 
 COPY . .
 
+# Runtime deps for the API server (engine itself is zero-dependency)
+RUN pip install --no-cache-dir fastapi uvicorn
+
 # Test
 RUN python -m unittest tests.test_engine -v
 

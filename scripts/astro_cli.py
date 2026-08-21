@@ -10,6 +10,19 @@ if _SCRIPTS_DIR not in sys.path:
 from astro_engine import calculate_full_profile, _demo
 
 
+def _get_version():
+    """Read version from pyproject.toml (single source of truth)."""
+    pyproject = os.path.join(_SCRIPTS_DIR, "..", "pyproject.toml")
+    try:
+        with open(pyproject) as f:
+            for line in f:
+                if line.startswith("version"):
+                    return line.split('"')[1]
+    except OSError:
+        pass
+    return "unknown"
+
+
 def _load_data(args):
     if args.json:
         return json.loads(args.json)
@@ -33,6 +46,8 @@ def main():
                "panchang, moon_phase, numerology, progressions, planetary_hours, "
                "transit_natal_aspects, horary, astrocartography",
     )
+    ap.add_argument("--version", action="version",
+                    version=f"hermes-astrology {_get_version()}")
     ap.add_argument("--json", help="birth data as JSON string")
     ap.add_argument("--file", help="path to birth data JSON file")
     ap.add_argument("--mode", "-m", default="natal",
@@ -47,17 +62,27 @@ def main():
                     help="partner birth data JSON (for synastry/compatibility)")
     a = ap.parse_args()
 
-    data = _load_data(a)
-    if a.mode:
-        data["mode"] = a.mode
-    if a.systems:
-        data["systems"] = a.systems
-    if a.date:
-        data["transit_date"] = a.date
-    if a.partner:
-        data["partner"] = json.loads(a.partner)
+    try:
+        data = _load_data(a)
+        if a.mode:
+            data["mode"] = a.mode
+        if a.systems:
+            data["systems"] = a.systems
+        if a.date:
+            data["transit_date"] = a.date
+        if a.partner:
+            data["partner"] = json.loads(a.partner)
 
-    result = calculate_full_profile(data)
+        result = calculate_full_profile(data)
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"error: invalid input: {e}", file=sys.stderr)
+        sys.exit(2)
+    except FileNotFoundError as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(2)
+    except KeyError as e:
+        print(f"error: missing required field: {e}", file=sys.stderr)
+        sys.exit(2)
 
     if a.summary:
         _print_summary(result, data)
