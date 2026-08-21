@@ -43,7 +43,9 @@ def _read_version():
         with open(pyproject) as f:
             for line in f:
                 if line.startswith("version"):
-                    return line.split('"')[1]
+                    parts = line.split('"')
+                    if len(parts) >= 2:
+                        return parts[1]
     except OSError:
         pass
     return "0.0.0"
