@@ -76,7 +76,7 @@ def main():
             data["partner"] = json.loads(a.partner)
 
         result = calculate_full_profile(data)
-    except (json.JSONDecodeError, ValueError) as e:
+    except ValueError as e:  # includes json.JSONDecodeError
         print(f"error: invalid input: {e}", file=sys.stderr)
         sys.exit(2)
     except FileNotFoundError as e:
