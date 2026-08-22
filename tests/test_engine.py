@@ -644,6 +644,43 @@ class TestPublicModesNoBirthData(unittest.TestCase):
         self.assertIn("phase", r["moon_phase"])
 
 
+class TestNodeTypeOption(unittest.TestCase):
+    """node_type option (wave 0-3): "true" (osculating, astro.com default)
+    vs "mean" (smoothed; classical Parashari/Lilly). True oscillates around
+    mean with amplitude ~1.5 deg over ~173 days."""
+
+    def test_true_vs_mean_nodes_differ_within_1p5deg(self):
+        jd = ae.julian_day(datetime(2026, 8, 22))
+        lons_true, _, _ = ae.body_longitudes(jd, node_type="true")
+        lons_mean, _, _ = ae.body_longitudes(jd, node_type="mean")
+        diff = abs(ae.norm180(lons_true["North Node"] - lons_mean["North Node"]))
+        self.assertGreater(diff, 0.001, "true and mean nodes should differ")
+        self.assertLess(diff, 2.0, "true node must stay within ~2 deg of mean")
+        # South nodes are antipodal in both systems
+        self.assertAlmostEqual(lons_true["South Node"],
+                               (lons_true["North Node"] + 180) % 360, places=6)
+
+    def test_default_is_true_with_swisseph_mean_without(self):
+        jd = ae.julian_day(datetime(2026, 8, 22))
+        _, _, backend = ae.body_longitudes(jd)
+        _, meta_node, _ = ae.body_longitudes(jd, node_type=None)
+        expected = "true" if ae._HAS_SWE else "mean"
+        self.assertEqual(expected, "true" if backend == "swisseph" else "mean")
+        self.assertIsNotNone(meta_node)
+
+    def test_calculate_full_profile_reports_and_applies_node_type(self):
+        d = dict(ae._demo()); d["systems"] = ["western"]
+        r_true = ae.calculate_full_profile({**d, "node_type": "true"})
+        r_mean = ae.calculate_full_profile({**d, "node_type": "mean"})
+        self.assertEqual(r_true["_meta"]["node_type"], "true")
+        self.assertEqual(r_mean["_meta"]["node_type"], "mean")
+        nn_t = r_true["charts"]["western"]["planets"]["North Node"]["abs_lon"]
+        nn_m = r_mean["charts"]["western"]["planets"]["North Node"]["abs_lon"]
+        diff = abs((nn_t - nn_m + 180) % 360 - 180)
+        self.assertGreater(diff, 0.001)
+        self.assertLess(diff, 2.0)
+
+
 class TestJPLValidation(unittest.TestCase):
     """Cross-check engine positions against NASA JPL Horizons reference values.
 

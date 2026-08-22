@@ -667,8 +667,11 @@ def _pluto_geo_lon(d):
 PLANET_ORDER = ["Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn",
                 "Uranus","Neptune","Pluto","North Node","South Node","Chiron"]
 
-def tropical_longitudes(jd):
-    """Return {body: longitude_deg} (tropical/geocentric) via builtin ephemeris."""
+def tropical_longitudes(jd, node_type="mean"):
+    """Return {body: longitude_deg} (tropical/geocentric) via builtin ephemeris.
+
+    Builtin backend only implements the mean node; true node requires swisseph.
+    """
     d = jd - 2451543.5
     sun = _sun(d)
     out = {"Sun":sun["lon"], "Moon":_moon_geo_lon(d,sun)}
@@ -681,8 +684,30 @@ def tropical_longitudes(jd):
     out["Chiron"] = _chiron_geo_lon(d, sun)
     return out
 
-def longitudes_swe(jd):
-    """High-precision longitudes if swisseph present (tropical)."""
+_SWE_FLAGS = None  # resolved lazily: FLG_SWIEPH if .se1 files exist, else MOSEPH
+
+def _swe_calc_flags(jd):
+    """FLG_SWIEPH needs .se1 data files; coverage is date-ranged, so a probe at
+    J2000 can pass while the requested date raises (missing seas_18.se1 etc.).
+    Probe with the actual jd + the most demanding body (true node). On failure
+    fall back to file-free Moshier ephemeris (FLG_MOSEPH): ~0.1 arcsec planets,
+    both nodes available."""
+    global _SWE_FLAGS
+    if _SWE_FLAGS is None:
+        probe = swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS
+        try:
+            swe.calc_ut(jd, swe.TRUE_NODE, probe)
+            _SWE_FLAGS = probe
+        except swe.Error:
+            _SWE_FLAGS = swe.FLG_MOSEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS
+    return _SWE_FLAGS
+
+def longitudes_swe(jd, node_type="true"):
+    """High-precision longitudes if swisseph present (tropical).
+
+    node_type: "true" (osculating node, astro.com default) or "mean"
+    (smoothed average; classical Parashari/Lilly tradition).
+    """
     # Never reset the ephe path here — that kills ephemeris files and breaks
     # Chiron/outers, forcing fallback to the builtin backend.
     if _EPHE_DIR and os.path.isdir(_EPHE_DIR):
@@ -690,29 +715,51 @@ def longitudes_swe(jd):
             swe.set_ephe_path(_EPHE_DIR)
         except Exception:
             pass
+    node_id = swe.TRUE_NODE if node_type == "true" else swe.MEAN_NODE
     ids = {"Sun":swe.SUN,"Moon":swe.MOON,"Mercury":swe.MERCURY,"Venus":swe.VENUS,
            "Mars":swe.MARS,"Jupiter":swe.JUPITER,"Saturn":swe.SATURN,"Uranus":swe.URANUS,
-           "Neptune":swe.NEPTUNE,"Pluto":swe.PLUTO,"North Node":swe.TRUE_NODE,
+           "Neptune":swe.NEPTUNE,"Pluto":swe.PLUTO,"North Node":node_id,
            "Chiron":swe.CHIRON}
+    # FLG_SWIEPH needs .se1 data files; without them fall back to the built-in
+    # Moshier ephemeris (no files, ~0.1 arcsec for planets, exact nodes).
+    flags = _swe_calc_flags(jd)
     out = {}
     speed = {}
     for name, pid in ids.items():
-        res = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS)[0]
+        try:
+            res = swe.calc_ut(jd, pid, flags)[0]
+        except swe.Error:
+            if name != "Chiron":
+                raise
+            # Chiron's asteroid file (seas_18.se1) is often missing while
+            # everything else works — degrade Chiron alone to builtin.
+            d = jd - 2451543.5
+            out[name] = _chiron_geo_lon(d, _sun(d))
+            speed[name] = 0.0
+            continue
         out[name] = res[0] % 360.0
         speed[name] = res[3]
     out["South Node"] = (out["North Node"]+180) % 360.0
     speed["South Node"] = speed["North Node"]
     return out, speed
 
-def body_longitudes(jd):
-    """Unified accessor: (longitudes, retro_speed, backend)."""
+_NODE_TYPE = None  # session-wide override set by calculate_full_profile
+
+def body_longitudes(jd, node_type=None):
+    """Unified accessor: (longitudes, retro_speed, backend).
+
+    node_type: "true"|"mean"|None. None = module override (_NODE_TYPE, set
+    from input "node_type"), else true if swisseph available (astro.com
+    convention), else mean (builtin backend has no true node).
+    """
+    nt = node_type or _NODE_TYPE or ("true" if _HAS_SWE else "mean")
     if _HAS_SWE:
         try:
-            lons, speed = longitudes_swe(jd)
+            lons, speed = longitudes_swe(jd, node_type=nt)
             return lons, speed, "swisseph"
         except Exception:
             pass
-    lons = tropical_longitudes(jd)
+    lons = tropical_longitudes(jd, node_type="mean")
     # finite-difference speed for retrograde detection
     lons2 = tropical_longitudes(jd + 1.0)
     speed = {b: norm180(lons2[b]-lons[b]) for b in lons}
@@ -731,7 +778,7 @@ def body_declinations(jd):
                    "Neptune":swe.NEPTUNE,"Pluto":swe.PLUTO,"North Node":swe.TRUE_NODE,
                    "Chiron":swe.CHIRON}
             for name, pid in ids.items():
-                res = swe.calc_ut(jd, pid, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS)
+                res = swe.calc_ut(jd, pid, _swe_calc_flags(jd))
                 # pyswisseph 2.10.x: res[0] is a 6-tuple (lon, lat, dist, ...)
                 lon, lat = res[0][0], res[0][1]
                 # declination from ecliptic lon/lat (NOT ecliptic latitude — that's
@@ -788,7 +835,7 @@ def station_dates(jd_start, jd_end, planet="Mercury", step=0.5):
     prev_lon = None
     t = jd_start
     while t < jd_end:
-        res = swe.calc_ut(t, pid, swe.FLG_SWIEPH | swe.FLG_SPEED | swe.FLG_TRUEPOS)
+        res = swe.calc_ut(t, pid, _swe_calc_flags(t))
         speed = res[0][3]
         lon = res[0][0] % 360
         if prev_speed is not None and (prev_speed * speed < 0 or abs(speed) < 0.0001):
@@ -3488,8 +3535,13 @@ PUBLIC_MODES = ("node_transit_all_signs", "weekly_calendar", "eclipses",
                 "void_of_course", "muhurta", "electional", "numerology")
 
 def calculate_full_profile(data):
+    global _NODE_TYPE
     data = _normalize_birth(data)
     mode=data.get("mode","natal")
+    nt_in = data.get("node_type")
+    if nt_in not in (None, "true", "mean"):
+        return {"mode": mode, "error": "node_type must be 'true' or 'mean'"}
+    _NODE_TYPE = nt_in or ("true" if _HAS_SWE else "mean")
 
     # Public modes — no birth data required. Handle before to_utc().
     if mode=="node_transit_all_signs":
@@ -3575,7 +3627,7 @@ def calculate_full_profile(data):
                      "birth_utc":birth_utc.strftime("%Y-%m-%d %H:%M"),"julian_day":round(jd,5),
                      "computed_on":TODAY.strftime("%Y-%m-%d"),
                      "house_system":"Placidus (Swiss Ephemeris)" if _HAS_SWE else "whole-sign",
-                     "node_type":"true" if _HAS_SWE else "mean",
+                     "node_type": _NODE_TYPE,
                      "precision_note":("arcsecond (Swiss Ephemeris)" if backend=="swisseph"
                                        else "~1-2 arcmin (builtin) — exact to sign/house/nakshatra/dasha")},
             "input":{k:data.get(k) for k in
