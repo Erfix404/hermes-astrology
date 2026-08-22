@@ -4,7 +4,7 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "hermes-astrology"
-version = "2.7.1"
+version = "2.7.2"
 description = "Deterministic multi-tradition astrology engine — Western, Vedic, Chinese BaZi"
 authors = [{name = "Erfan Ashouri", email = "erfix404@github.com"}]
 license = {text = "MIT"}
