@@ -609,6 +609,41 @@ class TestNodeTransitAllSigns(unittest.TestCase):
         self.assertIn("node_transit_all_signs", r)
 
 
+class TestPublicModesNoBirthData(unittest.TestCase):
+    """Sky-now modes must work with {"mode": ...} only — regression for the
+    KeyError crash where dispatch happened after to_utc()."""
+
+    MODES = ("weekly_calendar", "eclipses", "stations", "moon_phase",
+             "planetary_hours", "void_of_course", "muhurta", "electional")
+    # void_of_course returns its payload under "void_of_course_moon"
+    KEY_OVERRIDES = {"void_of_course": "void_of_course_moon"}
+
+    def test_each_public_mode_runs_without_birth_data(self):
+        for m in self.MODES:
+            with self.subTest(mode=m):
+                r = ae.calculate_full_profile({"mode": m})
+                self.assertIn(self.KEY_OVERRIDES.get(m, m), r,
+                              f"mode {m} missing its result key")
+                self.assertNotIn("error", r)
+
+    def test_numerology_without_birth_data_gives_error_not_crash(self):
+        r = ae.calculate_full_profile({"mode": "numerology"})
+        self.assertIn("error", r)
+
+    def test_numerology_with_date_only(self):
+        r = ae.calculate_full_profile({"mode": "numerology",
+                                       "year": 1995, "month": 4, "day": 15})
+        self.assertIn("numerology", r)
+        self.assertEqual(r["numerology"]["life_path"]["number"], 7)
+
+    def test_moon_phase_still_accepts_birth_data(self):
+        # Backwards-compat: birth-data call still computes at birth moment.
+        d = dict(ae._demo()); d["mode"] = "moon_phase"
+        r = ae.calculate_full_profile(d)
+        self.assertIn("moon_phase", r)
+        self.assertIn("phase", r["moon_phase"])
+
+
 class TestJPLValidation(unittest.TestCase):
     """Cross-check engine positions against NASA JPL Horizons reference values.
 

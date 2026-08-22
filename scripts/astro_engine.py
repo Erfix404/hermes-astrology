@@ -3480,6 +3480,13 @@ def _normalize_birth(d):
         _normalize_birth(d["partner"])
     return d
 
+# Modes that read the current sky (or need no birth data at all). They are
+# dispatched before to_utc() so they work with {"mode": ...} only — birth
+# data, if present, is ignored. "now" modes default to today's date.
+PUBLIC_MODES = ("node_transit_all_signs", "weekly_calendar", "eclipses",
+                "stations", "moon_phase", "planetary_hours",
+                "void_of_course", "muhurta", "electional", "numerology")
+
 def calculate_full_profile(data):
     data = _normalize_birth(data)
     mode=data.get("mode","natal")
@@ -3496,6 +3503,64 @@ def calculate_full_profile(data):
                   "mode": mode,
                   "node_transit_all_signs": node_transit_all_signs(t_lons, jd=tjd)}
         return result
+
+    if mode=="numerology":
+        try:
+            result = {"_meta": {"engine_backend": "builtin",
+                                "computed_on": TODAY.strftime("%Y-%m-%d")},
+                      "mode": mode,
+                      "numerology": numerology(data["year"], data["month"],
+                                               data["day"], data.get("full_name",""))}
+        except KeyError:
+            return {"mode": mode, "error": "numerology requires year/month/day (of birth or event)"}
+        return result
+
+    if mode in ("weekly_calendar", "eclipses", "stations", "moon_phase",
+                "planetary_hours", "void_of_course", "muhurta", "electional"):
+        # Sky-now modes: default anchor is today (UTC), optional lat/lng for
+        # sunrise-dependent features; birth data is NOT required.
+        tdt = datetime.utcnow()
+        tjd = julian_day(tdt)
+        tlat = data.get("lat", 0.0); tlng = data.get("lng", 0.0)
+        result = {"_meta": {"engine_backend": body_longitudes(tjd)[2],
+                            "swisseph_available": _HAS_SWE,
+                            "computed_on": TODAY.strftime("%Y-%m-%d")},
+                  "mode": mode}
+        if mode=="weekly_calendar":
+            from astro_advanced import weekly_astro_calendar
+            start_str = data.get("start_date")
+            sd = datetime.strptime(start_str, "%Y-%m-%d") if start_str else None
+            result["weekly_calendar"] = weekly_astro_calendar(sd)
+            return result
+        if mode=="eclipses":
+            result["eclipses"] = next_eclipses(tjd, data.get("count", 3))
+            return result
+        if mode=="stations":
+            p = data.get("planet", "Mercury")
+            result["stations"] = station_dates(tjd, tjd + data.get("days", 180), p)
+            return result
+        if mode=="moon_phase":
+            result["moon_phase"] = moon_phase(tjd)
+            result["upcoming_moon_phases"] = upcoming_moon_phases(tjd, count=4)
+            return result
+        if mode=="planetary_hours":
+            result["planetary_hours"] = planetary_hours(tjd, tlat, tlng)
+            return result
+        if mode=="void_of_course":
+            result["void_of_course_moon"] = void_of_course_moon(tjd, tlat, tlng, True)
+            return result
+        if mode=="electional":
+            from astro_advanced import find_electional_times
+            result["electional"] = find_electional_times(tjd, tlat, tlng,
+                                                         data.get("activity","general"),
+                                                         data.get("days_ahead", 14))
+            return result
+        if mode=="muhurta":
+            from astro_advanced import muhurta_finder
+            result["muhurta"] = muhurta_finder(tjd, tlat, tlng,
+                                               data.get("activity","marriage"),
+                                               data.get("days_ahead", 14))
+            return result
 
     birth_utc, tinfo = to_utc(data)
     jd=julian_day(birth_utc)
@@ -3597,16 +3662,6 @@ def calculate_full_profile(data):
         result["vedic_brief"]=vedic_chart(jd,lat,lng,birth_local,time_known)
         return result
 
-    if mode=="numerology":
-        result["numerology"]=numerology(data["year"],data["month"],data["day"],
-                                        data.get("full_name",""))
-        return result
-
-    if mode=="moon_phase":
-        result["moon_phase"]=moon_phase(jd)
-        result["upcoming_moon_phases"]=upcoming_moon_phases(jd, count=4)
-        return result
-
     if mode=="panchang":
         result["panchang"]=panchang_elements(jd)
         result["vedic_brief"]=vedic_chart(jd,lat,lng,birth_local,time_known)
@@ -3635,10 +3690,6 @@ def calculate_full_profile(data):
     if mode=="varga":
         varga=data.get("varga","D10")
         result["varga"]=varga_chart(jd, varga, lat, lng, time_known)
-        return result
-
-    if mode=="planetary_hours":
-        result["planetary_hours"]=planetary_hours(jd, lat, lng)
         return result
 
     if mode=="transit_natal_aspects":
@@ -3684,13 +3735,6 @@ def calculate_full_profile(data):
         result["solar_return"] = interpret_solar_return(sr)
         return result
 
-    if mode=="electional":
-        from astro_advanced import find_electional_times
-        activity=data.get("activity","general")
-        days_ahead=data.get("days_ahead", 14)
-        result["electional"] = find_electional_times(jd, lat, lng, activity, days_ahead)
-        return result
-
     if mode=="solar_arc":
         from astro_advanced import solar_arc_directions
         age=data.get("age", (TODAY - birth_local).days / 365.25)
@@ -3708,13 +3752,6 @@ def calculate_full_profile(data):
         natal_data.pop("mode", None)
         nat = calculate_full_profile(natal_data)
         result["remedies"] = suggest_remedies(nat)
-        return result
-
-    if mode=="weekly_calendar":
-        from astro_advanced import weekly_astro_calendar
-        start_str = data.get("start_date")
-        sd = datetime.strptime(start_str, "%Y-%m-%d") if start_str else None
-        result["weekly_calendar"] = weekly_astro_calendar(sd)
         return result
 
     if mode=="prashna":
@@ -3735,15 +3772,6 @@ def calculate_full_profile(data):
         result["prashna"] = prashna(qdt_utc, lat, lng, qtext, qtype)
         return result
 
-    if mode=="eclipses":
-        result["eclipses"] = next_eclipses(jd, data.get("count", 3))
-        return result
-
-    if mode=="stations":
-        p = data.get("planet", "Mercury")
-        result["stations"] = station_dates(jd, jd + data.get("days", 180), p)
-        return result
-
     if mode=="upagrahas":
         result["upagrahas"] = upagrahas(jd, lat, lng, time_known)
         return result
@@ -3756,10 +3784,6 @@ def calculate_full_profile(data):
         result["vimsopaka"] = vimsopaka_strength(jd)
         return result
 
-    if mode=="void_of_course":
-        result["void_of_course_moon"] = void_of_course_moon(jd, lat, lng, time_known)
-        return result
-
     if mode=="ashtottari":
         moon_sid = norm360(body_longitudes(jd)[0]["Moon"] - ayanamsha_lahiri(jd))
         result["ashtottari_dasha"] = ashtottari_dasha(moon_sid, birth_local)
@@ -3768,13 +3792,6 @@ def calculate_full_profile(data):
     if mode=="tajika":
         from astro_advanced import tajika_annual
         result["tajika"] = tajika_annual(birth_local, lat, lng)
-        return result
-
-    if mode=="muhurta":
-        from astro_advanced import muhurta_finder
-        result["muhurta"] = muhurta_finder(jd, lat, lng,
-                                           data.get("activity","marriage"),
-                                           data.get("days_ahead", 14))
         return result
 
     if mode=="shadbala":

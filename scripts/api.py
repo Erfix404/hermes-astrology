@@ -810,16 +810,32 @@ async def clear_interact_session(session_id: str):
 
 
 # ── MCP endpoints ────────────────────────────────────────────────────────────
-import skills.astrology.scripts.mcp_server as _mcp_mod
+try:
+    import skills.astrology.scripts.mcp_server as _mcp_mod
+except ModuleNotFoundError:
+    # Repo layout (no `skills` package above us): import the sibling module directly.
+    if _SCRIPTS_DIR not in sys.path:
+        sys.path.insert(0, _SCRIPTS_DIR)
+    try:
+        import mcp_server as _mcp_mod
+    except ImportError:
+        _mcp_mod = None
 
-_mcp_sse_app = _mcp_mod.mcp.sse_app()
-app.mount("/mcp", _mcp_sse_app)
-log.info("MCP SSE endpoint mounted at /mcp/sse")
+if _mcp_mod is None:
+    log.warning("mcp_server not importable — MCP endpoints disabled (pip install mcp)")
+else:
+    _mcp_sse_app = _mcp_mod.mcp.sse_app()
+    app.mount("/mcp", _mcp_sse_app)
+    log.info("MCP SSE endpoint mounted at /mcp/sse")
 
 
 @app.post("/streamable-mcp")
 @app.options("/streamable-mcp")
 async def mcp_streamable_http(request: Request):
+    if _mcp_mod is None:
+        return JSONResponse({"jsonrpc": "2.0", "id": None,
+                             "error": {"code": -32601, "message": "MCP server not available (mcp package missing)"}},
+                            status_code=503)
     if request.method == "OPTIONS":
         return JSONResponse({"status": "ok"})
     try:

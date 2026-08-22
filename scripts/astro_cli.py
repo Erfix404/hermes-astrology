@@ -2,6 +2,12 @@
 """CLI entry point for hermes-astrology."""
 import argparse, json, sys, os
 
+# Windows consoles default to legacy codepages (cp1256 etc.) that cannot
+# encode the retrograde glyph; force UTF-8 output before any printing.
+if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # Add scripts dir to path for importing astro_engine
 _SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPTS_DIR not in sys.path:

@@ -40,3 +40,6 @@ coverage/
 
 # git
 *.orig
+
+# Local research books (large PDFs, external sources)
+book/
