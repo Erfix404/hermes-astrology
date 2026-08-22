@@ -644,6 +644,47 @@ class TestPublicModesNoBirthData(unittest.TestCase):
         self.assertIn("phase", r["moon_phase"])
 
 
+class TestShadbalaCheshtaDrik(unittest.TestCase):
+    """Wave 0-5: Cheshta (BPHS 18/24-25) & Drik bala in shadbala_sthana_dig."""
+
+    def test_cheshta_sun_tracks_declination(self):
+        import astro_advanced as aa
+        jd = lambda *d: ae.julian_day(datetime(*d))
+        r_win = aa.shadbala_sthana_dig(jd(1990, 12, 22), 35.6892, 51.3890)
+        r_eq = aa.shadbala_sthana_dig(jd(1990, 9, 23), 35.6892, 51.3890)
+        r_sum = aa.shadbala_sthana_dig(jd(1990, 6, 21), 35.6892, 51.3890)
+        sun_win = r_win["cheshta_bala_virupas"]["Sun"]
+        sun_eq = r_eq["cheshta_bala_virupas"]["Sun"]
+        sun_sum = r_sum["cheshta_bala_virupas"]["Sun"]
+        # south declination → strong; north → weak; equinox midway
+        self.assertGreater(sun_win, 45, "winter solstice Sun should be strong")
+        self.assertLess(sun_sum, 15, "summer solstice Sun should be weak")
+        self.assertAlmostEqual(sun_eq, 30, delta=3)
+
+    def test_cheshta_kendra_range_and_moon_paksha(self):
+        import astro_advanced as aa
+        r = aa.shadbala_sthana_dig(
+            ae.julian_day(datetime(1990, 6, 15, 9, 0)), 35.6892, 51.3890)
+        ch = r["cheshta_bala_virupas"]
+        for p, v in ch.items():
+            self.assertGreaterEqual(v, 0, f"{p} negative")
+            self.assertLessEqual(v, 60, f"{p} exceeds 60 virupas")
+        # near-full moon (Jun 8 1990 diff ~175°): paksha should be high
+        r_fm = aa.shadbala_sthana_dig(ae.julian_day(datetime(1990, 6, 8)), 35.6892, 51.3890)
+        self.assertGreater(r_fm["cheshta_bala_virupas"]["Moon"], 50)
+
+    def test_drik_bala_present_and_finite(self):
+        import astro_advanced as aa
+        r = aa.shadbala_sthana_dig(
+            ae.julian_day(datetime(1990, 6, 15, 9, 0)), 35.6892, 51.3890)
+        d = r["drik_bala_rupas"]
+        self.assertEqual(set(d), {"Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"})
+        for p, v in d.items():
+            self.assertTrue(-5 <= v <= 5, f"{p} drik out of plausible range: {v}")
+        # total must now include both new components
+        self.assertIn("shadbala_total", r)
+
+
 class TestPtolemaicTerms(unittest.TestCase):
     """Wave 0-4: Ptolemaic terms alongside Egyptian terms (dignity_western)."""
 
