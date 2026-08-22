@@ -43,3 +43,6 @@ coverage/
 
 # Local research books (large PDFs, external sources)
 book/
+
+# Local secrets
+.env

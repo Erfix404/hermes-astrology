@@ -644,6 +644,51 @@ class TestPublicModesNoBirthData(unittest.TestCase):
         self.assertIn("phase", r["moon_phase"])
 
 
+class TestPtolemaicTerms(unittest.TestCase):
+    """Wave 0-4: Ptolemaic terms alongside Egyptian terms (dignity_western)."""
+
+    def test_ptolemaic_terms_sum_30_per_sign(self):
+        import astro_engine as ae
+        src = open(os.path.join(_SCRIPTS, "astro_engine.py"), encoding="utf-8").read()
+        ns = {}
+        # pull the ptolemaic_terms dict literal out of the source for validation
+        start = src.index("ptolemaic_terms = {")
+        block = src[start:src.index("}", start) + 1]
+        exec(block, ns)
+        tbl = ns["ptolemaic_terms"]
+        self.assertEqual(set(tbl), set(ae.SIGNS))
+        for sign, segs in tbl.items():
+            self.assertEqual([s[0] for s in segs], sorted(segs, key=lambda x: x[1])[0] and
+                             [s[0] for s in segs], msg=sign)
+            prev = 0
+            rulers = []
+            for ruler, end in segs:
+                self.assertGreater(end, prev, f"{sign}: non-increasing bound {end}")
+                prev = end
+                rulers.append(ruler)
+            self.assertEqual(prev, 30, f"{sign}: bounds must end at 30")
+            # all five term lords used exactly once (classical requirement)
+            self.assertEqual(sorted(rulers),
+                             sorted(["Saturn","Jupiter","Mars","Venus","Mercury"]),
+                             f"{sign}: must use each of the five term lords once")
+
+    def test_dignity_reports_both_term_systems(self):
+        # Aries 3° = Jupiter's first Egyptian AND Ptolemaic term → both labels
+        d = ae.dignity_western("Jupiter", "Aries", 3)
+        self.assertIn("term (Egyptian bound)", d)
+        self.assertIn("term (Ptolemaic)", d)
+        # Gemini 22°: Egyptian ruler=Mars, Ptolemaic ruler=Saturn; neither has
+        # a major dignity in Gemini so the term branch is reached.
+        d_mars = ae.dignity_western("Mars", "Gemini", 22)
+        self.assertIn("term (Egyptian bound)", d_mars)
+        self.assertNotIn("term (Ptolemaic)", d_mars)
+        d_sat = ae.dignity_western("Saturn", "Gemini", 22)
+        self.assertNotIn("term (Egyptian bound)", d_sat)
+        self.assertIn("term (Ptolemaic)", d_sat)
+        # Mercury rules no term at Taurus 23° in either system
+        self.assertEqual(ae.dignity_western("Mercury", "Taurus", 23), "")
+
+
 class TestNodeTypeOption(unittest.TestCase):
     """node_type option (wave 0-3): "true" (osculating, astro.com default)
     vs "mean" (smoothed; classical Parashari/Lilly). True oscillates around
