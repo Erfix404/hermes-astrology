@@ -644,6 +644,35 @@ class TestPublicModesNoBirthData(unittest.TestCase):
         self.assertIn("phase", r["moon_phase"])
 
 
+class TestVimshottariLevels(unittest.TestCase):
+    """Wave 2-1: pratyantardasha (3rd level) in Vimshottari."""
+
+    def test_pratyantar_present_and_proportional(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile(d)
+        v = r["charts"]["vedic"]["vimshottari_dasha"]
+        self.assertIn("current_pratyantardasha", v)
+        pts = v["pratyantardashas_in_current_antar"]
+        self.assertEqual(len(pts), 9)
+        # first pratyantar lord = antardasha lord (sequence starts from it)
+        self.assertEqual(pts[0]["lord"], v["current_antardasha"]["lord"])
+        # durations proportional to DASHA_YEARS: len(p2)/len(p1) = yrs2/yrs1
+        import datetime as _dt
+        s0 = _dt.datetime.strptime(pts[0]["start"], "%Y-%m-%d %H:%M")
+        e0 = _dt.datetime.strptime(pts[0]["end"], "%Y-%m-%d %H:%M")
+        s1 = _dt.datetime.strptime(pts[1]["start"], "%Y-%m-%d %H:%M")
+        e1 = _dt.datetime.strptime(pts[1]["end"], "%Y-%m-%d %H:%M")
+        self.assertEqual(s1, e0, "pratyantars must be contiguous")
+        ratio = (e1 - s1) / (e0 - s0)
+        expect = ae.DASHA_YEARS[pts[1]["lord"]] / ae.DASHA_YEARS[pts[0]["lord"]]
+        self.assertAlmostEqual(ratio, expect, delta=0.01)
+
+    def test_vedic_chart_still_builds(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile(d)
+        self.assertNotIn("error", r["charts"]["vedic"])
+
+
 class TestZodiacalReleasing(unittest.TestCase):
     """Wave 1-5: ZR per Valens IV — periods, LOB, peaks, symbolic calendar."""
 

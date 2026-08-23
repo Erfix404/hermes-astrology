@@ -1500,13 +1500,23 @@ def vimshottari(moon_lon, birth_dt):
         cur=end
     current=next((d for d in timeline if d["is_current"]), None)
     bhukti=[]
+    pratyantar=[]
     if current:
         antardasha=_antardasha(current["lord"],
                                datetime.strptime(current["start"],"%Y-%m-%d"))
         bhukti=antardasha
+        cur_antar=next((b for b in bhukti if b["is_current"]), None)
+        if cur_antar:
+            pratyantar=_pratyantardasha(
+                current["lord"], cur_antar["lord"],
+                datetime.strptime(cur_antar["start"],"%Y-%m-%d"),
+                datetime.strptime(cur_antar["end"],"%Y-%m-%d"))
     return {"birth_dasha_lord":lord,
             "current_mahadasha":current,
             "current_antardasha":next((b for b in bhukti if b["is_current"]),None),
+            "current_pratyantardasha":next((p for p in pratyantar
+                                            if p["is_current"]),None),
+            "pratyantardashas_in_current_antar":pratyantar,
             "maha_timeline":timeline,
             "antardasha_in_current_maha":bhukti}
 
@@ -1520,6 +1530,23 @@ def _antardasha(maha_lord, maha_start):
         sub_years=maha_years*DASHA_YEARS[L]/DASHA_TOTAL
         end=cur+timedelta(days=sub_years*365.25)
         out.append({"lord":L,"start":cur.strftime("%Y-%m-%d"),"end":end.strftime("%Y-%m-%d"),
+                    "is_current":cur<=TODAY<=end})
+        cur=end
+    return out
+
+def _pratyantardasha(maha_lord, antar_lord, antar_start, antar_end):
+    """Third-level Vimshottari periods inside one antardasha: same proportional
+    rule — each pratyantar = maha_years * DASHA_YEARS[lord]^2 / DASHA_TOTAL^2,
+    sequenced from the antardasha lord."""
+    start_idx=DASHA_SEQ.index(antar_lord)
+    span=(antar_end-antar_start).total_seconds()
+    out=[]; cur=antar_start
+    for k in range(9):
+        L=DASHA_SEQ[(start_idx+k)%9]
+        frac=DASHA_YEARS[L]/DASHA_TOTAL
+        end=cur+timedelta(seconds=span*frac)
+        out.append({"lord":L,"start":cur.strftime("%Y-%m-%d %H:%M"),
+                    "end":end.strftime("%Y-%m-%d %H:%M"),
                     "is_current":cur<=TODAY<=end})
         cur=end
     return out
