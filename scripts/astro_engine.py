@@ -3907,6 +3907,13 @@ def calculate_full_profile(data):
         result["shadbala"] = shadbala_sthana_dig(jd, lat, lng)
         return result
 
+    if mode=="gochara":
+        tdate=data.get("transit_date")
+        t_jd=julian_day(datetime.strptime(tdate,"%Y-%m-%d")) if tdate \
+            else julian_day(datetime.utcnow())
+        result["gochara"]=gochara(jd, t_jd)
+        return result
+
     if mode=="zr":
         topic = data.get("zr_topic", "spirit")
         if topic not in ("spirit", "fortune"):
@@ -4569,6 +4576,49 @@ def interpret_zr(zr_report):
         "lifetime_highlights": highlights[:12],
         "note": topic_note,
     }
+
+
+# Classical Gochara (transit) favorable houses from natal MOON — Parashari
+# standard (BPHS/Phala Deepika; subagent spec pending exact page refs):
+GOCHARA_GOOD_FROM_MOON = {
+    "Sun": (3, 6, 10, 11), "Moon": (1, 3, 6, 7, 10, 11),
+    "Mars": (3, 6, 11), "Mercury": (2, 4, 6, 8, 10, 11),
+    "Jupiter": (2, 5, 7, 9, 11), "Venus": (1, 2, 3, 4, 5, 8, 9, 11, 12),
+    "Saturn": (3, 6, 11), "North Node": (3, 6, 11), "South Node": (3, 6, 11),
+}
+# Sade Sati handled in transits(); here: full gochara snapshot
+
+def gochara(natal_jd, transit_jd=None):
+    """Vedic transits counted from the natal Moon (Chandra Rashi).
+    Returns per-planet favorability + note. Sidereal (Lahiri)."""
+    natal_lons, _, _ = body_longitudes(natal_jd)
+    t_jd = transit_jd or julian_day(datetime.utcnow())
+    t_lons, t_speed, _ = body_longitudes(t_jd)
+    ayan = ayanamsha_lahiri(t_jd)
+    moon_sign_idx = int(norm360(natal_lons["Moon"] - ayanamsha_lahiri(natal_jd)) // 30) % 12
+    out = {}
+    for p, good in GOCHARA_GOOD_FROM_MOON.items():
+        if p not in t_lons:
+            continue
+        p_sid = norm360(t_lons[p] - ayan)
+        house_from_moon = ((int(p_sid // 30) % 12) - moon_sign_idx) % 12 + 1
+        favorable = house_from_moon in good
+        note = ""
+        if p == "Saturn":
+            d = (int(p_sid // 30) % 12 - moon_sign_idx) % 12
+            if d == 11: note = "Sade Sati rising phase"
+            elif d == 0: note = "Sade Sati peak"
+            elif d == 1: note = "Sade Sati setting phase"
+            elif d == 4: note = "Ardha-ashtama (half)"
+            elif d == 7: note = "Ashtama Shani"
+        out[p] = {"house_from_moon": house_from_moon,
+                  "favorable": favorable,
+                  "retrograde": t_speed.get(p, 0) < 0,
+                  "note": note,
+                  "good_houses": list(good)}
+    return {"from_moon_sign": SIGNS[moon_sign_idx], "transits": out,
+            "note": ("Gochara from the Chandra Lagna (natal Moon sign), sidereal "
+                     "Lahiri; favorable houses per Parashari convention.")}
 
 
 def _demo():

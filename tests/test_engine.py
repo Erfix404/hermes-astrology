@@ -673,6 +673,35 @@ class TestVimshottariLevels(unittest.TestCase):
         self.assertNotIn("error", r["charts"]["vedic"])
 
 
+class TestGochara(unittest.TestCase):
+    """Wave 2-2: Vedic transits from natal Moon (Chandra Lagna)."""
+
+    def test_gochara_structure_and_favorability(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "gochara"})
+        g = r["gochara"]
+        self.assertIn("from_moon_sign", g)
+        for p in ("Sun", "Mars", "Saturn", "Jupiter"):
+            t = g["transits"][p]
+            self.assertTrue(1 <= t["house_from_moon"] <= 12)
+            expected = t["house_from_moon"] in t["good_houses"]
+            self.assertEqual(t["favorable"], expected)
+        # Saturn note consistency: house 1/2/12 → Sade Sati phases
+        sh = g["transits"]["Saturn"]["house_from_moon"]
+        if sh in (12, 1, 2):
+            self.assertTrue(g["transits"]["Saturn"]["note"].startswith("Sade"))
+
+    def test_sade_sati_consistency_with_transit_mode(self):
+        d = dict(ae._demo())
+        rg = ae.calculate_full_profile({**d, "mode": "gochara"})["gochara"]
+        rt = ae.calculate_full_profile({**d, "mode": "transit",
+                                        "transit_date": ae.TODAY.strftime("%Y-%m-%d")})
+        ss_transit = rt["transits"]["sade_sati"]
+        sat_house = rg["transits"]["Saturn"]["house_from_moon"]
+        if ss_transit.get("active"):
+            self.assertIn(sat_house, (12, 1, 2))
+
+
 class TestZodiacalReleasing(unittest.TestCase):
     """Wave 1-5: ZR per Valens IV — periods, LOB, peaks, symbolic calendar."""
 
