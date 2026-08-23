@@ -3914,6 +3914,15 @@ def calculate_full_profile(data):
         result["gochara"]=gochara(jd, t_jd)
         return result
 
+    if mode=="dasha_reading":
+        moon_sid = norm360(body_longitudes(jd)[0]["Moon"] - ayanamsha_lahiri(jd))
+        vim = vimshottari(moon_sid, birth_local)
+        result["vimshottari_reading"] = interpret_vimshottari(vim)
+        result["current_timeline"] = {
+            "maha": vim["current_mahadasha"], "antar": vim["current_antardasha"],
+            "pratyantar": vim["current_pratyantardasha"]}
+        return result
+
     if mode=="zr":
         topic = data.get("zr_topic", "spirit")
         if topic not in ("spirit", "fortune"):
@@ -4619,6 +4628,42 @@ def gochara(natal_jd, transit_jd=None):
     return {"from_moon_sign": SIGNS[moon_sign_idx], "transits": out,
             "note": ("Gochara from the Chandra Lagna (natal Moon sign), sidereal "
                      "Lahiri; favorable houses per Parashari convention.")}
+
+
+DASHA_LORD_THEMES = {
+    "Sun": "authority, government, father, bones, vitality, recognition; ego vs humility",
+    "Moon": "mother, emotions, home, public, liquids, mind's peace; fluctuation",
+    "Mars": "conflicts, property, siblings, surgery, courage, land; haste and accidents",
+    "Mercury": "education, trade, speech, friends, nerves, documents; versatility",
+    "Jupiter": "wealth, children, guru, dharma, expansion, marriage; optimism and gain",
+    "Venus": "marriage, romance, arts, vehicles, comfort, women; luxury and diplomacy",
+    "Saturn": "labor, delays, discipline, longevity, servants, loss then lasting gain",
+    "North Node": "ambition, unconventional rise, foreign, poison/obsession; sudden swings",
+    "South Node": "detachment, spirituality, obstacles, pilgrimage; endings that liberate",
+}
+
+def interpret_vimshottari(vim):
+    """Readable reading over a vimshottari() result: current maha/antar/pratyantar
+    themes + how to read the combination."""
+    out = {}
+    maha = vim.get("current_mahadasha")
+    antar = vim.get("current_antardasha")
+    praty = vim.get("current_pratyantardasha")
+    if not maha:
+        return {"reading": "No active mahadasha found.", }
+    lines = [f"Mahadasha of {maha['lord']} ({maha['start']} → {maha['end']}): "
+             f"{DASHA_LORD_THEMES[maha['lord']]}."]
+    if antar:
+        lines.append(f"Antardasha of {antar['lord']} ({antar['start']} → {antar['end']}): "
+                     f"{DASHA_LORD_THEMES[antar['lord']]}")
+        lines.append(f"The maha sets the stage; the antar decides which script plays. "
+                     f"{maha['lord']}+{antar['lord']} blends both themes.")
+    if praty:
+        lines.append(f"Pratyantardasha of {praty['lord']} until {praty['end']}: "
+                     f"short-term flavor — {DASHA_LORD_THEMES[praty['lord']].split(';')[0]}.")
+    return {"reading": " ".join(lines),
+            "themes": {k: DASHA_LORD_THEMES[k] for k in
+                       (maha["lord"],) + ((antar["lord"],) if antar else ())}}
 
 
 def _demo():

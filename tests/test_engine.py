@@ -702,6 +702,19 @@ class TestGochara(unittest.TestCase):
             self.assertIn(sat_house, (12, 1, 2))
 
 
+class TestDashaReading(unittest.TestCase):
+    """Wave 2-3: readable Vimshottari interpretation."""
+
+    def test_dasha_reading_mode(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "dasha_reading"})
+        rd = r["vimshottari_reading"]
+        self.assertIn("Mahadasha of", rd["reading"])
+        self.assertIn(r["current_timeline"]["maha"]["lord"], rd["themes"])
+        # all three levels present
+        self.assertTrue(all(r["current_timeline"][k] for k in ("maha", "antar", "pratyantar")))
+
+
 class TestZodiacalReleasing(unittest.TestCase):
     """Wave 1-5: ZR per Valens IV — periods, LOB, peaks, symbolic calendar."""
 
