@@ -685,6 +685,14 @@ class TestZodiacalReleasing(unittest.TestCase):
                                          "zr_topic": "nope"})
         self.assertIn("error", bad)
 
+    def test_zr_interpretation_layer(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "zr"})
+        zi = r.get("zr_interpretation")
+        self.assertIsNotNone(zi)
+        self.assertTrue(zi["current_reading"])
+        self.assertIsInstance(zi["lifetime_highlights"], list)
+
 
 class TestTransitInterpretation(unittest.TestCase):
     """Wave 1-3: readable interpretation layer over raw transit aspects."""

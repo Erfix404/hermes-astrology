@@ -3888,6 +3888,10 @@ def calculate_full_profile(data):
             jd, lat, lng, time_known, topic,
             max_level=int(data.get("max_level", 3)),
             until_age=min(int(data.get("until_age", 80)), 120))
+        try:
+            result["zr_interpretation"] = interpret_zr(result["zodiacal_releasing"])
+        except Exception:
+            pass
         return result
 
     if mode in ("profections", "firdaria", "forecast"):
@@ -4468,6 +4472,75 @@ def zodiacal_releasing(natal_jd, lat, lng, time_known=True, topic="spirit",
                  "(Schmidt/Riley): sequential sign-periods on the 360-day "
                  "symbolic year; Loosing-of-the-Bond jumps opposite at lap end; "
                  "peaks are angles from the Lot of Fortune."),
+    }
+
+
+ZR_TOPIC_FRAME = {
+    "spirit": ("career, life-direction, and actions",
+               "Valens rates Spirit-releases as the primary eminence/career timer"),
+    "fortune": ("body, health, and material circumstance",
+                "Fortune-releases track vitality, luck, and external events"),
+}
+
+def interpret_zr(zr_report):
+    """Readable narrative over zodiacal_releasing(): what the current L1/L2
+    mean, when the next peak/LOB hits, lifetime highlight reel."""
+    topic_label, topic_note = ZR_TOPIC_FRAME.get(
+        zr_report["topic"], ZR_TOPIC_FRAME["spirit"])
+    tl = zr_report["timeline_level1"]
+    active = next((e for e in reversed(tl)
+                   if e["start"] <= TODAY.strftime("%Y-%m-%d")), tl[0])
+    today_s = TODAY.strftime("%Y-%m-%d")
+    # find active L2
+    l2_active = None
+    for s in active.get("level2", []):
+        if s["start"] <= today_s < s["end"]:
+            l2_active = s
+            break
+    readings = []
+    role = active.get("triad_role")
+    if active["is_peak"]:
+        peak_txt = {"major": "the MAJOR peak of the life (angular to Fortune's own sign)",
+                    "moderate": "a moderate peak (7th-from-Fortune)",
+                    "minor": "a minor peak (angle from Fortune)"}.get(
+                        active.get("peak_weight"), "a peak period")
+        readings.append(f"You are in {active['sign']} — {peak_txt}. "
+                        f"Eminence markers in {topic_label} concentrate here.")
+    elif role == "build-up to peak":
+        nxt = next((e for e in tl if e["start"] > today_s and e["is_peak"]), None)
+        readings.append(f"{active['sign']} is a build-up period: momentum gathers "
+                        f"toward the {nxt['sign']} peak starting {nxt['start']}."
+                        if nxt else f"{active['sign']} builds toward an upcoming peak.")
+    elif role == "post-peak cool-down":
+        readings.append(f"{active['sign']} follows a peak — consolidate gains rather "
+                        f"than force new heights in {topic_label}.")
+    else:
+        readings.append(f"{active['sign']} is a steady chapter in {topic_label} — "
+                        f"ordinary time that sets up the extraordinary ones.")
+    if l2_active:
+        lob = " (Loosing of the Bond — a pivot point!)" if l2_active.get("is_lob") else ""
+        readings.append(f"Sub-period now: {l2_active['sign']} until "
+                        f"{l2_active['end']}{lob}.")
+    if active.get("is_lob"):
+        readings.append("This major period itself began with a Loosing of the Bond — "
+                        "expect its whole chapter to feel like a departure from the prior one.")
+    upcoming_peaks = [e for e in tl if e["is_peak"] and e["start"] > today_s][:3]
+    upcoming_lobs = [e for e in tl if e["is_lob"] and e["start"] > today_s][:3]
+    highlights = []
+    for e in tl:
+        tag = []
+        if e["is_peak"]: tag.append(f"PEAK ({e.get('peak_weight')})")
+        if e["is_lob"]: tag.append("LOB")
+        if e["is_culminating"]: tag.append("culminating")
+        if tag:
+            highlights.append(f"{e['start']}–{e['end']}  {e['sign']}: " + ", ".join(tag))
+    return {
+        "current_reading": " ".join(readings),
+        "upcoming_peaks": [{"sign": e["sign"], "from": e["start"],
+                            "weight": e.get("peak_weight")} for e in upcoming_peaks],
+        "upcoming_lobs": [{"sign": e["sign"], "from": e["start"]} for e in upcoming_lobs],
+        "lifetime_highlights": highlights[:12],
+        "note": topic_note,
     }
 
 
