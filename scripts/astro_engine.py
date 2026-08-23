@@ -4104,14 +4104,17 @@ def firdaria(birth_local, is_day_birth, until_age=75):
         return periods[-1]
     current_age = (TODAY - birth_local).days / 365.2425
     major = _active(current_age)
-    # sub-periods within the major: partners rotate through `order` starting
-    # from the major lord's own position
-    idx = order.index(major["lord"]) if major["lord"] in order else 0
+    # Sub-periods (Ibn Ezra, Reshit Hokhmah X / Sela p.602): each firdar divides
+    # into SEVEN equal sub-periods; co-rulers descend in orb order from the
+    # major lord's own position in the sect's planetary order (nodes excluded —
+    # only the seven planets participate as partners).
+    seven = [p for p in order if p not in ("North Node", "South Node")]
+    idx = seven.index(major["lord"]) if major["lord"] in seven else 0
     span = major["end_age"] - major["start_age"]
-    n_subs = len(order)
+    n_subs = 7
     subs = []
     for k in range(n_subs):
-        partner = order[(idx + k) % len(order)]
+        partner = seven[(idx + k) % len(seven)]
         s_start = major["start_age"] + span * k / n_subs
         s_end = major["start_age"] + span * (k + 1) / n_subs
         subs.append({"partner_lord": partner,
