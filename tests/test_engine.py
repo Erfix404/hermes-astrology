@@ -644,6 +644,32 @@ class TestPublicModesNoBirthData(unittest.TestCase):
         self.assertIn("phase", r["moon_phase"])
 
 
+class TestTransitInterpretation(unittest.TestCase):
+    """Wave 1-3: readable interpretation layer over raw transit aspects."""
+
+    def test_interpret_transits_ranks_and_reads(self):
+        raw = {"aspects_to_natal": [
+            {"transiting": "Pluto", "to_natal": "Moon", "aspect": "square",
+             "orb": 0.5, "transiting_sign": "Aquarius", "retrograde": False,
+             "meaning": "x"},
+            {"transiting": "Mars", "to_natal": "Venus", "aspect": "trine",
+             "orb": 3.0, "transiting_sign": "Leo", "retrograde": False,
+             "meaning": "y"},
+        ]}
+        out = ae.interpret_transits(raw)
+        self.assertTrue(out["headline"].startswith("Dominant transit: Pluto"))
+        self.assertEqual(out["key_transits"][0]["transiting"], "Pluto")
+        self.assertIn("reading", out["key_transits"][0])
+        self.assertIsInstance(out["advice"], list)
+
+    def test_transit_mode_includes_interpretation(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "transit",
+                                       "transit_date": "2026-08-23"})
+        self.assertIn("transit_interpretation", r)
+        self.assertIn("headline", r["transit_interpretation"])
+
+
 class TestProfectionsFirdaria(unittest.TestCase):
     """Wave 1-1/1-2: annual profections + Firdaria periods."""
 

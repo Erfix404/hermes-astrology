@@ -3667,6 +3667,10 @@ def calculate_full_profile(data):
         tdate=data.get("transit_date")
         tdt=datetime.strptime(tdate,"%Y-%m-%d") if tdate else TODAY
         result["transits"]=transits(jd,lat,lng,tdt)
+        try:
+            result["transit_interpretation"]=interpret_transits(result["transits"])
+        except Exception:
+            pass
         result["life_phase"]=life_phase(birth_local)
         return result
 
@@ -4121,6 +4125,72 @@ def firdaria(birth_local, is_day_birth, until_age=75):
                  "the Sun, night with the Moon); each major period divides into "
                  "sub-periods co-ruled by every planet in sequence."),
     }
+
+
+TRANSIT_ASPECT_TONE = {
+    "conjunction": "fuses with",
+    "sextile":     "opens an easy door to",
+    "square":      "creates friction with",
+    "trine":       "flows naturally into",
+    "opposition":  "faces off against",
+}
+
+SLOW_PLANET_TIMING = {
+    "Pluto": ("years", "a generational, deep-structural change touching this life area"),
+    "Neptune": ("years", "dissolving old certainties; inspiration mixed with confusion"),
+    "Uranus": ("months", "disruption and liberation; expect the unexpected"),
+    "Saturn": ("weeks-months", "consolidation, testing, and mature commitment"),
+    "Jupiter": ("weeks", "growth and opportunity — but watch for overreach"),
+    "North Node": ("weeks", "karmic pull toward unfamiliar growth territory"),
+    "Mars": ("days", "surges of energy and initiative — or conflict if forced"),
+}
+
+def interpret_transits(transit_result):
+    """Turn raw transit aspects into ranked, readable guidance.
+    transit_result: output of transits() — uses aspects_to_natal + current_positions.
+    Adds 'headline' (dominant theme), 'key_transits' (top interpreted hits),
+    'advice' list."""
+    hits = transit_result.get("aspects_to_natal", [])
+    scored = []
+    for h in hits:
+        tp = h["transiting"]
+        slow = tp in SLOW_PLANET_TIMING
+        tightness = max(0.0, 1.0 - h["orb"] / 8.0)
+        weight = (2.0 if slow else 0.6) * tightness \
+                 * (1.3 if h["to_natal"] in ("Sun","Moon","Ascendant") else 1.0)
+        timing_unit, tone = SLOW_PLANET_TIMING.get(
+            tp, ("days", "brief passing influence"))
+        text = (f"Transiting {tp} {TRANSIT_ASPECT_TONE.get(h['aspect'], 'contacts')} "
+                f"natal {h['to_natal']} (orb {h['orb']}°) — {tone}. "
+                f"Window: {timing_unit}.")
+        scored.append({**h, "weight": round(weight, 2), "reading": text})
+    scored.sort(key=lambda x: -x["weight"])
+    key = scored[:5]
+    headline = None
+    if key:
+        dom = key[0]
+        headline = (f"Dominant transit: {dom['transiting']} {dom['aspect']} "
+                    f"natal {dom['to_natal']}")
+    hard = [k for k in key if k["aspect"] in ("square", "opposition")]
+    soft = [k for k in key if k["aspect"] in ("trine", "sextile")]
+    advice = []
+    if len(hard) >= 2:
+        advice.append("Multiple hard aspects active: pace yourself; pressure is "
+                      "productive only when it has a deadline.")
+    if len(soft) >= 2:
+        advice.append("Supportive currents dominate — use this window to launch "
+                      "or consolidate.")
+    sat = next((k for k in key if k["transiting"] == "Saturn"), None)
+    if sat:
+        advice.append(f"Saturn on natal {sat['to_natal']}: say yes to structure, "
+                      f"no to shortcuts. What you build now lasts.")
+    jup = next((k for k in key if k["transiting"] == "Jupiter"), None)
+    if jup:
+        advice.append(f"Jupiter on natal {jup['to_natal']}: expand deliberately — "
+                      f"the growth is real but so is the temptation to overshoot.")
+    return {"headline": headline,
+            "key_transits": key[:5],
+            "advice": advice}
 
 
 def _demo():
