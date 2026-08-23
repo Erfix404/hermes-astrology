@@ -644,6 +644,52 @@ class TestPublicModesNoBirthData(unittest.TestCase):
         self.assertIn("phase", r["moon_phase"])
 
 
+class TestProfectionsFirdaria(unittest.TestCase):
+    """Wave 1-1/1-2: annual profections + Firdaria periods."""
+
+    def test_profection_rotation_known_ages(self):
+        # Asc = Aries (idx 0): age 0→house 1, age 5→house 6, age 12→house 1
+        birth = datetime(1990, 6, 15)
+        r0 = ae.annual_profections(0, birth, datetime(1990, 7, 15))
+        self.assertEqual((r0["active_house"], r0["active_sign"]), (1, "Aries"))
+        r5 = ae.annual_profections(0, birth, datetime(1995, 7, 15))
+        self.assertEqual(r5["active_house"], 6)
+        r12 = ae.annual_profections(0, birth, datetime(2002, 7, 15))
+        self.assertEqual(r12["active_house"], 1)
+        # year lord = ruler of profected sign
+        r9 = ae.annual_profections(0, birth, datetime(1999, 7, 15))
+        self.assertEqual(r9["active_sign"], "Capricorn")
+        self.assertEqual(r9["year_lord"], "Saturn")
+
+    def test_firdaria_sect_and_coverage(self):
+        birth = datetime(1990, 6, 15, 14, 30)  # day birth → Sun first
+        f = ae.firdaria(birth, is_day_birth=True)
+        self.assertEqual(f["sect"], "day")
+        tl = f["timeline_to_age_75"]
+        self.assertEqual(tl[0]["lord"], "Sun")
+        # day order total + final Moon = 75 years coverage
+        self.assertAlmostEqual(tl[-1]["end_age"], 75.0, delta=0.1)
+        # every age in [0,75) falls inside exactly one major firdar
+        for age in range(0, 75, 3):
+            hits = [p for p in tl if p["start_age"] <= age < p["end_age"]]
+            self.assertEqual(len(hits), 1, f"age {age} covered {len(hits)}x")
+        fn = ae.firdaria(birth, is_day_birth=False)
+        self.assertEqual(fn["timeline_to_age_75"][0]["lord"], "Moon")
+
+    def test_modes_dispatch(self):
+        d = dict(ae._demo())
+        rp = ae.calculate_full_profile({**d, "mode": "profections"})
+        self.assertIn("annual_profections", rp)
+        self.assertNotIn("error", rp)
+        rf = ae.calculate_full_profile({**d, "mode": "firdaria"})
+        self.assertIn("firdaria", rf)
+        self.assertEqual(rf["firdaria"]["sect"],
+                         rf["firdaria"]["sect"])  # stable
+        rc = ae.calculate_full_profile({**d, "mode": "forecast"})
+        self.assertIn("annual_profections", rc)
+        self.assertIn("firdaria", rc)
+
+
 class TestShadbalaCheshtaDrik(unittest.TestCase):
     """Wave 0-5: Cheshta (BPHS 18/24-25) & Drik bala in shadbala_sthana_dig."""
 

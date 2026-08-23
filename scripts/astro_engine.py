@@ -3871,6 +3871,32 @@ def calculate_full_profile(data):
         result["shadbala"] = shadbala_sthana_dig(jd, lat, lng)
         return result
 
+    if mode in ("profections", "firdaria", "forecast"):
+        asc_lon_f, _ = (ascendant_mc(jd, lat, lng) if time_known
+                        else (lons["Sun"], 0))
+        asc_sign_idx = int(norm360(asc_lon_f) // 30) % 12
+        target_date = None
+        if data.get("target_date"):
+            target_date = datetime.strptime(data["target_date"], "%Y-%m-%d")
+        is_day_birth = True
+        try:
+            sun_alt_check = norm360(asc_lon_f - body_longitudes(jd)[0]["Sun"])
+            is_day_birth = 90 <= sun_alt_check <= 270
+        except Exception:
+            pass
+        if mode in ("profections", "forecast"):
+            result["annual_profections"] = annual_profections(
+                asc_sign_idx, birth_local, target_date)
+        if mode in ("firdaria", "forecast"):
+            until_age = min(int(data.get("until_age", 75)), 100)
+            f = firdaria(birth_local, is_day_birth)
+            if data.get("until_age") and data["until_age"] < 75:
+                f["timeline_to_age_75"] = [
+                    p for p in f["timeline_to_age_75"]
+                    if p["start_age"] < data["until_age"]]
+            result["firdaria"] = f
+        return result
+
     # ── Natal with advanced features ────────────────────────────────
     do_advanced = data.get("advanced", False)
     result["charts"]={}
@@ -3961,6 +3987,140 @@ def calculate_full_profile(data):
             result["_advanced_error"] = repr(e)
 
     return result
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — WESTERN FORECASTING: PROFECTIONS & FIRDARIA
+# ═════════════════════════════════════════════════════════════════════════════
+
+PROFECTION_THEMES = {
+    1:  ("self, body, vitality — a year of personal initiative and new beginnings",
+         "identity reset; how you appear and initiate"),
+    2:  ("money, resources, values, self-worth — building material stability",
+         "income and possessions; what you value"),
+    3:  ("communication, siblings, short trips, learning — busy local movement",
+         "study, writing, neighbors, everyday exchanges"),
+    4:  ("home, family, roots, inner foundation — private and domestic focus",
+         "relocation, property, parents, emotional base"),
+    5:  ("creativity, romance, children, pleasure — expressive and playful",
+         "love affairs, creative projects, fun, kids"),
+    6:  ("work, health, daily routine, service — discipline and maintenance",
+         "jobs, habits, fitness, illness prevention"),
+    7:  ("partnerships, marriage, contracts, open enemies — the other person's year",
+         "committed relationships, negotiations, rivals"),
+    8:  ("shared resources, debt, transformation, sexuality — deep change",
+         "taxes, inheritance, intimacy, crisis-and-rebirth"),
+    9:  ("travel, higher education, philosophy, publishing — expansion of horizons",
+         "long journeys, university, beliefs, foreign contacts"),
+    10: ("career, public standing, authority, achievement — the visible year",
+         "promotion, reputation, bosses, life direction"),
+    11: ("friends, groups, hopes, wishes, networks — collective support",
+         "allies, communities, long-term goals, gains"),
+    12: ("retreat, solitude, hidden matters, healing — end of a cycle",
+         "rest, introspection, hospitals, closure before renewal"),
+}
+
+def annual_profections(asc_sign_idx, birth_local, target_date=None):
+    """Full profection report given the natal rising-sign index (0=Aries).
+    Returns active house (1-12), its lord, theme, plus month-level rotation."""
+    """Full profection report given the natal rising-sign index (0=Aries).
+    Returns active house (1-12), its lord, theme, plus next-year preview."""
+    target = target_date or TODAY
+    age_exact = (target - birth_local).days / 365.2425
+    prof_index = int(age_exact) % 12          # 0-based rotation from Asc
+    house = prof_index + 1
+    asc_sign = SIGNS[asc_sign_idx]
+    prof_sign = SIGNS[(asc_sign_idx + prof_index) % 12]
+    lord = SIGN_DATA[prof_sign]["ruler"]
+    theme, detail = PROFECTION_THEMES[house]
+    # monthly profections: each month advances one sign from the yearly sign
+    month_in_year = int((age_exact % 1) * 12)
+    month_sign = SIGNS[(asc_sign_idx + prof_index + month_in_year) % 12]
+    month_house = ((prof_index + month_in_year) % 12) + 1
+    # age boundaries of this profection year
+    start = birth_local.replace(year=birth_local.year + int(age_exact)) \
+        if birth_local.month != 2 or birth_local.day != 29 \
+        else birth_local.replace(year=birth_local.year + int(age_exact), day=28)
+    end_year = int(age_exact) + 1
+    try:
+        end = start.replace(year=start.year + 1)
+    except ValueError:
+        end = start.replace(year=start.year + 1, day=28)
+    return {
+        "age": round(age_exact, 2),
+        "profection_year": int(age_exact),
+        "active_house": house,
+        "active_sign": prof_sign,
+        "year_lord": lord,
+        "theme": theme,
+        "detail": detail,
+        "month_profection": {"index": month_in_year + 1, "sign": month_sign,
+                             "house": month_house,
+                             "lord": SIGN_DATA[month_sign]["ruler"]},
+        "period": {"start": start.strftime("%Y-%m-%d"), "end": end.strftime("%Y-%m-%d")},
+        "note": ("Hellenistic annual profection: the profected house and its lord "
+                 "color the whole year; the lord's natal condition shows how easily "
+                 "the themes flow."),
+    }
+
+FIRDARIA_DAY_ORDER = ["Sun","Venus","Mercury","Saturn","Jupiter","Mars",
+                      "North Node","South Node"]
+FIRDARIA_NIGHT_ORDER = ["Moon","Saturn","Jupiter","Mars","North Node","South Node",
+                        "Sun","Venus","Mercury"]
+FIRDARIA_YEARS = {"Sun":10,"Venus":8,"Mercury":13,"Moon":9,"Saturn":11,"Jupiter":12,
+                  "Mars":7,"North Node":3,"South Node":2}
+# classical scheme: 66 main years then a universal final Moon firdar to 75
+
+def firdaria(birth_local, is_day_birth, until_age=75):
+    """Firdaria (medieval Persian): life split into 75 years —
+    day births start with Sun, night births with Moon; each planet rules a
+    'firdar' of fixed length, subdivided into sub-periods with partners in order."""
+    order = FIRDARIA_DAY_ORDER if is_day_birth else FIRDARIA_NIGHT_ORDER
+    periods = []
+    age_cursor = 0.0
+    for i, p in enumerate(order):
+        yrs = FIRDARIA_YEARS[p]
+        periods.append({"lord": p, "start_age": round(age_cursor, 1),
+                        "end_age": round(age_cursor + yrs, 1),
+                        "years": yrs})
+        age_cursor += yrs
+    # classical scheme ends at 75 with a final Moon firdar for everyone
+    periods.append({"lord": "Moon", "start_age": round(age_cursor, 1),
+                    "end_age": round(age_cursor + 9, 1), "years": 9,
+                    "note": "final universal Moon firdar"})
+    def _active(age):
+        for pr in periods:
+            if pr["start_age"] <= age < pr["end_age"]:
+                return pr
+        return periods[-1]
+    current_age = (TODAY - birth_local).days / 365.2425
+    major = _active(current_age)
+    # sub-periods within the major: partners rotate through `order` starting
+    # from the major lord's own position
+    idx = order.index(major["lord"]) if major["lord"] in order else 0
+    span = major["end_age"] - major["start_age"]
+    n_subs = len(order)
+    subs = []
+    for k in range(n_subs):
+        partner = order[(idx + k) % len(order)]
+        s_start = major["start_age"] + span * k / n_subs
+        s_end = major["start_age"] + span * (k + 1) / n_subs
+        subs.append({"partner_lord": partner,
+                     "start_age": round(s_start, 2), "end_age": round(s_end, 2)})
+    active_sub = next((s for s in subs
+                       if s["start_age"] <= current_age < s["end_age"]), subs[-1])
+    upcoming = [p for p in periods if p["start_age"] > current_age][:3]
+    return {
+        "sect": "day" if is_day_birth else "night",
+        "current_age": round(current_age, 1),
+        "major_firdar": {k: major[k] for k in ("lord", "start_age", "end_age")},
+        "sub_period": active_sub,
+        "upcoming_majors": upcoming,
+        "timeline_to_age_75": periods,
+        "note": ("Firdaria: long periods ruled by one planet (day sect begins with "
+                 "the Sun, night with the Moon); each major period divides into "
+                 "sub-periods co-ruled by every planet in sequence."),
+    }
 
 
 def _demo():
