@@ -3754,7 +3754,12 @@ def calculate_full_profile(data):
 
     if mode=="progressions":
         target_age=data.get("target_age", 30)
-        result["progressions"]=secondary_progressions(jd, target_age, lat, lng)
+        prog=secondary_progressions(jd, target_age, lat, lng)
+        result["progressions"]=prog
+        try:
+            result["progression_interpretation"]=interpret_progressions(jd, prog)
+        except Exception:
+            pass
         return result
 
     if mode=="planetary_return":
@@ -4191,6 +4196,99 @@ def interpret_transits(transit_result):
     return {"headline": headline,
             "key_transits": key[:5],
             "advice": advice}
+
+
+PROG_MOON_PHASE = {
+    "new":      ("dark-of-the-moon chapter", "instinctive beginnings; plant seeds quietly, don't force outcomes"),
+    "crescent": ("crescent chapter", "struggle to break from the past; early wins come through persistence"),
+    "first_quarter": ("first-quarter chapter", "action and decision; obstacles are the curriculum"),
+    "gibbous":  ("gibbous chapter", "refine and adjust; progress through analysis and improvement"),
+    "full":     ("full-moon chapter", "culmination and visibility; relationships and goals peak"),
+    "disseminating": ("disseminating chapter", "share what you've learned; teach, publish, pass it on"),
+    "last_quarter": ("last-quarter chapter", "release and reassessment; let go of what no longer fits"),
+    "balsamic": ("balsamic chapter", "dissolve and prepare; an old 29.5-year story closes before a new one"),
+}
+
+def interpret_progressions(natal_jd, prog_chart):
+    """Readable reading over a secondary_progressions() chart:
+    progressed Sun/Moon narrative (sign, house, lunar phase) + strongest
+    progressed-to-natal aspects + practical summary for the target age."""
+    natal_lons, _, _ = body_longitudes(natal_jd)
+    age = prog_chart.get("target_age")
+    ps = prog_chart["planets"]
+    readings = []
+
+    # ── progressed Sun ──────────────────────────────────────────────
+    p_sun = ps["Sun"]; n_sun = natal_lons["Sun"]
+    sun_sign_change = p_sun["sign"] != sign_of(n_sun)[0]
+    readings.append({
+        "planet": "Sun",
+        "headline": f"Progressed Sun in {p_sun['sign']} (house {p_sun['house']})",
+        "text": (
+            f"Your evolving identity now runs through {p_sun['sign']} — "
+            f"{SIGN_DATA[p_sun['sign']]['keywords'].split(';')[0]} — expressed "
+            f"through house {p_sun['house']}: {HOUSE_MEANINGS[p_sun['house']].split(',')[0].lower()}."
+            + (" This is a recent sign change: the core self is rewriting its style."
+               if sun_sign_change else
+               f" The progressed Sun advances ~1°/year; next sign change in "
+               f"~{30 - p_sun['deg_in_sign']:.0f} years.")),
+    })
+
+    # ── progressed Moon + phase ────────────────────────────────────
+    p_moon = ps["Moon"]; n_moon = natal_lons["Moon"]
+    phase_angle = norm360(p_moon["abs_lon"] - p_sun["abs_lon"])
+    phases = ["new","crescent","first_quarter","gibbous","full",
+              "disseminating","last_quarter","balsamic"]
+    phase = phases[int(((phase_angle + 22.5) % 360) // 45)]
+    ph_label, ph_text = PROG_MOON_PHASE[phase]
+    moon_sign_change = p_moon["sign"] != sign_of(n_moon)[0]
+    readings.append({
+        "planet": "Moon",
+        "headline": f"Progressed Moon in {p_moon['sign']} (house {p_moon['house']}) — {ph_label}",
+        "text": (f"Emotional focus sits in {p_moon['sign']}, {HOUSE_MEANINGS[p_moon['house']].split(',')[0].lower()}. "
+                 f"You're in the {ph_text}. The progressed Moon changes signs every "
+                 f"~2.5 years{'; a fresh emotional season just began' if moon_sign_change else ''}."),
+        "lunar_phase": phase,
+    })
+
+    # ── progressed Ascendant / MC ─────────────────────────────────
+    pa = prog_chart.get("ascendant"); pm = prog_chart.get("midheaven")
+    if pa and pm:
+        readings.append({
+            "planet": "Angles",
+            "headline": f"Progressed Asc in {pa['sign']}, MC in {pm['sign']}",
+            "text": (f"How you meet the world matures into {pa['sign']}; public direction "
+                     f"tilts toward {pm['sign']}. Angle shifts mark visible identity pivots."),
+        })
+
+    # ── progressed-to-natal aspects (tightest first) ──────────────
+    prog_lons = {n: v["abs_lon"] for n, v in ps.items()
+                 if n in ("Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn")}
+    hits = []
+    for pp, plon in prog_lons.items():
+        for np_, nlon in natal_lons.items():
+            if np_ not in PLANET_ARCHETYPES or np_ == pp:
+                continue
+            sep = abs(norm180(plon - nlon))
+            for asp, (ang, orb, desc) in ASPECTS.items():
+                tight = min(orb, 1.5)
+                if abs(sep - ang) <= tight:
+                    hits.append({"progressed": pp, "to_natal": np_,
+                                 "aspect": asp, "orb": round(abs(sep - ang), 2),
+                                 "meaning": desc})
+                    break
+    hits.sort(key=lambda x: x["orb"])
+    return {
+        "age": age,
+        "readings": readings,
+        "key_progressed_aspects": hits[:6],
+        "summary": (f"At age {age}: identity themes center on "
+                    f"{p_sun['sign']} (house {p_sun['house']}), emotions run through "
+                    f"a {phase.replace('_',' ')} Moon in {p_moon['sign']}."
+                    + (f" Tightest progressed contact: {hits[0]['progressed']} "
+                       f"{hits[0]['aspect']} natal {hits[0]['to_natal']} — {hits[0]['meaning']}"
+                       if hits else "")),
+    }
 
 
 def _demo():

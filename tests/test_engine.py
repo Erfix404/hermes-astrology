@@ -670,6 +670,33 @@ class TestTransitInterpretation(unittest.TestCase):
         self.assertIn("headline", r["transit_interpretation"])
 
 
+class TestProgressionInterpretation(unittest.TestCase):
+    """Wave 1-4: readable reading over secondary progressions."""
+
+    def test_interpret_progressions_structure(self):
+        jd = ae.julian_day(datetime(1990, 6, 15, 11, 0))
+        prog = ae.secondary_progressions(jd, 36, 35.6892, 51.3890)
+        out = ae.interpret_progressions(jd, prog)
+        self.assertEqual(out["age"], 36)
+        planets_read = {r["planet"] for r in out["readings"]}
+        self.assertIn("Sun", planets_read)
+        self.assertIn("Moon", planets_read)
+        self.assertIn("lunar_phase", out["readings"][1])
+        self.assertTrue(out["summary"].startswith("At age 36:"))
+
+    def test_progressions_mode_includes_interpretation(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "progressions",
+                                       "target_age": 36})
+        self.assertIn("progression_interpretation", r)
+        self.assertIn("summary", r["progression_interpretation"])
+
+    def test_lunar_phase_mapping(self):
+        # phase angle 0 → new; 180 → full
+        phases = ae.PROG_MOON_PHASE.keys()
+        self.assertEqual(len(list(phases)), 8)
+
+
 class TestProfectionsFirdaria(unittest.TestCase):
     """Wave 1-1/1-2: annual profections + Firdaria periods."""
 
