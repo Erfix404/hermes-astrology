@@ -644,6 +644,48 @@ class TestPublicModesNoBirthData(unittest.TestCase):
         self.assertIn("phase", r["moon_phase"])
 
 
+class TestZodiacalReleasing(unittest.TestCase):
+    """Wave 1-5: ZR per Valens IV — periods, LOB, peaks, symbolic calendar."""
+
+    def test_period_table_matches_valens(self):
+        self.assertEqual(ae.ZR_PERIODS["Cancer"], 25)
+        self.assertEqual(ae.ZR_PERIODS["Leo"], 19)
+        self.assertEqual(ae.ZR_PERIODS["Libra"], 8)
+        self.assertEqual(ae.ZR_PERIODS["Capricorn"], 27)
+        self.assertEqual(sum(ae.ZR_PERIODS.values()), 211)
+
+    def test_l1_sequence_and_lob(self):
+        # from Leo: Leo(19) Virgo(20) Libra(8) ... after a full lap the count
+        # returns toward Leo → LOB jumps to Aquarius instead
+        seq = ae._zr_release_sequence("Leo", 211 * 360 + 10, 1)
+        signs = [s["sign"] for s in seq]
+        self.assertEqual(signs[0], "Leo")
+        self.assertNotIn("Leo", signs[1:], "starting sign must not repeat pre-LOB")
+        lob_entries = [s for s in seq if s["is_lob"]]
+        self.assertTrue(lob_entries, "LOB must fire within one full lap")
+        self.assertEqual(lob_entries[0]["sign"], "Aquarius")
+        # durations follow the 360-day year
+        leo = seq[0]
+        self.assertAlmostEqual(leo["end_day"] - leo["start_day"], 19 * 360)
+
+    def test_zr_mode_report_structure(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "zr",
+                                       "zr_topic": "spirit", "until_age": 80})
+        zr = r["zodiacal_releasing"]
+        for key in ("release_point", "peak_signs", "active_period",
+                    "timeline_level1", "lot_of_fortune_sign"):
+            self.assertIn(key, zr)
+        self.assertEqual(len(zr["peak_signs"]), 4)
+        # every L1 entry has level2 children starting with its own sign
+        first = zr["timeline_level1"][0]
+        if first.get("level2"):
+            self.assertEqual(first["level2"][0]["sign"], first["sign"])
+        bad = ae.calculate_full_profile({**d, "mode": "zr",
+                                         "zr_topic": "nope"})
+        self.assertIn("error", bad)
+
+
 class TestTransitInterpretation(unittest.TestCase):
     """Wave 1-3: readable interpretation layer over raw transit aspects."""
 

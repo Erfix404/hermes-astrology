@@ -3880,6 +3880,16 @@ def calculate_full_profile(data):
         result["shadbala"] = shadbala_sthana_dig(jd, lat, lng)
         return result
 
+    if mode=="zr":
+        topic = data.get("zr_topic", "spirit")
+        if topic not in ("spirit", "fortune"):
+            return {"mode": mode, "error": "zr_topic must be 'spirit' or 'fortune'"}
+        result["zodiacal_releasing"] = zodiacal_releasing(
+            jd, lat, lng, time_known, topic,
+            max_level=int(data.get("max_level", 3)),
+            until_age=min(int(data.get("until_age", 80)), 120))
+        return result
+
     if mode in ("profections", "firdaria", "forecast"):
         asc_lon_f, _ = (ascendant_mc(jd, lat, lng) if time_known
                         else (lons["Sun"], 0))
@@ -4291,6 +4301,173 @@ def interpret_progressions(natal_jd, prog_chart):
                     + (f" Tightest progressed contact: {hits[0]['progressed']} "
                        f"{hits[0]['aspect']} natal {hits[0]['to_natal']} — {hits[0]['meaning']}"
                        if hits else "")),
+    }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — ZODIACAL RELEASING (Valens, Anthology IV.4-4.11)
+# ═════════════════════════════════════════════════════════════════════════════
+
+ZR_PERIODS = {"Aries":15,"Taurus":8,"Gemini":20,"Cancer":25,"Leo":19,
+              "Virgo":20,"Libra":8,"Scorpio":15,"Sagittarius":12,
+              "Capricorn":27,"Aquarius":30,"Pisces":12}
+ZR_SIGNS = list(ZR_PERIODS)          # zodiacal order
+# symbolic calendar: 1 year = 360 days, 1 month = 30, L3 "week" = 2.5 d
+ZR_LEVEL_DAYS = {1: 360.0, 2: 30.0, 3: 2.5, 4: 5.0/24.0}
+
+def _zr_release_sequence(start_sign, end_day, level):
+    """Sequential sign periods from start_sign; applies Loosing of the Bond:
+    when the count would re-enter the previous LOB landing sign (initially the
+    starting sign), jump to its opposite instead. Durations in symbolic days."""
+    seq = []
+    cur = start_sign
+    lb_landing = start_sign
+    day = 0.0
+    while day < end_day:
+        is_lob = bool(seq) and cur == lb_landing and ZR_SIGNS.index(cur) != -1 \
+                 and seq and seq[-1]["sign"] != cur
+        if is_lob:
+            cur = ZR_SIGNS[(ZR_SIGNS.index(cur) + 6) % 12]
+            lb_landing = cur
+        dur = ZR_PERIODS[cur] * ZR_LEVEL_DAYS[level]
+        seq.append({"sign": cur, "start_day": round(day, 3),
+                    "end_day": round(day + dur, 3), "years": ZR_PERIODS[cur],
+                    "is_lob": is_lob})
+        day += dur
+        cur = ZR_SIGNS[(ZR_SIGNS.index(cur) + 1) % 12]
+    return seq
+
+def zodiacal_releasing(natal_jd, lat, lng, time_known=True, topic="spirit",
+                       max_level=3, until_age=80):
+    """Full ZR report. topic: 'spirit' (career/direction) or 'fortune'
+    (body/circumstance). Levels 1..max_level nested; peaks = angular signs
+    from the Lot of Fortune (whole-sign). Symbolic 360-day-year calendar."""
+    lons, _, _ = body_longitudes(natal_jd)
+    if time_known:
+        asc_lon, _ = ascendant_mc(natal_jd, lat, lng)
+    else:
+        asc_lon = lons["Sun"]
+    sun_tropical = lons["Sun"]
+    # sect: Sun above horizon → day (rough whole-sign-safe check via Asc)
+    asc_sign_idx = int(norm360(asc_lon) // 30) % 12
+    sun_sign_idx = int(sun_tropical // 30) % 12
+    # proper sect needs houses; Valens-style approximation: Asc-Sun semicircle
+    rel = norm360(asc_lon - sun_tropical)
+    is_day_birth = 90 <= rel <= 270 or rel < 0 and rel < -90
+    is_day_birth = 90 <= rel <= 270
+    fortune = part_of_fortune(sun_tropical, lons["Moon"], asc_lon, is_day_birth)
+    spirit_lon = norm360((asc_lon + sun_tropical - lons["Moon"]) if not is_day_birth
+                         else (asc_lon - sun_tropical + lons["Moon"]))
+    fortune_idx = int(fortune["longitude"] // 30) % 12
+    spirit_idx = int(spirit_lon // 30) % 12
+    # Valens adjustment: Fortune==Spirit sign → release from next sign
+    adjusted = False
+    if topic == "fortune":
+        start_idx = fortune_idx
+    else:
+        start_idx = spirit_idx
+        if spirit_idx == fortune_idx:
+            start_idx = (start_idx + 1) % 12
+            adjusted = True
+    birth_dt = datetime(2000, 1, 1) + timedelta(days=natal_jd - 2451544.5)
+    end_days_real = until_age * 365.2425
+    end_symbolic = until_age * 360.0   # symbolic years of 360 days
+    # symbolic days track real days 1:1 (the YEAR unit is symbolic, the day isn't)
+    end_day = min(end_days_real, end_symbolic) if False else until_age * 365.2425
+
+    def _nested(parent_start_day, parent_end_day, level, first_sign):
+        """Sub-periods inside a parent window: sequential signs starting at
+        first_sign, each lasting PERIODS[sign] * level-unit-days, with LOB.
+        Returns list trimmed to the parent's real-day window."""
+        out = []
+        cur = first_sign
+        lb_landing = first_sign
+        day = parent_start_day
+        guard = 0
+        while day < parent_end_day and guard < 500:
+            guard += 1
+            is_lob = bool(out) and cur == lb_landing and out[-1]["sign"] != cur
+            if is_lob:
+                cur = ZR_SIGNS[(ZR_SIGNS.index(cur) + 6) % 12]
+                lb_landing = cur
+            dur = ZR_PERIODS[cur] * ZR_LEVEL_DAYS.get(level, 2.5)
+            out.append({"sign": cur, "start_day": round(day, 3),
+                        "end_day": round(min(day + dur, parent_end_day + dur), 3),
+                        "is_lob": is_lob})
+            day += dur
+            cur = ZR_SIGNS[(ZR_SIGNS.index(cur) + 1) % 12]
+        return out
+
+    l1 = []
+    raw_seq = _zr_release_sequence(ZR_SIGNS[start_idx], end_day, 1)
+    for seg in raw_seq:
+        sdt = birth_dt + timedelta(days=seg["start_day"])
+        edt = birth_dt + timedelta(days=seg["end_day"])
+        entry = {"sign": seg["sign"], "years": seg["years"],
+                 "is_lob": seg["is_lob"],
+                 "start": sdt.strftime("%Y-%m-%d"),
+                 "end": edt.strftime("%Y-%m-%d"),
+                 "age_at_start": round(seg["start_day"] / 365.2425, 1)}
+        # peak: angular (1/4/7/10 whole-sign) from FORTUNE
+        dist_from_fortune = (ZR_SIGNS.index(seg["sign"]) - fortune_idx) % 12
+        entry["is_peak"] = dist_from_fortune in (0, 3, 6, 9)
+        entry["peak_weight"] = ({0: "major", 6: "moderate", 9: "minor",
+                                 3: "minor"}.get(dist_from_fortune))
+        # culminating: 10th from release point
+        entry["is_culminating"] = ((ZR_SIGNS.index(seg["sign"]) - start_idx) % 12) == 9
+        # completion: second activation of the starting sign
+        entry["is_completion"] = (seg["sign"] == ZR_SIGNS[start_idx]
+                                  and len(l1) > 0
+                                  and any(e["sign"] == seg["sign"] for e in l1))
+        # triad role relative to nearest peak
+        nxt_peak_i = None
+        for k in range(1, 4):
+            cand = ZR_SIGNS[(ZR_SIGNS.index(seg["sign"]) + k) % 12]
+            cdist = (ZR_SIGNS.index(cand) - fortune_idx) % 12
+            if cdist in (0, 3, 6, 9):
+                nxt_peak_i = k
+                break
+        prv_peak_i = None
+        for k in range(1, 4):
+            cand = ZR_SIGNS[(ZR_SIGNS.index(seg["sign"]) - k) % 12]
+            cdist = (ZR_SIGNS.index(cand) - fortune_idx) % 12
+            if cdist in (0, 3, 6, 9):
+                prv_peak_i = k
+                break
+        if not entry["is_peak"]:
+            if nxt_peak_i == 1: entry["triad_role"] = "build-up to peak"
+            elif prv_peak_i == 1: entry["triad_role"] = "post-peak cool-down"
+        # L2 children (sequential months starting with the parent sign itself)
+        if max_level >= 2:
+            subs = _nested(seg["start_day"], seg["end_day"], 2, seg["sign"])
+            entry["level2"] = [
+                {"sign": s["sign"],
+                 "start": (birth_dt + timedelta(days=s["start_day"])).strftime("%Y-%m-%d"),
+                 "end": (birth_dt + timedelta(days=s["end_day"])).strftime("%Y-%m-%d"),
+                 "is_lob": s["is_lob"]} for s in subs[:40]]
+        l1.append(entry)
+    active = next((e for e in reversed(l1)
+                   if e["start"] <= TODAY.strftime("%Y-%m-%d")), l1[0])
+    active_l2 = None
+    if max_level >= 2 and active.get("level2"):
+        today_s = TODAY.strftime("%Y-%m-%d")
+        active_l2 = next((s for s in active["level2"]
+                          if s["start"] <= today_s < s["end"]), None)
+    return {
+        "topic": topic,
+        "release_point": ZR_SIGNS[start_idx],
+        "lot_of_fortune_sign": ZR_SIGNS[fortune_idx],
+        "lot_of_spirit_sign": ZR_SIGNS[spirit_idx],
+        "valens_adjustment_applied": adjusted,
+        "sect": "day" if is_day_birth else "night",
+        "peak_signs": [ZR_SIGNS[(fortune_idx + k) % 12] for k in (0, 3, 6, 9)],
+        "active_period": {"l1": active["sign"], "l2": active_l2 and active_l2["sign"],
+                          "since": active["start"]},
+        "timeline_level1": l1,
+        "note": ("Zodiacal Releasing per Vettius Valens, Anthology IV "
+                 "(Schmidt/Riley): sequential sign-periods on the 360-day "
+                 "symbolic year; Loosing-of-the-Bond jumps opposite at lap end; "
+                 "peaks are angles from the Lot of Fortune."),
     }
 
 
