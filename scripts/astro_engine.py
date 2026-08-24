@@ -3907,6 +3907,30 @@ def calculate_full_profile(data):
         result["shadbala"] = shadbala_sthana_dig(jd, lat, lng)
         return result
 
+    if mode=="mundane":
+        cname = data.get("country", "iran").lower()
+        if cname not in MUNDANE_CAPITALS:
+            return {"mode": mode, "error":
+                    f"unknown country '{cname}' — available: "
+                    + ", ".join(sorted(MUNDANE_CAPITALS))}
+        lat_c, lng_c = MUNDANE_CAPITALS[cname]
+        year = int(data.get("year", TODAY.year))
+        kind = data.get("ingress_kind", "aries")
+        result["mundane"] = ingress_chart(cname, lat_c, lng_c, year, kind)
+        try:
+            result["eclipse_activations"] = eclipse_activations(
+                julian_day(datetime(2000, 1, 1)), lat_c, lng_c,
+                count=int(data.get("eclipse_count", 4)))
+        except Exception:
+            pass
+        if data.get("include_lunations"):
+            try:
+                result["lunations"] = lunation_cycle(lat_c, lng_c,
+                                                     count=int(data.get("lunation_count", 3)))
+            except Exception:
+                pass
+        return result
+
     if mode=="gochara":
         tdate=data.get("transit_date")
         t_jd=julian_day(datetime.strptime(tdate,"%Y-%m-%d")) if tdate \
@@ -4731,6 +4755,167 @@ def chara_dasha(natal_jd, lat, lng, time_known=True, until_age=90):
                      "Simplified single-lord rule for dual-lord signs.")}
 
 chara_years_cache = {}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — MUNDANE ASTROLOGY: INGRESSES, ECLIPSE ACTIVATION, LUNATIONS
+# ═════════════════════════════════════════════════════════════════════════════
+
+MUNDANE_HOUSE_MEANINGS = {
+    1: "the nation's people and collective mood",
+    2: "the economy, treasury, national wealth",
+    3: "media, transport, neighboring states, education",
+    4: "land, agriculture, housing, the opposition (in some traditions)",
+    5: "entertainment, sports, births, speculation markets",
+    6: "public health, workforce, civil service, military rank-and-file",
+    7: "foreign affairs, treaties, open enemies, war/peace",
+    8: "deaths, national debt, crises, intelligence services",
+    9: "law, courts, religion, long-distance relations, trade abroad",
+    10: "the government, head of state, national reputation",
+    11: "parliament, allies, legislative bodies, public hopes",
+    12: "prisons, hospitals, secret enemies, covert operations",
+}
+
+def solar_ingress_jd(year, sign_idx):
+    """Exact JD when the Sun enters SIGNS[sign_idx] in the given year
+    (bisection over the ~3-day window around the expected date).
+    sign_idx 0=Aries (Mar), 3=Cancer (Jun), 6=Libra (Sep), 9=Capricorn (Dec)."""
+    month = [3, 6, 9, 12][sign_idx // 3]
+    day0 = [20, 21, 22, 21][sign_idx // 3]
+    target_lon = sign_idx * 30.0
+    low = julian_day(datetime(year, month, day0 - 2))
+    high = julian_day(datetime(year, month, day0 + 2))
+    for _ in range(50):
+        mid = (low + high) / 2
+        sun = tropical_longitudes(mid)["Sun"]
+        diff = norm180(sun - target_lon)
+        if abs(diff) < 0.0005:
+            break
+        if diff > 0:
+            high = mid
+        else:
+            low = mid
+    return (low + high) / 2
+
+def mundane_chart(jd_moment, lat, lng, title=""):
+    """Full chart cast for a mundane moment at a capital; adds mundane house
+    glosses to planets."""
+    ch = western_chart(jd_moment, lat, lng, True)
+    ch["system"] = title or "Mundane Ingress Chart"
+    for nm, blk in ch["planets"].items():
+        h = blk.get("house")
+        if h in MUNDANE_HOUSE_MEANINGS:
+            blk["mundane_signification"] = MUNDANE_HOUSE_MEANINGS[h]
+    return ch
+
+def ingress_chart(country_name, lat, lng, year=None, kind="aries"):
+    """Aries ingress = solar year for the nation; cardinal ingresses seasonally.
+    Returns the mundane chart + a few headline judgments."""
+    year = year or TODAY.year
+    idx_map = {"aries": 0, "cancer": 3, "libra": 6, "capricorn": 9}
+    key = kind.lower()
+    if key not in idx_map:
+        return {"error": "kind must be aries|cancer|libra|capricorn"}
+    jd_m = solar_ingress_jd(year, idx_map[key])
+    utc_dt = _jd_to_dt(jd_m)
+    ch = mundane_chart(jd_m, lat, lng,
+                       f"{country_name} {kind.capitalize()} Ingress {year}")
+    # headline mundane judgments (mechanical, classical)
+    judgments = []
+    sun_house = ch["planets"]["Sun"]["house"]
+    sat = ch["planets"]["Saturn"]; mar = ch["planets"]["Mars"]; jup = ch["planets"]["Jupiter"]
+    judgments.append(f"Sun in house {sun_house} — the year's focus falls on "
+                     f"{MUNDANE_HOUSE_MEANINGS.get(sun_house, 'general affairs')}.")
+    judgments.append(f"Saturn in house {sat['house']} ({sat['sign']}): pressure on "
+                     f"{MUNDANE_HOUSE_MEANINGS.get(sat['house'], 'that sphere')} — "
+                     f"where the nation must do hard structural work.")
+    judgments.append(f"Mars in house {mar['house']}: energy/conflict around "
+                     f"{MUNDANE_HOUSE_MEANINGS.get(mar['house'], 'that sphere')}.")
+    judgments.append(f"Jupiter in house {jup['house']}: growth/protection for "
+                     f"{MUNDANE_HOUSE_MEANINGS.get(jup['house'], 'that sphere')}.")
+    ang = [n for n in ("Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn")
+           if ch["planets"][n]["house"] in (1,4,7,10)]
+    if len(ang) >= 4:
+        judgments.append("Heavy angular concentration: an eventful, visible year.")
+    return {"place": {"lat": lat, "lng": lng}, "moment_utc": utc_dt.strftime("%Y-%m-%d %H:%M"),
+            "chart": ch, "judgments": judgments}
+
+
+MUNDANE_CAPITALS = {
+    "iran": (35.6892, 51.3890), "usa": (38.8951, -77.0364),
+    "uk": (51.5074, -0.1278), "france": (48.8566, 2.3522),
+    "germany": (52.5200, 13.4050), "russia": (55.7558, 37.6173),
+    "china": (39.9042, 116.4074), "israel": (31.7683, 35.2137),
+    "turkey": (39.9334, 32.8597), "india": (28.6139, 77.2090),
+    "japan": (35.6762, 139.6503), "brazil": (-15.7975, -47.8919),
+}
+
+def eclipse_activations(natal_chart_jd, lat, lng, count=4):
+    """Map upcoming eclipses onto this chart's houses: what life-sphere each
+    one electrifies. Uses next_eclipses() + whole-sign-ish house of eclipse degree."""
+    ecl = next_eclipses(julian_day(datetime.utcnow()), count=count)
+    if isinstance(ecl, dict) and "error" in ecl:
+        return ecl
+    asc_lon, _ = ascendant_mc(natal_chart_jd, lat, lng)
+    out = []
+    for e in ecl:
+        jd_e = e["jd"]
+        lon_e = tropical_longitudes(jd_e)
+        if e["type"] == "solar":
+            deg = lon_e["Sun"]
+        else:
+            deg = lon_e["Moon"]
+        house = whole_sign_house(deg, asc_lon)
+        sign = sign_of(deg)[0]
+        out.append({**e, "degree": round(deg % 30, 2), "sign": sign,
+                    "house_of_natal_chart": house,
+                    "activates": MUNDANE_HOUSE_MEANINGS.get(house, ""),
+                    "note": ("New-moon-like reset" if e["type"] == "solar"
+                             else "Culmination/disclosure")})
+    return out
+
+
+def lunation_cycle(lat, lng, count=3, start_jd=None):
+    """Next new/full moons cast as charts for a location — the monthly
+    weather of a nation or person. New Moon = seed/theme; Full = climax."""
+    t = start_jd or julian_day(datetime.utcnow())
+    out = []
+    for _ in range(count):
+        # find next new moon: Moon-Sun elongation = 0 (bisection per lunation)
+        low = t
+        e = norm360(tropical_longitudes(low)["Moon"] - tropical_longitudes(low)["Sun"])
+        high = low + 29.65
+        for _ in range(45):
+            mid = (low + high) / 2
+            l2 = tropical_longitudes(mid)
+            diff = norm180(l2["Moon"] - l2["Sun"])
+            if abs(diff) < 0.001:
+                break
+            if diff > 0:
+                high = mid
+            else:
+                low = mid
+        nm_jd = (low + high) / 2
+        ch = mundane_chart(nm_jd, lat, lng, "New Moon")
+        fm_jd = nm_jd + 14.77
+        chf = mundane_chart(fm_jd, lat, lng, "Full Moon")
+        sun_h = ch["planets"]["Sun"]["house"]
+        moon_h_nm = ch["planets"]["Moon"]["house"]
+        moon_h_fm = chf["planets"]["Moon"]["house"]
+        out.append({
+            "new_moon": _jd_to_dt(nm_jd).strftime("%Y-%m-%d %H:%M"),
+            "new_moon_sign": sign_of(tropical_longitudes(nm_jd)["Sun"])[0],
+            "theme_house": sun_h,
+            "theme": MUNDANE_HOUSE_MEANINGS.get(sun_h, ""),
+            "moon_house_at_new": moon_h_nm,
+            "full_moon": _jd_to_dt(fm_jd).strftime("%Y-%m-%d %H:%M"),
+            "full_moon_climax_house": moon_h_fm,
+        })
+        t = nm_jd + 25.0
+    return {"lunations": out,
+            "note": ("Monthly lunation cycle: each New Moon seeds a theme "
+                     "(its Sun's house); the Full Moon two weeks later "
+                     "brings the related matter to a head.")}
 
 
 def _demo():

@@ -741,6 +741,48 @@ class TestCharaDasha(unittest.TestCase):
         self.assertEqual(yrs, 12)
 
 
+class TestMundaneAstrology(unittest.TestCase):
+    """Wave 3: ingress charts, eclipse activations, lunations."""
+
+    def test_ingress_jd_known_value(self):
+        # March 2026 equinox: ~2026-03-20 14:46 UTC (well-known); our bisection
+        # should land on Mar 19-21
+        jd = ae.solar_ingress_jd(2026, 0)
+        dt = ae._jd_to_dt(jd)
+        self.assertEqual(dt.year, 2026)
+        self.assertIn(dt.month, (3,))
+        self.assertTrue(19 <= dt.day <= 21)
+        # Sun must be at 0° Aries within a tolerance
+        lons = ae.tropical_longitudes(jd)
+        self.assertLess(abs(ae.norm180(lons["Sun"] - 0.0)), 0.01)
+
+    def test_ingress_chart_mode(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "mundane",
+                                       "country": "iran", "year": 2026})
+        m = r["mundane"]
+        self.assertNotIn("error", m)
+        self.assertTrue(m["judgments"])
+        sun = m["chart"]["planets"]["Sun"]
+        self.assertIn("mundane_signification", sun)
+        bad = ae.calculate_full_profile({**d, "mode": "mundane",
+                                         "country": "atlantis"})
+        self.assertIn("error", bad)
+
+    def test_eclipse_activations_and_lunations(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "mundane",
+                                       "country": "usa", "include_lunations": True})
+        ea = r["eclipse_activations"]
+        self.assertTrue(len(ea) >= 2)
+        for e in r["eclipse_activations"]:
+            self.assertIn("house_of_natal_chart", e)
+            self.assertTrue(1 <= e["house_of_natal_chart"] <= 12)
+        for l in r["lunations"]["lunations"]:
+            self.assertTrue(1 <= l["theme_house"] <= 12)
+            self.assertTrue(1 <= l["full_moon_climax_house"] <= 12)
+
+
 class TestZodiacalReleasing(unittest.TestCase):
     """Wave 1-5: ZR per Valens IV — periods, LOB, peaks, symbolic calendar."""
 
