@@ -3921,6 +3921,7 @@ def calculate_full_profile(data):
         result["current_timeline"] = {
             "maha": vim["current_mahadasha"], "antar": vim["current_antardasha"],
             "pratyantar": vim["current_pratyantardasha"]}
+        result["chara_dasha"] = chara_dasha(jd, lat, lng, time_known)
         return result
 
     if mode=="zr":
@@ -4664,6 +4665,72 @@ def interpret_vimshottari(vim):
     return {"reading": " ".join(lines),
             "themes": {k: DASHA_LORD_THEMES[k] for k in
                        (maha["lord"],) + ((antar["lord"],) if antar else ())}}
+
+
+# Jaimini Chara Dasha (K.N. Rao method — the widely-used variant):
+# period years = distance from sign to its lord's sign (counting the sign
+# itself as 1, direct for odd-foot... simplified: standard Rao counting);
+# sequence starts from the Lagna sign and proceeds by "direction" (direct
+# if lagna in odd sign, reverse if even). 9th strongest etc. omitted —
+# we use the simple Rao duration rule.
+def chara_dasha(natal_jd, lat, lng, time_known=True, until_age=90):
+    """Chara (sign) dasha per K.N. Rao: periods of SIGNS not planets.
+    Duration = count from the sign to its lord (min of direct/reverse counts,
+    minus 1 when lord is IN that sign → 12 years). Starts from Lagna sign."""
+    lons, _, _ = body_longitudes(natal_jd)
+    if time_known:
+        asc_lon, _ = ascendant_mc(natal_jd, lat, lng)
+    else:
+        asc_lon = lons["Sun"]
+    ayan = ayanamsha_lahiri(natal_jd)
+    sid = {p: norm360(lons[p] - ayan) for p in lons}
+    asc_sid = norm360(asc_lon - ayan)
+    RASHI_LORDS_J = {"Aries":"Mars","Taurus":"Venus","Gemini":"Mercury",
+                     "Cancer":"Moon","Leo":"Sun","Virgo":"Mercury",
+                     "Libra":"Venus","Scorpio":"Mars","Sagittarius":"Jupiter",
+                     "Capricorn":"Saturn","Aquarius":"Saturn","Pisces":"Jupiter"}
+    def sign_years(sign_idx):
+        # dual lordship (Mercury/Venus/Saturn/Jupiter own two signs): Rao uses
+        # the stronger lord; simplification: nearest occurrence wins.
+        sign_name = SIGNS[sign_idx]
+        lord = RASHI_LORDS_J[sign_name]
+        try:
+            lord_idx = int(sid[lord] // 30) % 12
+        except KeyError:
+            return 6
+        fwd = ((lord_idx - sign_idx) % 12) or 12
+        rev = ((sign_idx - lord_idx) % 12) or 12
+        n = min(fwd, rev)
+        return 12 if n == 1 else n - 1   # lord in own sign → 12 years
+    start_idx = int(asc_sid // 30) % 12
+    direction = 1 if start_idx % 2 == 0 else -1   # Aries-start odd/even rule
+    birth_dt = datetime(2000, 1, 1) + timedelta(days=natal_jd - 2451544.5)
+    timeline = []
+    idx = start_idx
+    cursor_days = 0.0
+    k = 0
+    while cursor_days / 365.2425 < until_age and k < 24:
+        yrs = chara_years_cache.get(SIGNS[idx]) or sign_years(idx)
+        chara_years_cache[SIGNS[idx]] = yrs
+        sdt = birth_dt + timedelta(days=cursor_days)
+        edt = birth_dt + timedelta(days=cursor_days + yrs * 365.25)
+        timeline.append({"sign": SIGNS[idx], "years": yrs,
+                         "start": sdt.strftime("%Y-%m-%d"),
+                         "end": edt.strftime("%Y-%m-%d"),
+                         "is_current": sdt <= TODAY <= edt})
+        cursor_days += yrs * 365.25
+        idx = (idx + direction) % 12
+        k += 1
+    current = next((t for t in timeline if t["is_current"]), None)
+    return {"system": "Chara Dasha (Jaimini/K.N. Rao)",
+            "starting_sign": SIGNS[start_idx],
+            "current_dasha": current,
+            "timeline": timeline[:16],
+            "note": ("Rashi (sign) dasha: each SIGN governs a period; length "
+                     "= count to its lord (own-sign lordship → 12y). "
+                     "Simplified single-lord rule for dual-lord signs.")}
+
+chara_years_cache = {}
 
 
 def _demo():

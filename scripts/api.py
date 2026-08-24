@@ -818,7 +818,8 @@ except ModuleNotFoundError:
         sys.path.insert(0, _SCRIPTS_DIR)
     try:
         import mcp_server as _mcp_mod
-    except ImportError:
+    except (ImportError, SystemExit):
+        # mcp_server sys.exit(1)s when the optional 'mcp' package is missing.
         _mcp_mod = None
 
 if _mcp_mod is None:
