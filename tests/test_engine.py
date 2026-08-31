@@ -742,17 +742,23 @@ class TestCharaDasha(unittest.TestCase):
 
 
 class TestMundaneAstrology(unittest.TestCase):
-    """Wave 3: ingress charts, eclipse activations, lunations."""
+    """Wave 3: ingress charts, eclipse activations, lunations (enriched with
+    Skyscript/Lilly/Bonatti mundane canon)."""
+
+    def test_ingress_validity_rule(self):
+        # Taurus/Leo/Scorpio/Aquarius (Fixed) -> 12 months
+        self.assertEqual(ae.ingress_validity_period("Taurus")["validity_months"], 12)
+        # Gemini/Virgo/Sag/Pisces (Mutable) -> 6 months
+        self.assertEqual(ae.ingress_validity_period("Virgo")["validity_months"], 6)
+        # Aries/Cancer/Libra/Cap (Cardinal) -> 3 months
+        self.assertEqual(ae.ingress_validity_period("Aries")["validity_months"], 3)
 
     def test_ingress_jd_known_value(self):
-        # March 2026 equinox: ~2026-03-20 14:46 UTC (well-known); our bisection
-        # should land on Mar 19-21
         jd = ae.solar_ingress_jd(2026, 0)
         dt = ae._jd_to_dt(jd)
         self.assertEqual(dt.year, 2026)
         self.assertIn(dt.month, (3,))
         self.assertTrue(19 <= dt.day <= 21)
-        # Sun must be at 0° Aries within a tolerance
         lons = ae.tropical_longitudes(jd)
         self.assertLess(abs(ae.norm180(lons["Sun"] - 0.0)), 0.01)
 
@@ -762,6 +768,7 @@ class TestMundaneAstrology(unittest.TestCase):
                                        "country": "iran", "year": 2026})
         m = r["mundane"]
         self.assertNotIn("error", m)
+        self.assertIn("validity", m)
         self.assertTrue(m["judgments"])
         sun = m["chart"]["planets"]["Sun"]
         self.assertIn("mundane_signification", sun)
@@ -778,6 +785,8 @@ class TestMundaneAstrology(unittest.TestCase):
         for e in r["eclipse_activations"]:
             self.assertIn("house_of_natal_chart", e)
             self.assertTrue(1 <= e["house_of_natal_chart"] <= 12)
+            self.assertIn("trigger_timing", e)
+            self.assertIn("sun_square_window", e["trigger_timing"])
         for l in r["lunations"]["lunations"]:
             self.assertTrue(1 <= l["theme_house"] <= 12)
             self.assertTrue(1 <= l["full_moon_climax_house"] <= 12)
@@ -1020,9 +1029,10 @@ class TestPtolemaicTerms(unittest.TestCase):
 
 class TestNodeTypeOption(unittest.TestCase):
     """node_type option (wave 0-3): "true" (osculating, astro.com default)
-    vs "mean" (smoothed; classical Parashari/Lilly). True oscillates around
-    mean with amplitude ~1.5 deg over ~173 days."""
+    vs "mean" (smoothed; classical Parashari/Lilly). True node requires
+    swisseph; on builtin both return mean."""
 
+    @unittest.skipUnless(ae._HAS_SWE, "true vs mean node difference requires swisseph backend")
     def test_true_vs_mean_nodes_differ_within_1p5deg(self):
         jd = ae.julian_day(datetime(2026, 8, 22))
         lons_true, _, _ = ae.body_longitudes(jd, node_type="true")
@@ -1042,6 +1052,7 @@ class TestNodeTypeOption(unittest.TestCase):
         self.assertEqual(expected, "true" if backend == "swisseph" else "mean")
         self.assertIsNotNone(meta_node)
 
+    @unittest.skipUnless(ae._HAS_SWE, "true vs mean node difference requires swisseph backend")
     def test_calculate_full_profile_reports_and_applies_node_type(self):
         d = dict(ae._demo()); d["systems"] = ["western"]
         r_true = ae.calculate_full_profile({**d, "node_type": "true"})

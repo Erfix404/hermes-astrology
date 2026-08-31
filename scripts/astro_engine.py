@@ -1076,32 +1076,65 @@ def ashtottari_dasha(moon_lon_sidereal, birth_dt):
             "periods": periods[:3]}
 
 def next_eclipses(jd, count=3):
-    """Next solar & lunar eclipse dates using Swiss Ephemeris (if present)."""
-    if not _HAS_SWE:
-        return {"error": "eclipse calculation requires swisseph"}
+    """Next solar & lunar eclipse dates using Swiss Ephemeris (if present)
+    with a nodal-geometry fallback (New/Full Moon within ~18° of Node) when
+    swe eclipse data files are missing."""
     out = []
-    t = jd
-    for _ in range(count):
+    if _HAS_SWE:
         try:
-            res = swe.sol_eclipse_when_glob(t, 0)
-            t_sol = res[1][0]
-            out.append({"type": "solar", "jd": round(t_sol, 4),
-                        "date": _jd_to_dt(t_sol).strftime("%Y-%m-%d %H:%M")})
-            t = t_sol + 1.0
+            t = jd
+            for _ in range(count):
+                res = swe.sol_eclipse_when_glob(t, 0)
+                t_sol = res[1][0]
+                out.append({"type": "solar", "jd": round(t_sol, 4),
+                            "date": _jd_to_dt(t_sol).strftime("%Y-%m-%d %H:%M")})
+                t = t_sol + 1.0
+            t = jd
+            for _ in range(count):
+                res = swe.lun_eclipse_when(t, 0)
+                t_lun = res[1][0]
+                out.append({"type": "lunar", "jd": round(t_lun, 4),
+                            "date": _jd_to_dt(t_lun).strftime("%Y-%m-%d %H:%M")})
+                t = t_lun + 1.0
+            out.sort(key=lambda e: e["jd"])
+            if out:
+                return out[:count]
         except Exception:
-            break
+            pass
+    # Nodal fallback: step across lunations, bisect exact syzygy, check node distance
     t = jd
-    for _ in range(count):
-        try:
-            res = swe.lun_eclipse_when(t, 0)
-            t_lun = res[1][0]
-            out.append({"type": "lunar", "jd": round(t_lun, 4),
-                        "date": _jd_to_dt(t_lun).strftime("%Y-%m-%d %H:%M")})
-            t = t_lun + 1.0
-        except Exception:
-            break
+    guard = 0
+    while len(out) < count and guard < 60:
+        guard += 1
+        # find next New Moon (Sun-Moon elongation = 0)
+        low_nm = t; high_nm = t + 30.0
+        for _ in range(40):
+            mid = (low_nm + high_nm) / 2
+            l_ = tropical_longitudes(mid)
+            diff = norm180(l_["Moon"] - l_["Sun"])
+            if abs(diff) < 0.01: break
+            if diff > 0: high_nm = mid
+            else: low_nm = mid
+        nm_jd = (low_nm + high_nm) / 2
+        l_nm = tropical_longitudes(nm_jd)
+        node_dist_nm = min(abs(norm180(l_nm["Sun"] - l_nm["North Node"])),
+                           abs(norm180(l_nm["Sun"] - l_nm["South Node"])))
+        if node_dist_nm < 18.5 and nm_jd > jd:
+            out.append({"type": "solar", "jd": round(nm_jd, 4),
+                        "date": _jd_to_dt(nm_jd).strftime("%Y-%m-%d %H:%M"),
+                        "approximate": True})
+        # Full Moon (~14.77 days after New Moon)
+        fm_jd = nm_jd + 14.77
+        l_fm = tropical_longitudes(fm_jd)
+        node_dist_fm = min(abs(norm180(l_fm["Sun"] - l_fm["North Node"])),
+                           abs(norm180(l_fm["Sun"] - l_fm["South Node"])))
+        if node_dist_fm < 12.5 and fm_jd > jd and len(out) < count:
+            out.append({"type": "lunar", "jd": round(fm_jd, 4),
+                        "date": _jd_to_dt(fm_jd).strftime("%Y-%m-%d %H:%M"),
+                        "approximate": True})
+        t = nm_jd + 25.0
     out.sort(key=lambda e: e["jd"])
-    return out
+    return out[:count]
 
 def ayanamsha_lahiri(jd):
     """Lahiri ayanamsha in degrees (Chitrapaksha). Accurate to ~1-2 arcmin."""
@@ -4663,6 +4696,8 @@ DASHA_LORD_THEMES = {
     "Jupiter": "wealth, children, guru, dharma, expansion, marriage; optimism and gain",
     "Venus": "marriage, romance, arts, vehicles, comfort, women; luxury and diplomacy",
     "Saturn": "labor, delays, discipline, longevity, servants, loss then lasting gain",
+    "Rahu": "ambition, unconventional rise, foreign, poison/obsession; sudden swings",
+    "Ketu": "detachment, spirituality, obstacles, pilgrimage; endings that liberate",
     "North Node": "ambition, unconventional rise, foreign, poison/obsession; sudden swings",
     "South Node": "detachment, spirituality, obstacles, pilgrimage; endings that liberate",
 }
@@ -4808,9 +4843,43 @@ def mundane_chart(jd_moment, lat, lng, title=""):
             blk["mundane_signification"] = MUNDANE_HOUSE_MEANINGS[h]
     return ch
 
+# Mundane planetary significations per traditional mundane astrology
+# (Lilly / Raphael / Skyscript Ingresses canon):
+MUNDANE_PLANET_ROLES = {
+    "Sun": "the sovereign, head of state, national leaders, magistrates",
+    "Moon": "the general populace, public opinion, crowds, women of the nation",
+    "Mercury": "the press, media, communications, trade, local commuting",
+    "Venus": "arts, cultural diplomacy, social peace, treaties and alliances",
+    "Mars": "armed forces, warfare, strikes, civil conflict, fires, emergency services",
+    "Jupiter": "the judiciary, high finance, legal institutions, religion, national wealth",
+    "Saturn": "the elderly, national mourning, epidemic/public health strains, mining, land",
+    "Uranus": "political disruption, protests, technological shocks, right/left volatility",
+    "Neptune": "covert operations, ideological movements, scandals, supply confusion",
+    "Pluto": "deep-structural institutional overhaul, intelligence services, organized crime",
+    "North Node": "amplification, expansion, karmic public focus (Jupiter-like nature)",
+    "South Node": "drain, loss, release, institutional reckoning (Saturn-like nature)",
+}
+
+def ingress_validity_period(asc_sign):
+    """Classical ingress validity rule (Bonatti/Lilly):
+    Fixed Ascendant (Taurus/Leo/Scorpio/Aquarius) -> valid whole 12 months.
+    Mutable Ascendant (Gemini/Virgo/Sag/Pisces) -> valid 6 months (re-cast at Libra).
+    Cardinal Ascendant (Aries/Cancer/Libra/Cap) -> valid 3 months (re-cast each quarter)."""
+    mod = SIGN_DATA[asc_sign]["modality"]
+    if mod == "Fixed":
+        return {"validity_months": 12, "scope": "entire solar year (12 months)",
+                "note": "Fixed rising: this single Aries Ingress governs the whole year."}
+    elif mod == "Mutable":
+        return {"validity_months": 6, "scope": "half year (6 months) — re-cast at Libra ingress",
+                "note": "Mutable rising: valid for 6 months; the Libra Ingress takes over for autumn/winter."}
+    else:
+        return {"validity_months": 3, "scope": "one quarter (3 months) — re-cast each cardinal ingress",
+                "note": "Cardinal rising: valid for one season; cast separate charts for Cancer, Libra, Capricorn."}
+
 def ingress_chart(country_name, lat, lng, year=None, kind="aries"):
     """Aries ingress = solar year for the nation; cardinal ingresses seasonally.
-    Returns the mundane chart + a few headline judgments."""
+    Evaluates validity period by Ascendant modality (Bonatti/Lilly) + classical
+    mundane planet-in-house judgments."""
     year = year or TODAY.year
     idx_map = {"aries": 0, "cancer": 3, "libra": 6, "capricorn": 9}
     key = kind.lower()
@@ -4819,26 +4888,29 @@ def ingress_chart(country_name, lat, lng, year=None, kind="aries"):
     jd_m = solar_ingress_jd(year, idx_map[key])
     utc_dt = _jd_to_dt(jd_m)
     ch = mundane_chart(jd_m, lat, lng,
-                       f"{country_name} {kind.capitalize()} Ingress {year}")
-    # headline mundane judgments (mechanical, classical)
+                       f"{country_name.capitalize()} {kind.capitalize()} Ingress {year}")
+    asc_sign = ch["ascendant"]["sign"]
+    validity = ingress_validity_period(asc_sign)
+    # headline mundane judgments (classical: planet roles x house spheres)
     judgments = []
-    sun_house = ch["planets"]["Sun"]["house"]
+    sun_h = ch["planets"]["Sun"]["house"]
     sat = ch["planets"]["Saturn"]; mar = ch["planets"]["Mars"]; jup = ch["planets"]["Jupiter"]
-    judgments.append(f"Sun in house {sun_house} — the year's focus falls on "
-                     f"{MUNDANE_HOUSE_MEANINGS.get(sun_house, 'general affairs')}.")
-    judgments.append(f"Saturn in house {sat['house']} ({sat['sign']}): pressure on "
-                     f"{MUNDANE_HOUSE_MEANINGS.get(sat['house'], 'that sphere')} — "
-                     f"where the nation must do hard structural work.")
-    judgments.append(f"Mars in house {mar['house']}: energy/conflict around "
-                     f"{MUNDANE_HOUSE_MEANINGS.get(mar['house'], 'that sphere')}.")
-    judgments.append(f"Jupiter in house {jup['house']}: growth/protection for "
-                     f"{MUNDANE_HOUSE_MEANINGS.get(jup['house'], 'that sphere')}.")
+    moon = ch["planets"]["Moon"]
+    judgments.append(f"Ascendant in {asc_sign} ({SIGN_DATA[asc_sign]['modality']}): {validity['note']}")
+    judgments.append(f"Sun in house {sun_h}: {MUNDANE_PLANET_ROLES['Sun']} actively shaped by {MUNDANE_HOUSE_MEANINGS.get(sun_h, '')}.")
+    judgments.append(f"Moon in house {moon['house']} ({moon['sign']}): public mood centers on {MUNDANE_HOUSE_MEANINGS.get(moon['house'], '')}.")
+    judgments.append(f"Saturn in house {sat['house']} ({sat['sign']}): pressure on {MUNDANE_HOUSE_MEANINGS.get(sat['house'], '')} — {MUNDANE_PLANET_ROLES['Saturn']}.")
+    judgments.append(f"Mars in house {mar['house']} ({mar['sign']}): energy/volatility in {MUNDANE_HOUSE_MEANINGS.get(mar['house'], '')}.")
+    judgments.append(f"Jupiter in house {jup['house']} ({jup['sign']}): growth and protection for {MUNDANE_HOUSE_MEANINGS.get(jup['house'], '')}.")
     ang = [n for n in ("Sun","Moon","Mercury","Venus","Mars","Jupiter","Saturn")
            if ch["planets"][n]["house"] in (1,4,7,10)]
     if len(ang) >= 4:
-        judgments.append("Heavy angular concentration: an eventful, visible year.")
-    return {"place": {"lat": lat, "lng": lng}, "moment_utc": utc_dt.strftime("%Y-%m-%d %H:%M"),
-            "chart": ch, "judgments": judgments}
+        judgments.append(f"Angular concentration ({len(ang)}/7 planets in 1/4/7/10): an eventful, highly visible period.")
+    return {"place": {"lat": lat, "lng": lng},
+            "moment_utc": utc_dt.strftime("%Y-%m-%d %H:%M"),
+            "validity": validity,
+            "chart": ch,
+            "judgments": judgments}
 
 
 MUNDANE_CAPITALS = {
@@ -4852,7 +4924,9 @@ MUNDANE_CAPITALS = {
 
 def eclipse_activations(natal_chart_jd, lat, lng, count=4):
     """Map upcoming eclipses onto this chart's houses: what life-sphere each
-    one electrifies. Uses next_eclipses() + whole-sign-ish house of eclipse degree."""
+    one electrifies, plus classical trigger timing (Carter/Bonatti rule: latent
+    events trigger ~3 months later when Sun squares the eclipse point, or on
+    Mars transit over it)."""
     ecl = next_eclipses(julian_day(datetime.utcnow()), count=count)
     if isinstance(ecl, dict) and "error" in ecl:
         return ecl
@@ -4867,11 +4941,22 @@ def eclipse_activations(natal_chart_jd, lat, lng, count=4):
             deg = lon_e["Moon"]
         house = whole_sign_house(deg, asc_lon)
         sign = sign_of(deg)[0]
-        out.append({**e, "degree": round(deg % 30, 2), "sign": sign,
-                    "house_of_natal_chart": house,
-                    "activates": MUNDANE_HOUSE_MEANINGS.get(house, ""),
-                    "note": ("New-moon-like reset" if e["type"] == "solar"
-                             else "Culmination/disclosure")})
+        # classical trigger window: Sun square = ~90 days later
+        dt_e = _jd_to_dt(jd_e)
+        sun_square_trigger = dt_e + timedelta(days=91.3)
+        out.append({
+            **e,
+            "degree": round(deg % 30, 2), "sign": sign,
+            "house_of_natal_chart": house,
+            "activates": MUNDANE_HOUSE_MEANINGS.get(house, ""),
+            "nature": ("Solar: new-cycle seed, structural/leadership reset"
+                       if e["type"] == "solar"
+                       else "Lunar: emotional climax, disclosure, public outcome"),
+            "trigger_timing": {
+                "sun_square_window": sun_square_trigger.strftime("%Y-%m-%d"),
+                "rule": "Carter trigger rule: events often manifest when transiting Sun squares this point (~3 months later)"
+            },
+        })
     return out
 
 
