@@ -4089,6 +4089,36 @@ def calculate_full_profile(data):
         result["love_blueprint"] = compute_love_blueprint(jd, lat, lng, time_known)
         return result
 
+    if mode=="rectify_birth_time" or mode=="rectification":
+        events = data.get("life_events", [])
+        win = int(data.get("window_minutes", 60))
+        step = float(data.get("step_minutes", 2.0))
+        result["rectification"] = rectify_birth_time(data, events, window_minutes=win, step_minutes=step)
+        return result
+
+    if mode=="master_chronology" or mode=="life_story":
+        max_a = int(data.get("max_age", 85))
+        result["master_life_chronology"] = generate_master_life_chronology(
+            jd, lat, lng, time_known, max_age=max_a)
+        return result
+
+    if mode=="financial" or mode=="crypto":
+        asset = data.get("asset", "BTC")
+        result["financial_weather"] = crypto_financial_weather(asset, target_eval_dt)
+        return result
+
+    if mode=="davison_progression":
+        p = data["partner"]
+        p_utc, _ = to_utc(p); jdB = julian_day(p_utc)
+        latB = p.get("lat", 0.0); lngB = p.get("lng", 0.0)
+        result["davison_progression"] = davison_progression_forecast(
+            jd, jdB, lat, lng, latB, lngB, target_dt=target_eval_dt)
+        return result
+
+    if mode=="hermetic_tarot" or mode=="tarot":
+        result["hermetic_tarot_profile"] = map_hermetic_tarot_profile(jd, lat, lng, time_known)
+        return result
+
     if mode=="zr":
         topic = data.get("zr_topic", "spirit")
         if topic not in ("spirit", "fortune"):
@@ -6333,6 +6363,360 @@ def compute_tri_tradition_convergence(natal_jd, lat, lng, time_known=True, as_of
         ),
         "note": ("Tri-Tradition Convergence: When Western time-lords, Vedic dashas, and BaZi luck pillars independently "
                  "align on positive indicators, event certainty reaches highest statistical probability.")
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — BIRTH TIME RECTIFICATION & LIFE CHRONOLOGY (Master Engine v4.0)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def rectify_birth_time(base_data, life_events, window_minutes=60, step_minutes=2.0):
+    """Automated Birth Time Rectification (BTR) Engine:
+    Scans candidate birth times within +/- window_minutes using Solar Arc Directions (SAD)
+    and outer transits mapped against major reported life events.
+    Events format: [{'event': 'marriage'|'career_peak'|'relocation'|'accident', 'date': 'YYYY-MM-DD', 'weight': 1-5}]"""
+    base_utc, tinfo = to_utc(base_data)
+    base_jd = julian_day(base_utc)
+    lat = base_data.get("lat", 0.0); lng = base_data.get("lng", 0.0)
+
+    steps = int((2 * window_minutes) / step_minutes) + 1
+    candidates = []
+
+    for i in range(steps):
+        offset_min = -window_minutes + (i * step_minutes)
+        cand_jd = base_jd + (offset_min / 1440.0)
+        cand_lons, _, _ = body_longitudes(cand_jd)
+        cand_asc, cand_mc = ascendant_mc(cand_jd, lat, lng)
+        cand_angles = {"ASC": cand_asc, "MC": cand_mc, "DSC": norm360(cand_asc + 180.0), "IC": norm360(cand_mc + 180.0)}
+
+        score_accum = 0.0
+        weight_accum = 0.0
+
+        for ev in life_events:
+            ev_date_str = ev.get("date")
+            if not ev_date_str: continue
+            try:
+                ev_dt = datetime.strptime(ev_date_str, "%Y-%m-%d")
+            except Exception:
+                continue
+            ev_jd = julian_day(ev_dt)
+            ev_weight = float(ev.get("weight", 3.0))
+            ev_type = ev.get("event", "career_peak").lower()
+
+            # Solar arc calculation
+            sun_birth = cand_lons["Sun"]
+            sun_ev = tropical_longitudes(ev_jd)["Sun"]
+            arc = norm360(sun_ev - sun_birth)
+
+            # Target angle & significators based on event category
+            target_angle = "MC" if "career" in ev_type else "DSC" if "marriage" in ev_type or "partner" in ev_type else "ASC" if "accident" in ev_type or "health" in ev_type else "IC"
+            target_lon = cand_angles[target_angle]
+            significators = ["Sun", "Jupiter", "Mars"] if target_angle == "MC" else ["Venus", "Moon", "Jupiter"] if target_angle == "DSC" else ["Mars", "Saturn", "Uranus"] if target_angle == "ASC" else ["Moon", "Saturn", "Jupiter"]
+
+            best_hit = 0.0
+            # Test Directed Angle to Natal Planet
+            dir_angle = norm360(target_lon + arc)
+            for sig in significators:
+                p_lon = cand_lons.get(sig, 0)
+                for aspect in (0.0, 90.0, 180.0, 120.0, 60.0):
+                    orb = abs(norm180(dir_angle - p_lon) - aspect)
+                    if orb <= 1.2:
+                        tightness = max(0.0, (1.2 - orb) / 1.2)
+                        asp_mult = 1.0 if aspect in (0, 90, 180) else 0.6
+                        h_score = tightness * asp_mult
+                        if h_score > best_hit: best_hit = h_score
+
+            score_accum += best_hit * ev_weight
+            weight_accum += ev_weight
+
+        norm_score = round((score_accum / max(0.1, weight_accum)) * 100.0, 1)
+        candidates.append({"offset_minutes": offset_min, "score": norm_score})
+
+    candidates.sort(key=lambda x: -x["score"])
+    best = candidates[0]
+    rectified_utc = base_utc + timedelta(minutes=best["offset_minutes"])
+
+    return {
+        "best_rectified_time": {
+            "offset_minutes": best["offset_minutes"],
+            "rectified_time_utc": rectified_utc.strftime("%Y-%m-%d %H:%M UTC"),
+            "confidence_score": best["score"]
+        },
+        "top_candidates": candidates[:5],
+        "events_evaluated_count": len(life_events),
+        "note": "Birth Time Rectification via Solar Arc Directions & Angle resonance. Evaluates exact alignment against major life milestones."
+    }
+
+def generate_master_life_chronology(natal_jd, lat, lng, time_known=True, max_age=85):
+    """Compile a Master 0-85 Year Life Story Chronology (Master Engine v4.0):
+    Synthesizes Firdaria, Vimshottari Dasha, Zodiacal Releasing, Saturn Returns,
+    and Progressed Moon transitions into a unified chronological story stream."""
+    birth_dt = datetime(2000,1,1) + timedelta(days=natal_jd - 2451544.5)
+    lons, _, _ = body_longitudes(natal_jd)
+    ayan = ayanamsha_lahiri(natal_jd)
+    moon_sid = norm360(lons["Moon"] - ayan)
+    asc_lon = lons["Sun"]
+    if time_known: asc_lon, _ = ascendant_mc(natal_jd, lat, lng)
+    is_day = 90 <= norm360(asc_lon - lons["Sun"]) <= 270
+
+    # 1. Macro systems
+    fir = firdaria(birth_dt, is_day, until_age=max_age)
+    vim = vimshottari(moon_sid, birth_dt)
+    zr = zodiacal_releasing(natal_jd, lat, lng, time_known, topic="spirit", until_age=max_age)
+
+    # 2. Key life milestone events
+    milestones = []
+    # Saturn Returns (~29.5, ~59.0)
+    for s_age, s_title in [(29.45, "First Saturn Return"), (58.9, "Second Saturn Return"), (42.2, "Uranus Opposition")]:
+        if s_age <= max_age:
+            milestones.append({
+                "age": s_age, "year": birth_dt.year + int(s_age),
+                "type": "Astronomical Cycle", "title": s_title,
+                "theme": "Structural maturation, identity consolidation, and life-course testing"
+            })
+
+    # ZR Major Peaks & LOBs
+    for e in zr.get("timeline_level1", []):
+        if e.get("is_peak"):
+            milestones.append({
+                "age": e["age_at_start"], "year": int(e["start"][:4]),
+                "type": "Zodiacal Releasing Peak", "title": f"Career Peak in {e['sign']} ({e.get('peak_weight','')} peak)",
+                "theme": f"Prominence and major vocational emergence under {e['sign']} period"
+            })
+        elif e.get("is_lob"):
+            milestones.append({
+                "age": e["age_at_start"], "year": int(e["start"][:4]),
+                "type": "Loosing of the Bond", "title": f"Major Directional Pivot in {e['sign']}",
+                "theme": "Departure from previous chapter, initiating a completely new trajectory"
+            })
+
+    milestones.sort(key=lambda x: x["age"])
+
+    return {
+        "domain": "Master Life Story Chronology (0 to 85 Years)",
+        "birth_year": birth_dt.year,
+        "sect": "day" if is_day else "night",
+        "milestones_timeline": milestones,
+        "firdaria_majors": fir.get("timeline_to_age_75", []),
+        "vimshottari_mahadashas": vim.get("maha_timeline", []),
+        "note": "Chronological synthesis across 3 independent timing paradigms."
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — FINANCIAL & CRYPTO ASTROLOGY (Astro-Trading & Genesis Charts)
+# ═════════════════════════════════════════════════════════════════════════════
+
+CRYPTO_FINANCIAL_GENESIS = {
+    "BTC":  {"name": "Bitcoin", "date": "2009-01-03 18:15:05", "lat": 51.5074, "lng": -0.1278, "sun_sign": "Capricorn", "desc": "Bitcoin Genesis Block"},
+    "ETH":  {"name": "Ethereum", "date": "2015-07-30 15:26:13", "lat": 47.1662, "lng": 8.5155, "sun_sign": "Leo", "desc": "Ethereum Genesis Execution"},
+    "SPX":  {"name": "S&P 500 / NYSE", "date": "1792-05-17 14:56:02", "lat": 40.7128, "lng": -74.0060, "sun_sign": "Taurus", "desc": "NYSE Buttonwood Agreement"},
+    "GOLD": {"name": "Gold (Fiat Era)", "date": "1971-08-16 01:00:00", "lat": 38.8951, "lng": -77.0364, "sun_sign": "Leo", "desc": "Nixon Shock End of Bretton Woods"},
+}
+
+def crypto_financial_weather(asset="BTC", target_dt=None):
+    """Financial & Crypto Market Astrology Engine:
+    Evaluates current sky transits to the Genesis Chart of major financial assets (BTC, ETH, SPX, Gold).
+    Identifies high-volatility flash points (Mars-Uranus), liquidity surges (Jupiter-Pluto), and eclipse triggers."""
+    target_eval = target_dt or datetime.now(timezone.utc).replace(tzinfo=None)
+    asset_key = asset.upper()
+    if asset_key not in CRYPTO_FINANCIAL_GENESIS:
+        return {"error": f"Asset {asset} not in registry. Available: {list(CRYPTO_FINANCIAL_GENESIS.keys())}"}
+
+    gen_info = CRYPTO_FINANCIAL_GENESIS[asset_key]
+    gen_dt = datetime.strptime(gen_info["date"], "%Y-%m-%d %H:%M:%S") if len(gen_info["date"]) > 10 else datetime.strptime(gen_info["date"], "%Y-%m-%d")
+    gen_jd = julian_day(gen_dt)
+    target_jd = julian_day(target_eval)
+
+    # Calculate Transits to Genesis Chart
+    gen_transits = transits(gen_jd, gen_info["lat"], gen_info["lng"], target_eval)
+    aspects_to_gen = gen_transits.get("aspects_to_natal", [])
+
+    volatility_score = 40.0
+    signals = []
+
+    for asp in aspects_to_gen:
+        tp, np_, aname, orb = asp["transiting"], asp["to_natal"], asp["aspect"], asp["orb"]
+        if tp in ("Mars", "Uranus") and np_ in ("Mars", "Uranus", "Sun", "Mercury") and aname in ("conjunction", "square", "opposition") and orb <= 2.5:
+            volatility_score += 25.0
+            signals.append(f"HIGH VOLATILITY ALERT: Transiting {tp} {aname} Genesis {np_} (orb {orb}°) — rapid price swings and breakout risk")
+        elif tp == "Jupiter" and np_ in ("Sun", "Pluto", "Venus") and aname in ("conjunction", "trine", "sextile") and orb <= 3.0:
+            volatility_score += 15.0
+            signals.append(f"BULLISH LIQUIDITY EXPANSION: Transiting Jupiter {aname} Genesis {np_} (orb {orb}°) — capital inflow and upside momentum")
+        elif tp in ("Saturn", "Pluto") and np_ in ("Sun", "Moon") and aname in ("square", "opposition") and orb <= 2.0:
+            volatility_score -= 10.0
+            signals.append(f"MACRO RESISTANCE / CONTRACTION: Transiting {tp} {aname} Genesis {np_} (orb {orb}°) — regulatory/macro headwind")
+
+    # Current sky Mercury retrograde status
+    t_lons, t_speed, _ = body_longitudes(target_jd)
+    if t_speed.get("Mercury", 0) < 0:
+        signals.append("MERCURY RETROGRADE ACTIVE: Watch for execution slippage, exchange glitches, and choppy false breakouts")
+
+    market_condition = "Extreme Volatility" if volatility_score >= 75 else "Active Momentum" if volatility_score >= 55 else "Consolidation / Quiet"
+
+    return {
+        "asset": gen_info["name"],
+        "symbol": asset_key,
+        "as_of_date": target_eval.strftime("%Y-%m-%d"),
+        "genesis_details": gen_info,
+        "market_astrological_condition": market_condition,
+        "volatility_index": min(100.0, volatility_score),
+        "key_signals": signals[:5],
+        "active_transits_count": len(aspects_to_gen),
+        "note": "Financial astrology tracks cycles and psychological volatility against the inception moment of markets."
+    }
+
+def davison_progression_forecast(jdA, jdB, latA, lngA, latB, lngB, target_dt=None):
+    """Secondary Progressions applied to the Davison Time-Space relationship chart:
+    1 day after midpoint date = 1 tropical year of relationship life.
+    Reveals evolving relationship chapters, commitment peaks, and crisis resolution dates."""
+    mid_jd = (jdA + jdB) / 2.0
+    mid_lat = (latA + latB) / 2.0
+    mid_lng = (lngA + lngB) / 2.0
+    if abs(lngA - lngB) > 180: mid_lng = norm180(mid_lng + 180.0)
+
+    target_eval = target_dt or datetime.now(timezone.utc).replace(tzinfo=None)
+    target_jd = julian_day(target_eval)
+    rel_age_years = (target_jd - mid_jd) / 365.2422
+
+    # Secondary progressed JD on the Davison chart
+    prog_jd = mid_jd + rel_age_years
+    prog_chart = western_chart(prog_jd, mid_lat, mid_lng, time_known=True)
+    natal_davison_chart = western_chart(mid_jd, mid_lat, mid_lng, time_known=True)
+
+    # Check Progressed-to-Natal Davison aspects
+    p_lons = {p: b["abs_lon"] for p, b in prog_chart["planets"].items()}
+    n_lons = {p: b["abs_lon"] for p, b in natal_davison_chart["planets"].items()}
+    aspects = []
+
+    for pp in ("Sun", "Moon", "Venus", "Mars", "Jupiter", "Saturn"):
+        for np_ in ("Sun", "Moon", "Venus", "Mars", "Jupiter", "Saturn", "Ascendant"):
+            plon = p_lons.get(pp)
+            nlon = n_lons.get(np_) if np_ != "Ascendant" else natal_davison_chart["ascendant"].get("abs_lon", 0)
+            if plon is None or nlon is None or pp == np_: continue
+            sep = abs(norm180(plon - nlon))
+            for asp, (ang, orb, desc) in ASPECTS.items():
+                if abs(sep - ang) <= 1.2:
+                    aspects.append({
+                        "progressed_planet": pp, "to_natal_davison": np_,
+                        "aspect": asp, "orb": round(abs(sep - ang), 2),
+                        "meaning": desc
+                    })
+                    break
+
+    aspects.sort(key=lambda x: x["orb"])
+
+    return {
+        "domain": "Davison Relationship Progression",
+        "relationship_age_years": round(rel_age_years, 2),
+        "as_of_date": target_eval.strftime("%Y-%m-%d"),
+        "progressed_sun_sign": prog_chart["planets"]["Sun"]["sign"],
+        "progressed_moon_sign": prog_chart["planets"]["Moon"]["sign"],
+        "key_progressed_aspects": aspects[:5],
+        "note": "Progressing the Davison Time-Space chart reveals the internal psychological and structural growth of the relationship over time."
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — HERMETIC 36 DECANS & TAROT / TREE OF LIFE MATRIX (Golden Dawn)
+# ═════════════════════════════════════════════════════════════════════════════
+
+HERMETIC_DECANS_TABLE = [
+    # Aries
+    {"sign":"Aries","decan":1,"span":[0,10],"ruler":"Mars","tarot_card":"2 of Wands","title":"Dominion"},
+    {"sign":"Aries","decan":2,"span":[10,20],"ruler":"Sun","tarot_card":"3 of Wands","title":"Established Strength"},
+    {"sign":"Aries","decan":3,"span":[20,30],"ruler":"Venus","tarot_card":"4 of Wands","title":"Perfected Work"},
+    # Taurus
+    {"sign":"Taurus","decan":1,"span":[0,10],"ruler":"Mercury","tarot_card":"5 of Pentacles","title":"Material Trouble"},
+    {"sign":"Taurus","decan":2,"span":[10,20],"ruler":"Moon","tarot_card":"6 of Pentacles","title":"Material Success"},
+    {"sign":"Taurus","decan":3,"span":[20,30],"ruler":"Saturn","tarot_card":"7 of Pentacles","title":"Success Unfulfilled"},
+    # Gemini
+    {"sign":"Gemini","decan":1,"span":[0,10],"ruler":"Jupiter","tarot_card":"8 of Swords","title":"Shortened Force"},
+    {"sign":"Gemini","decan":2,"span":[10,20],"ruler":"Mars","tarot_card":"9 of Swords","title":"Despair and Cruelty"},
+    {"sign":"Gemini","decan":3,"span":[20,30],"ruler":"Sun","tarot_card":"10 of Swords","title":"Ruin"},
+    # Cancer
+    {"sign":"Cancer","decan":1,"span":[0,10],"ruler":"Venus","tarot_card":"2 of Cups","title":"Love"},
+    {"sign":"Cancer","decan":2,"span":[10,20],"ruler":"Mercury","tarot_card":"3 of Cups","title":"Abundance"},
+    {"sign":"Cancer","decan":3,"span":[20,30],"ruler":"Moon","tarot_card":"4 of Cups","title":"Blended Pleasure"},
+    # Leo
+    {"sign":"Leo","decan":1,"span":[0,10],"ruler":"Saturn","tarot_card":"5 of Wands","title":"Strife"},
+    {"sign":"Leo","decan":2,"span":[10,20],"ruler":"Jupiter","tarot_card":"6 of Wands","title":"Victory"},
+    {"sign":"Leo","decan":3,"span":[20,30],"ruler":"Mars","tarot_card":"7 of Wands","title":"Valour"},
+    # Virgo
+    {"sign":"Virgo","decan":1,"span":[0,10],"ruler":"Sun","tarot_card":"8 of Pentacles","title":"Prudence"},
+    {"sign":"Virgo","decan":2,"span":[10,20],"ruler":"Venus","tarot_card":"9 of Pentacles","title":"Material Gain"},
+    {"sign":"Virgo","decan":3,"span":[20,30],"ruler":"Mercury","tarot_card":"10 of Pentacles","title":"Wealth"},
+    # Libra
+    {"sign":"Libra","decan":1,"span":[0,10],"ruler":"Moon","tarot_card":"2 of Swords","title":"Peace Restored"},
+    {"sign":"Libra","decan":2,"span":[10,20],"ruler":"Saturn","tarot_card":"3 of Swords","title":"Sorrow"},
+    {"sign":"Libra","decan":3,"span":[20,30],"ruler":"Jupiter","tarot_card":"4 of Swords","title":"Rest from Strife"},
+    # Scorpio
+    {"sign":"Scorpio","decan":1,"span":[0,10],"ruler":"Mars","tarot_card":"5 of Cups","title":"Loss in Pleasure"},
+    {"sign":"Scorpio","decan":2,"span":[10,20],"ruler":"Sun","tarot_card":"6 of Cups","title":"Pleasure"},
+    {"sign":"Scorpio","decan":3,"span":[20,30],"ruler":"Venus","tarot_card":"7 of Cups","title":"Illusionary Success"},
+    # Sagittarius
+    {"sign":"Sagittarius","decan":1,"span":[0,10],"ruler":"Mercury","tarot_card":"8 of Wands","title":"Swiftness"},
+    {"sign":"Sagittarius","decan":2,"span":[10,20],"ruler":"Moon","tarot_card":"9 of Wands","title":"Great Strength"},
+    {"sign":"Sagittarius","decan":3,"span":[20,30],"ruler":"Saturn","tarot_card":"10 of Wands","title":"Oppression"},
+    # Capricorn
+    {"sign":"Capricorn","decan":1,"span":[0,10],"ruler":"Jupiter","tarot_card":"2 of Pentacles","title":"Harmonious Change"},
+    {"sign":"Capricorn","decan":2,"span":[10,20],"ruler":"Mars","tarot_card":"3 of Pentacles","title":"Material Works"},
+    {"sign":"Capricorn","decan":3,"span":[20,30],"ruler":"Sun","tarot_card":"4 of Pentacles","title":"Earthly Power"},
+    # Aquarius
+    {"sign":"Aquarius","decan":1,"span":[0,10],"ruler":"Venus","tarot_card":"5 of Swords","title":"Defeat"},
+    {"sign":"Aquarius","decan":2,"span":[10,20],"ruler":"Mercury","tarot_card":"6 of Swords","title":"Earned Success"},
+    {"sign":"Aquarius","decan":3,"span":[20,30],"ruler":"Moon","tarot_card":"7 of Swords","title":"Unstable Effort"},
+    # Pisces
+    {"sign":"Pisces","decan":1,"span":[0,10],"ruler":"Saturn","tarot_card":"8 of Cups","title":"Abandoned Success"},
+    {"sign":"Pisces","decan":2,"span":[10,20],"ruler":"Jupiter","tarot_card":"9 of Cups","title":"Material Happiness"},
+    {"sign":"Pisces","decan":3,"span":[20,30],"ruler":"Mars","tarot_card":"10 of Cups","title":"Perfected Success"}
+]
+
+HERMETIC_MAJOR_ARCANA = {
+    "Aries": "The Emperor (IV)", "Taurus": "The Hierophant (V)", "Gemini": "The Lovers (VI)",
+    "Cancer": "The Chariot (VII)", "Leo": "Strength (VIII)", "Virgo": "The Hermit (IX)",
+    "Libra": "Justice (XI)", "Scorpio": "Death (XIII)", "Sagittarius": "Temperance (XIV)",
+    "Capricorn": "The Devil (XV)", "Aquarius": "The Star (XVII)", "Pisces": "The Moon (XVIII)",
+    "Sun": "The Sun (XIX)", "Moon": "The High Priestess (II)", "Mercury": "The Magician (I)",
+    "Venus": "The Empress (III)", "Mars": "The Tower (XVI)", "Jupiter": "Wheel of Fortune (X)", "Saturn": "The World (XXI)"
+}
+
+def map_hermetic_tarot_profile(natal_jd, lat, lng, time_known=True):
+    """Hermetic Astrology & Tarot Mapping (Golden Dawn / Thoth / Picatrix canon):
+    Maps natal planets and Ascendant to their exact 36 Decan Minor Arcana cards
+    and the 22 Major Arcana archetypes on the Tree of Life."""
+    w_chart = western_chart(natal_jd, lat, lng, time_known)
+    planets = w_chart["planets"]
+
+    decan_profile = {}
+    for p, b in planets.items():
+        s = b["sign"]; deg = b["deg_in_sign"]
+        decan_num = int(deg // 10) + 1
+        # Find decan info
+        match = next((d for d in HERMETIC_DECANS_TABLE if d["sign"] == s and d["decan"] == decan_num), None)
+        if match:
+            decan_profile[p] = {
+                "sign": s, "degree": deg, "decan": decan_num,
+                "decan_ruler": match["ruler"],
+                "tarot_card": match["tarot_card"],
+                "hermetic_title": match["title"],
+                "major_arcana_sign": HERMETIC_MAJOR_ARCANA.get(s, ""),
+                "major_arcana_planet": HERMETIC_MAJOR_ARCANA.get(p, "")
+            }
+
+    asc_sign = w_chart["ascendant"]["sign"]
+    asc_deg = w_chart["ascendant"]["deg_in_sign"]
+    asc_decan = int(asc_deg // 10) + 1
+    asc_match = next((d for d in HERMETIC_DECANS_TABLE if d["sign"] == asc_sign and d["decan"] == asc_decan), None)
+
+    return {
+        "domain": "Hermetic Decans & Tarot Archetype Profile",
+        "ascendant_soul_card": {
+            "sign": asc_sign,
+            "decan": asc_decan,
+            "tarot_card": asc_match["tarot_card"] if asc_match else "",
+            "hermetic_title": asc_match["title"] if asc_match else "",
+            "major_arcana_ruler": HERMETIC_MAJOR_ARCANA.get(asc_sign, "")
+        },
+        "planetary_tarot_cards": decan_profile,
+        "note": "Golden Dawn / Book of Thoth canon: Each 10° decan embodies a Minor Arcana card, expressing the lived mystical archetype of that degree."
     }
 
 def _demo():

@@ -775,6 +775,56 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestMasterV4Features(unittest.TestCase):
+    """Wave 14-17: Master Engine v4.0 suite (BTR, Master Chronology, Crypto, Davison Progression, Hermetic Tarot)."""
+
+    def test_birth_time_rectification_mode(self):
+        d = dict(ae._demo())
+        events = [{"event": "career_peak", "date": "2020-05-15", "weight": 4.0},
+                  {"event": "marriage", "date": "2018-09-20", "weight": 5.0}]
+        r = ae.calculate_full_profile({**d, "mode": "rectify_birth_time", "life_events": events, "window_minutes": 20})
+        btr = r["rectification"]
+        self.assertIn("best_rectified_time", btr)
+        self.assertIn("confidence_score", btr["best_rectified_time"])
+        self.assertEqual(len(btr["top_candidates"]), 5)
+
+    def test_master_life_chronology(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "master_chronology", "max_age": 80})
+        mlc = r["master_life_chronology"]
+        self.assertIn("milestones_timeline", mlc)
+        self.assertTrue(len(mlc["milestones_timeline"]) >= 3)
+        self.assertIn("firdaria_majors", mlc)
+        self.assertIn("vimshottari_mahadashas", mlc)
+
+    def test_crypto_financial_weather(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "crypto", "asset": "BTC"})
+        fw = r["financial_weather"]
+        self.assertEqual(fw["symbol"], "BTC")
+        self.assertIn("market_astrological_condition", fw)
+        self.assertTrue(0 <= fw["volatility_index"] <= 100)
+
+    def test_davison_progression_forecast(self):
+        pA = dict(ae._demo())
+        pB = dict(ae._demo())
+        pB["year"] = 1992
+        r = ae.calculate_full_profile({**pA, "mode": "davison_progression", "partner": pB})
+        dp = r["davison_progression"]
+        self.assertIn("relationship_age_years", dp)
+        self.assertIn("progressed_sun_sign", dp)
+        self.assertIn("progressed_moon_sign", dp)
+
+    def test_hermetic_tarot_profile(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "hermetic_tarot"})
+        tp = r["hermetic_tarot_profile"]
+        self.assertIn("ascendant_soul_card", tp)
+        self.assertIn("planetary_tarot_cards", tp)
+        self.assertIn("Sun", tp["planetary_tarot_cards"])
+        self.assertIn("tarot_card", tp["planetary_tarot_cards"]["Sun"])
+
+
 class TestTriTraditionConsensus(unittest.TestCase):
     """Wave 13: Tri-Tradition Convergence and Confidence Score Engine."""
 
