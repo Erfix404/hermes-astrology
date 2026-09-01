@@ -1608,34 +1608,96 @@ def _pratyantardasha(maha_lord, antar_lord, antar_start, antar_end, as_of_dt=Non
         cur=end
     return out
 
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — ADVANCED VEDIC YOGAS (B.V. Raman: 300 Important Combinations)
+# ═════════════════════════════════════════════════════════════════════════════
+
+MAHAPURUSHA_YOGA_DEFS = {
+    "Mars":    ("Ruchaka Yoga", ("Aries", "Scorpio", "Capricorn"), "Physical valor, leadership, land ownership, competitive mastery"),
+    "Mercury": ("Bhadra Yoga", ("Gemini", "Virgo"), "Intellectual supremacy, oratorical genius, commercial acumen, long life"),
+    "Jupiter": ("Hamsa Yoga", ("Sagittarius", "Pisces", "Cancer"), "Spiritual wisdom, high prestige, righteous conduct, universally respected"),
+    "Venus":   ("Malavya Yoga", ("Taurus", "Libra", "Pisces"), "Refined aesthetic grace, wealth, vehicles, luxury, harmonious marriage"),
+    "Saturn":  ("Sasa Yoga", ("Capricorn", "Aquarius", "Libra"), "Commanding authority, enduring power, mastery over resources, leadership of the masses")
+}
+
 def detect_yogas(planets, lagna_sign):
-    """A few classical, mechanically-checkable yogas (grounded, not exhaustive)."""
-    yogas=[]
-    def house(p): return planets[p]["house"] if p in planets else None
-    # Gajakesari: Jupiter in kendra (1/4/7/10) from Moon
+    """Detect classical Vedic yogas per B.V. Raman's '300 Important Combinations':
+    1. Pancha Mahapurusha Yogas (Ruchaka, Bhadra, Hamsa, Malavya, Sasa).
+    2. Viparita Raja Yogas (Harsha, Sarala, Vimala).
+    3. Neecha Bhanga Raja Yogas (NBRY - 5 cancellation rules for debilitated planets).
+    4. Dharma-Karmadhipati & Lakshmi Dhana Yogas.
+    5. Classical Solar/Lunar yogas (Gajakesari, Budha-Aditya, Chandra-Mangala)."""
+    yogas = []
+    lagna_idx = SIGNS.index(lagna_sign) if lagna_sign in SIGNS else 0
+
+    def house(p): return planets.get(p, {}).get("house")
+    def sign(p): return planets.get(p, {}).get("sign")
+
+    # 1. Pancha Mahapurusha Yogas (Mars, Mercury, Jupiter, Venus, Saturn in Kendra in own/exalted sign)
+    for p, (y_name, valid_signs, effect) in MAHAPURUSHA_YOGA_DEFS.items():
+        if p in planets and house(p) in (1, 4, 7, 10) and sign(p) in valid_signs:
+            yogas.append({
+                "name": y_name, "planet": p,
+                "rule": f"{p} in Kendra (house {house(p)}) in {sign(p)} (own/exaltation)",
+                "effect": effect
+            })
+
+    # 2. Viparita Raja Yogas (Harsha 6th, Sarala 8th, Vimala 12th)
+    # Lords of dusthanas situated exclusively in dusthanas (6, 8, 12)
+    h6_sign = SIGNS[(lagna_idx + 5) % 12]; l6 = RASHI_LORDS[h6_sign]
+    h8_sign = SIGNS[(lagna_idx + 7) % 12]; l8 = RASHI_LORDS[h8_sign]
+    h12_sign = SIGNS[(lagna_idx + 11) % 12]; l12 = RASHI_LORDS[h12_sign]
+
+    if house(l6) in (6, 8, 12):
+        yogas.append({"name": "Viparita Raja Yoga (Harsha)", "planet": l6, "rule": f"6th Lord ({l6}) placed in house {house(l6)}", "effect": "Triumph over rivals, immunity from disease, sudden breakthrough during crisis"})
+    if house(l8) in (6, 8, 12):
+        yogas.append({"name": "Viparita Raja Yoga (Sarala)", "planet": l8, "rule": f"8th Lord ({l8}) placed in house {house(l8)}", "effect": "Fearlessness, longevity, unexpected prosperity, victory in contentious affairs"})
+    if house(l12) in (6, 8, 12):
+        yogas.append({"name": "Viparita Raja Yoga (Vimala)", "planet": l12, "rule": f"12th Lord ({l12}) placed in house {house(l12)}", "effect": "Independent wealth, noble character, spiritual detachment, freedom from debts"})
+
+    # 3. Neecha Bhanga Raja Yoga (NBRY - Debilitation Cancellation per Raman)
+    for p, deb_s in DEBIL_SIGN.items():
+        if sign(p) == deb_s:
+            # Check 5 cancellation conditions
+            rules_triggered = []
+            sign_lord = RASHI_LORDS[deb_s]
+            exalt_lord = RASHI_LORDS[EXALT_SIGN[p]]
+            sl_h = house(sign_lord); el_h = house(exalt_lord); p_h = house(p)
+
+            if sl_h in (1, 4, 7, 10): rules_triggered.append(f"Lord of debilitation sign ({sign_lord}) in Kendra (House {sl_h})")
+            if el_h in (1, 4, 7, 10): rules_triggered.append(f"Exaltation lord ({exalt_lord}) in Kendra (House {el_h})")
+            if p_h in (1, 4, 7, 10): rules_triggered.append(f"Debilitated {p} itself in Kendra (House {p_h})")
+
+            if rules_triggered:
+                yogas.append({
+                    "name": f"Neecha Bhanga Raja Yoga ({p})", "planet": p,
+                    "rule": "; ".join(rules_triggered),
+                    "effect": f"Debilitation of {p} cancelled and transformed into profound resilience, status and eventual triumph"
+                })
+
+    # 4. Dharma-Karmadhipati Yoga (9th and 10th lords conjoined or in mutual aspect)
+    h9_sign = SIGNS[(lagna_idx + 8) % 12]; l9 = RASHI_LORDS[h9_sign]
+    h10_sign = SIGNS[(lagna_idx + 9) % 12]; l10 = RASHI_LORDS[h10_sign]
+    if l9 != l10 and house(l9) and house(l10):
+        if house(l9) == house(l10):
+            yogas.append({"name": "Dharma-Karmadhipati Yoga", "planet": f"{l9}+{l10}", "rule": f"9th Lord ({l9}) and 10th Lord ({l10}) conjoined in house {house(l9)}", "effect": "High executive status, public acclaim, ethical leadership and supreme good fortune"})
+        elif (house(l9) == 10 and house(l10) == 9):
+            yogas.append({"name": "Maha Parivartana Yoga (9th & 10th Lords)", "planet": f"{l9}<->{l10}", "rule": f"9th and 10th lords in mutual sign exchange", "effect": "Kingly stature, monumental career success and enduring legacy"})
+
+    # 5. Gajakesari: Jupiter in kendra (1/4/7/10) from Moon
     if "Jupiter" in planets and "Moon" in planets:
-        diff=(planets["Jupiter"]["house"]-planets["Moon"]["house"])%12
-        if planets["Jupiter"]["house"] in (1,4,7,10) and \
-           ((SIGNS.index(planets["Jupiter"]["sign"])-SIGNS.index(planets["Moon"]["sign"]))%12) in (0,3,6,9):
-            yogas.append({"name":"Gajakesari Yoga",
-                "rule":"Jupiter in a kendra (1/4/7/10) from the Moon",
-                "effect":"intelligence, reputation, lasting prosperity, respected influence"})
-    # Budha-Aditya: Sun & Mercury same sign
-    if planets.get("Sun",{}).get("sign")==planets.get("Mercury",{}).get("sign"):
-        yogas.append({"name":"Budha-Aditya Yoga",
-            "rule":"Sun and Mercury conjoined in the same sign",
-            "effect":"sharp intellect, communication skill, administrative talent (weakened if Mercury combust)"})
-    # Chandra-Mangala: Moon & Mars conjoined
-    if planets.get("Moon",{}).get("sign")==planets.get("Mars",{}).get("sign"):
-        yogas.append({"name":"Chandra-Mangala Yoga",
-            "rule":"Moon and Mars in the same sign",
-            "effect":"drive for wealth, emotional intensity, entrepreneurial energy"})
-    # Exalted planets
-    for p in ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"]:
-        if planets.get(p,{}).get("dignity")=="exalted":
-            yogas.append({"name":f"{p} exalted",
-                "rule":f"{p} in its sign of exaltation ({EXALT_SIGN[p]})",
-                "effect":f"the significations of {p} ({GRAHA_KARAKAS[p]}) are powerfully expressed"})
+        diff = (planets["Jupiter"]["house"] - planets["Moon"]["house"]) % 12
+        if planets["Jupiter"]["house"] in (1, 4, 7, 10) and diff in (0, 3, 6, 9):
+            yogas.append({"name": "Gajakesari Yoga", "planet": "Jupiter+Moon", "rule": "Jupiter in a kendra (1/4/7/10) from the Moon", "effect": "Intelligence, noble reputation, lasting prosperity and respected influence"})
+
+    # 6. Budha-Aditya: Sun & Mercury same sign
+    if planets.get("Sun", {}).get("sign") == planets.get("Mercury", {}).get("sign"):
+        yogas.append({"name": "Budha-Aditya Yoga", "planet": "Sun+Mercury", "rule": "Sun and Mercury conjoined in the same sign", "effect": "Sharp intellect, communication mastery and administrative talent"})
+
+    # 7. Chandra-Mangala: Moon & Mars conjoined
+    if planets.get("Moon", {}).get("sign") == planets.get("Mars", {}).get("sign"):
+        yogas.append({"name": "Chandra-Mangala Yoga", "planet": "Moon+Mars", "rule": "Moon and Mars conjoined in the same sign", "effect": "Commercial acumen, emotional drive and entrepreneurial wealth creation"})
+
     return yogas
 
 # ── BaZi ─────────────────────────────────────────────────────────────────────
@@ -3435,12 +3497,18 @@ def horary(question_utc, lat, lng, question_text=""):
     hour_ruler = chaldean[hour_ruler_idx]
     # "Hour planet" classical interpretation: the planet ruling the hour
     # describes the *flavour* of the moment, useful in horary timing.
+    sat_h = whole_sign_house(lons["Saturn"], asc_lon)
+    asc_deg = (asc_lon % 30)
+    lilly_checks = evaluate_horary_considerations(asc_deg, moon_lon, voc, sat_h)
+
     return {
         "system": "Horary / Prasna (chart of the moment)",
         "question_text": question_text,
         "question_utc": question_utc.strftime("%Y-%m-%d %H:%M:%S"),
         "ascendant": asc_sign,
+        "ascendant_deg": round(asc_deg, 2),
         "ascendant_ruler": asc_ruler,
+        "lilly_considerations": lilly_checks,
         "moon": {"sign": moon_sign,
                  "house_in_horary": moon_p_house,
                  "void_of_course": voc,
@@ -4070,6 +4138,10 @@ def calculate_full_profile(data):
             "maha": vim["current_mahadasha"], "antar": vim["current_antardasha"],
             "pratyantar": vim["current_pratyantardasha"]}
         result["chara_dasha"] = chara_dasha(jd, lat, lng, time_known, as_of_dt=target_eval_dt)
+        return result
+
+    if mode=="almuten" or mode=="almuten_figuris":
+        result["almuten"] = calculate_almuten_figuris(jd, lat, lng, time_known)
         return result
 
     if mode=="tri_consensus" or mode=="consensus" or mode=="confidence":
@@ -6859,6 +6931,100 @@ def compute_ayurvedic_medical_profile(natal_jd, lat, lng, time_known=True):
             "avoidance_windows": "Avoid major surgeries within 48h of Full Moon (high fluid/hemorrhage risk) and during Moon Void-of-Course."
         },
         "note": "Based on Dr. K.S. Charak (Essentials of Medical Astrology) and Nicholas Culpeper (1655)."
+    }
+
+def calculate_almuten_figuris(natal_jd, lat, lng, time_known=True):
+    """Calculate the Almuten Figuris (Master Ruler of the Chart) per William Lilly (1647) & Ibn Ezra:
+    Synthesizes essential dignities (Domicile=5, Exalt=4, Triplicity=3, Term=2, Face=1)
+    and accidental house placements across the 5 Hylegical root points:
+    Sun, Moon, Ascendant, Part of Fortune, and Prenatal Syzygy."""
+    w_chart = western_chart(natal_jd, lat, lng, time_known)
+    lons = {p: b["abs_lon"] for p, b in w_chart["planets"].items()}
+    asc_lon = w_chart["ascendant"]["abs_lon"] if "abs_lon" in w_chart["ascendant"] else lons["Sun"]
+    is_day = 90 <= norm360(asc_lon - lons["Sun"]) <= 270
+
+    pof = part_of_fortune(lons["Sun"], lons["Moon"], asc_lon, is_day)
+    pof_lon = pof["longitude"]
+
+    # 5 Hylegical points to evaluate
+    hyleg_points = [
+        ("Sun", lons["Sun"]),
+        ("Moon", lons["Moon"]),
+        ("Ascendant", asc_lon),
+        ("Part_of_Fortune", pof_lon)
+    ]
+
+    traditional_planets = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"]
+    almuten_scores = {p: 0 for p in traditional_planets}
+
+    # 1. Essential Dignity accumulation at the Hyleg points
+    for name, p_lon in hyleg_points:
+        s, _, deg = sign_of(p_lon)
+        # Domicile ruler (+5)
+        dom_ruler = SIGN_DATA[s]["ruler"]
+        if dom_ruler in almuten_scores: almuten_scores[dom_ruler] += 5
+        # Exaltation ruler (+4)
+        ex_ruler = {"Aries":"Sun","Taurus":"Moon","Cancer":"Jupiter","Virgo":"Mercury","Libra":"Saturn","Capricorn":"Mars","Pisces":"Venus"}.get(s)
+        if ex_ruler and ex_ruler in almuten_scores: almuten_scores[ex_ruler] += 4
+        # Triplicity (+3)
+        tri_elem = SIGN_DATA[s]["element"]
+        tri_ruler = {"Fire": "Sun" if is_day else "Jupiter",
+                     "Earth": "Venus" if is_day else "Moon",
+                     "Air": "Saturn" if is_day else "Mercury",
+                     "Water": "Mars"}.get(tri_elem)
+        if tri_ruler in almuten_scores: almuten_scores[tri_ruler] += 3
+
+    # 2. Accidental House scores (Lilly house ranking: 1st=12, 10th=11, 7th=10, 4th=9, 11th=8, 5th=7, 2nd=6, 9th=5, 8th=4, 3rd=3, 12th=2, 6th=1)
+    house_pts = {1: 12, 10: 11, 7: 10, 4: 9, 11: 8, 5: 7, 2: 6, 9: 5, 8: 4, 3: 3, 12: 2, 6: 1}
+    for p in traditional_planets:
+        h = w_chart["planets"][p]["house"]
+        almuten_scores[p] += house_pts.get(h, 1)
+
+    # 3. Day / Hour ruler points (+3 / +2)
+    dt_utc = _jd_to_dt(natal_jd)
+    chaldean = ["Saturn","Jupiter","Mars","Sun","Venus","Mercury","Moon"]
+    day_ruler = chaldean[dt_utc.weekday()]
+    hour_ruler = chaldean[(dt_utc.weekday() * 12 + dt_utc.hour) % 7]
+    if day_ruler in almuten_scores: almuten_scores[day_ruler] += 3
+    if hour_ruler in almuten_scores: almuten_scores[hour_ruler] += 2
+
+    # Find highest scoring planet
+    sorted_almuten = sorted(almuten_scores.items(), key=lambda x: -x[1])
+    master_almuten = sorted_almuten[0][0]
+
+    return {
+        "almuten_figuris": master_almuten,
+        "score": sorted_almuten[0][1],
+        "scoreboard": dict(sorted_almuten),
+        "day_ruler": day_ruler,
+        "hour_ruler": hour_ruler,
+        "note": f"William Lilly Almuten Figuris: {master_almuten} acts as the supreme guiding intelligence and spiritual guardian of the chart."
+    }
+
+def evaluate_horary_considerations(asc_deg_in_sign, moon_abs_lon, moon_voc, saturn_house):
+    """Evaluate William Lilly's Considerations Before Judgment (Christian Astrology Book 2):
+    Early Asc (<3°), Late Asc (>27°), Moon in Via Combusta, Moon VOC, Saturn in 7th/1st."""
+    is_via_combusta = (199.0 <= moon_abs_lon <= 213.0) and not (203.0 <= moon_abs_lon <= 205.0) # Libra 19° to Scorpio 3°, Spica exempt
+    warnings = []
+    if asc_deg_in_sign < 3.0:
+        warnings.append("Early Ascendant (<3°) — The question is premature; events are not yet ripe for judgment.")
+    if asc_deg_in_sign > 27.0:
+        warnings.append("Late Ascendant (>27°) — The matter is post-factum or already decided beyond the querent's control.")
+    if is_via_combusta:
+        warnings.append("Moon in Via Combusta (Libra 19° to Scorpio 3°) — Extreme emotional distress or sudden turn of fortune.")
+    if moon_voc:
+        warnings.append("Moon Void-of-Course — 'Nothing will come of the matter'; actions will not produce intended fruit.")
+    if saturn_house == 7:
+        warnings.append("Saturn in 7th House — The astrologer's judgment is impeded or the question is contentious.")
+    if saturn_house == 1:
+        warnings.append("Saturn in 1st House — The querent is deeply afflicted or acting out of fear.")
+
+    is_safe = len(warnings) == 0 or (len(warnings) == 1 and moon_voc)
+    return {
+        "is_safe_to_judge": is_safe,
+        "considerations_count": len(warnings),
+        "warnings": warnings,
+        "judgment_advisory": "Safe for clear judgment" if is_safe else "Caution: Classical impediments present"
     }
 
 def _demo():

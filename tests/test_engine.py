@@ -775,6 +775,35 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestLillyAlmutenAndRamanYogas(unittest.TestCase):
+    """William Lilly's Almuten Figuris & B.V. Raman's 300 Important Combinations."""
+
+    def test_almuten_figuris_calculation(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "almuten"})
+        alm = r["almuten"]
+        self.assertIn("almuten_figuris", alm)
+        self.assertIn("score", alm)
+        self.assertIn("scoreboard", alm)
+        self.assertIn(alm["almuten_figuris"], ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"])
+
+    def test_horary_lilly_considerations(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "horary", "question": "Will my project succeed?"})
+        hor = r["horary"]
+        self.assertIn("lilly_considerations", hor)
+        self.assertIn("is_safe_to_judge", hor["lilly_considerations"])
+        self.assertIn("warnings", hor["lilly_considerations"])
+
+    def test_raman_advanced_yogas_detection(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile(d)
+        yogas = r["charts"]["vedic"]["yogas"]
+        self.assertTrue(len(yogas) >= 1)
+        yoga_names = [y["name"] for y in yogas]
+        self.assertTrue(any("Yoga" in name for name in yoga_names))
+
+
 class TestMedicalAndAyurvedic(unittest.TestCase):
     """Deep Medical Astrology and Ayurvedic Tri-Dosha balance (Charak & Culpeper)."""
 
