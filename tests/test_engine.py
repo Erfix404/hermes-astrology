@@ -775,6 +775,30 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestRemediesAndUpayas(unittest.TestCase):
+    """Wave 12: Scientific Vedic remedies (BPHS) and psychological grounding habits."""
+
+    def test_remedies_blueprint_differentiation(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "remedies_blueprint"})
+        rem = r["remedies_blueprint"]
+        self.assertIn("approved_gemstones", rem)
+        self.assertIn("karmic_charity_daan", rem)
+        self.assertIn("lagna_sign", rem)
+
+        # 1. Approved gemstones are strictly for Functional Benefics
+        for g in rem["approved_gemstones"]:
+            self.assertIn("gemstone", g)
+            self.assertIn("metal", g)
+            self.assertIn("finger", g)
+
+        # 2. Charity Daan contains warning against wearing wrong gemstones
+        for c in rem["karmic_charity_daan"]:
+            self.assertIn("recommended_donation", c)
+            self.assertIn("gemstone_warning", c)
+            self.assertIn("STRICT BPHS PROHIBITION", c["gemstone_warning"])
+
+
 class TestDomainBlueprints(unittest.TestCase):
     """Wave 11: Multi-tradition Wealth and Love synthesis blueprints."""
 

@@ -4072,6 +4072,10 @@ def calculate_full_profile(data):
         result["chara_dasha"] = chara_dasha(jd, lat, lng, time_known, as_of_dt=target_eval_dt)
         return result
 
+    if mode=="remedies_blueprint" or mode=="upayas" or mode=="gemstones":
+        result["remedies_blueprint"] = compute_remedies_blueprint(jd, lat, lng, time_known)
+        return result
+
     if mode=="wealth_blueprint" or mode=="wealth":
         result["wealth_blueprint"] = compute_wealth_blueprint(jd, lat, lng, time_known)
         return result
@@ -6084,6 +6088,124 @@ def compute_love_blueprint(natal_jd, lat, lng, time_known=True):
         "strengths": strengths,
         "cautions": cautions,
         "synthesis_summary": f"Overall relationship potential is rated {tier} ({final_score}/100). Partnership orientation is governed by {h7['sign']} on the 7th house and Venus in {ven['sign']}."
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — SCIENTIFIC ASTROLOGICAL REMEDIES & UPAYAS (BPHS & Liz Greene)
+# ═════════════════════════════════════════════════════════════════════════════
+
+GEMSTONE_MATRIX = {
+    "Sun":     {"gem": "Ruby (Manikya)", "substitute": "Red Garnet / Spinel", "metal": "Gold / Copper", "finger": "Ring finger (Anamika)", "color": "Deep Red / Saffron"},
+    "Moon":    {"gem": "Natural Pearl (Moti)", "substitute": "Moonstone", "metal": "Silver", "finger": "Little finger (Kanishtha)", "color": "Milky White"},
+    "Mars":    {"gem": "Red Coral (Moonga)", "substitute": "Carnelian", "metal": "Copper / Gold", "finger": "Ring finger (Anamika)", "color": "Bright Vermilion Red"},
+    "Mercury": {"gem": "Emerald (Panna)", "substitute": "Peridot / Green Tourmaline", "metal": "Gold / Bronze", "finger": "Little finger (Kanishtha)", "color": "Emerald Green"},
+    "Jupiter": {"gem": "Yellow Sapphire (Pukhraj)", "substitute": "Yellow Topaz", "metal": "22K Gold", "finger": "Index finger (Tarjani)", "color": "Golden Yellow"},
+    "Venus":   {"gem": "Diamond (Heera)", "substitute": "White Zircon / White Sapphire", "metal": "Platinum / Silver", "finger": "Middle / Little finger", "color": "Iridescent White"},
+    "Saturn":  {"gem": "Blue Sapphire (Neelam)", "substitute": "Amethyst / Iolite", "metal": "Iron / Silver", "finger": "Middle finger (Madhyama)", "color": "Deep Navy Blue"},
+    "Rahu":    {"gem": "Hessonite (Gomed)", "substitute": "Cinnamon Zircon", "metal": "Silver / Ashtadhatu", "finger": "Middle finger", "color": "Honey Brown"},
+    "Ketu":    {"gem": "Cat's Eye (Vaidurya)", "substitute": "Chrysoberyl", "metal": "Silver", "finger": "Little finger", "color": "Smoky Green"}
+}
+
+DAAN_CHARITY_MATRIX = {
+    "Sun":     {"day": "Sunday (Sunrise)", "items": "Wheat, jaggery (gur), copper vessel, saffron", "action": "Offer fresh water to the rising sun; honor elders and mentors"},
+    "Moon":    {"day": "Monday (Evening)", "items": "Raw white rice, milk, clean water, silver", "action": "Support mothers and destitute women; install clean water access"},
+    "Mars":    {"day": "Tuesday (Noon)", "items": "Red lentils (masoor dal), copper, sweet bread", "action": "Donate blood; support emergency workers or athletes; physical training"},
+    "Mercury": {"day": "Wednesday (Morning)", "items": "Green gram (moong dal), green cloth, notebooks", "action": "Fund student supplies; feed green fodder to animals"},
+    "Jupiter": {"day": "Thursday (Morning)", "items": "Chana dal, turmeric, yellow cloth, educational books", "action": "Support teachers, libraries, and philosophical institutions"},
+    "Venus":   {"day": "Friday (Dawn)", "items": "White sugar, refined flour, silk, ghee, curd", "action": "Support women artists, donate cosmetics or clothing to shelters"},
+    "Saturn":  {"day": "Saturday (Sunset)", "items": "Black sesame (til), mustard oil, iron pan, dark blanket", "action": "Aid manual laborers, sweepers, and the disabled; feed crows"},
+    "Rahu":    {"day": "Saturday (Night)", "items": "Mustard seeds, coconut, dark blue blanket", "action": "Feed stray dogs daily; support people facing chronic marginalization"},
+    "Ketu":    {"day": "Tuesday (Morning)", "items": "Seven mixed grains (sapta dhanya), brown blanket", "action": "Support spiritual seekers, meditation centers, and monks"}
+}
+
+PSYCHOLOGICAL_GROUNDING_MATRIX = {
+    ("Sun", "Saturn"): "Establish disciplined daily routines; decouple self-worth from external praise; build internal self-validation.",
+    ("Sun", "Pluto"): "Embrace radical transparency; practice conscious delegation of control; channel intensity into deep transformation.",
+    ("Moon", "Saturn"): "Practice emotional reparenting; allow scheduled processing of grief; engage in soothing somatic bodywork.",
+    ("Moon", "Neptune"): "Establish firm relational boundaries (practice saying 'No'); ground feelings through music/art; maintain emotional clarity.",
+    ("Mars", "Saturn"): "Commit to periodized physical discipline (long-term training); direct energy into step-by-step constructive projects.",
+    ("Mars", "Pluto"): "Channel volatile drive through high-intensity martial arts (boxing/BJJ); lead during crisis turnarounds.",
+    ("Venus", "Saturn"): "Define clear relational agreements; invest in self-care budgets; take patient, steady steps toward intimacy.",
+    ("Venus", "Pluto"): "Develop relational autonomy; channel passion into creative and psychological metamorphosis without control games.",
+    ("Mercury", "Saturn"): "Combat mental rumination with evidence-based journaling and structured checklists; practice clear articulation.",
+    ("Mercury", "Neptune"): "Use strict checklist verification for facts and finances; reserve poetic ambiguity purely for creative arts."
+}
+
+def compute_remedies_blueprint(natal_jd, lat, lng, time_known=True):
+    """Scientific Astrological Remediation Engine (BPHS & Liz Greene):
+    1. Evaluates Functional Benefics vs Functional Malefics to prescribe gemstones safely
+       (Gemstones are strictly prohibited for Dusthana lords to avoid amplifying crises).
+    2. Daan (Charity & Karmic Discharges) for pacifying afflicted/malefic planets.
+    3. Constructive psychological grounding habits for hard aspect dynamics."""
+    w_chart = western_chart(natal_jd, lat, lng, time_known)
+    lons, _, _ = body_longitudes(natal_jd)
+    ayan = ayanamsha_lahiri(natal_jd)
+    asc_sid = norm360(w_chart["ascendant"]["abs_lon"] - ayan)
+    lagna_sign_idx = int(asc_sid // 30) % 12
+    lagna_sign = SIGNS[lagna_sign_idx]
+
+    # Functional benefic rules: Lords of Trikonas (1, 5, 9)
+    # Trikona signs from Lagna
+    trikona_houses = {1: lagna_sign,
+                      5: SIGNS[(lagna_sign_idx + 4) % 12],
+                      9: SIGNS[(lagna_sign_idx + 8) % 12]}
+    trikona_lords = {RASHI_LORDS[s] for s in trikona_houses.values()}
+
+    # Dusthana houses: 6, 8, 12
+    dusthana_houses = {6: SIGNS[(lagna_sign_idx + 5) % 12],
+                       8: SIGNS[(lagna_sign_idx + 7) % 12],
+                       12: SIGNS[(lagna_sign_idx + 11) % 12]}
+    dusthana_lords = {RASHI_LORDS[s] for s in dusthana_houses.values()}
+
+    gemstone_prescriptions = []
+    charity_prescriptions = []
+
+    for p in ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"]:
+        if p in trikona_lords and p not in dusthana_lords:
+            # Safe to amplify with gemstone
+            info = GEMSTONE_MATRIX[p]
+            gemstone_prescriptions.append({
+                "planet": p,
+                "role": f"Functional Benefic (Lord of Auspicious Trikona House for {lagna_sign} Lagna)",
+                "gemstone": info["gem"],
+                "substitute": info["substitute"],
+                "metal": info["metal"],
+                "finger": info["finger"],
+                "color": info["color"],
+                "rule": "Approved for amplification per BPHS guidelines"
+            })
+        elif p in dusthana_lords:
+            # Pacification via charity only
+            c_info = DAAN_CHARITY_MATRIX[p]
+            charity_prescriptions.append({
+                "planet": p,
+                "reason": f"Functional Malefic / Dusthana Ruler for {lagna_sign} Lagna",
+                "charity_timing": c_info["day"],
+                "recommended_donation": c_info["items"],
+                "constructive_action": c_info["action"],
+                "gemstone_warning": f"STRICT BPHS PROHIBITION: Do NOT wear {GEMSTONE_MATRIX[p]['gem']} — it will amplify crisis/debt/illness."
+            })
+
+    # Psychological Grounding for Active Hard Aspects
+    psy_habits = []
+    aspects = w_chart["aspects"]
+    for asp in aspects:
+        if asp["aspect"] in ("square", "opposition", "inconjunct") and asp["orb"] <= 3.5:
+            pair = tuple(sorted([asp["a"], asp["b"]]))
+            if pair in PSYCHOLOGICAL_GROUNDING_MATRIX:
+                psy_habits.append({
+                    "aspect": f"{asp['a']} {asp['aspect']} {asp['b']} (orb {asp['orb']}°)",
+                    "growth_habit": PSYCHOLOGICAL_GROUNDING_MATRIX[pair]
+                })
+
+    return {
+        "domain": "Astrological Remediation & Upayas",
+        "lagna_sign": lagna_sign,
+        "approved_gemstones": gemstone_prescriptions,
+        "karmic_charity_daan": charity_prescriptions,
+        "psychological_grounding_habits": psy_habits[:4],
+        "note": ("Vedic gemstone philosophy: gemstones act as bio-optical amplifiers and are prescribed ONLY "
+                 "for Functional Benefics (Houses 1, 5, 9). Afflicted planets are pacified exclusively through Daan (charity) and constructive psychological habits.")
     }
 
 def _demo():
