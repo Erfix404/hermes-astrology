@@ -775,6 +775,37 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestElectionalAndRelocation(unittest.TestCase):
+    """Wave 10: Ibn Ezra electional search engine & Jim Lewis city relocation."""
+
+    def test_electional_moment_evaluation(self):
+        d = dict(ae._demo())
+        jd = ae.julian_day(datetime(2026, 9, 1, 10, 0))
+        ev = ae.evaluate_election_moment(jd, 35.6892, 51.3890, activity="business_commerce")
+        self.assertIn("score", ev)
+        self.assertTrue(0 <= ev["score"] <= 100)
+        self.assertIn("rating", ev)
+        self.assertIn("moon_status", ev)
+        self.assertIn("ascendant", ev)
+
+    def test_find_best_time_search_mode(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "find_best_time", "activity": "marriage_partnership", "days_ahead": 10})
+        ew = r["electional_windows"]
+        self.assertEqual(ew["activity"], "marriage_partnership")
+        self.assertTrue(len(ew["top_windows"]) >= 1)
+        self.assertTrue(0 <= ew["top_windows"][0]["score"] <= 100)
+
+    def test_city_relocation_mode(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "relocate_chart", "target_city": "London"})
+        rel = r["relocated_chart"]
+        self.assertEqual(rel["target_city"], "London")
+        self.assertIn("relocated_ascendant", rel)
+        self.assertIn("relocated_midheaven", rel)
+        self.assertTrue(len(rel["activated_spheres"]) >= 5)
+
+
 class TestAstrodynes(unittest.TestCase):
     """Wave 9: Astrodynes / Cosmodynes quantitative power and harmony scoring."""
 

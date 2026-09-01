@@ -4048,6 +4048,20 @@ def calculate_full_profile(data):
         result["gochara"]=gochara(jd, target_eval_jd, lat=lat, lng=lng)
         return result
 
+    if mode=="find_best_time" or mode=="electional_search":
+        activity = data.get("activity", "business_commerce")
+        days = int(data.get("days_ahead", 30))
+        organ = data.get("organ_sign")
+        result["electional_windows"] = find_best_electional_windows(
+            lat, lng, target_eval_dt, days_ahead=days, activity=activity, organ_sign=organ)
+        return result
+
+    if mode=="relocate_chart" or mode=="relocation":
+        target_city = data.get("target_city", "Dubai")
+        coords = CITIES.get(target_city, (data.get("target_lat", lat), data.get("target_lng", lng)))
+        result["relocated_chart"] = relocate_natal_chart(jd, target_city, coords[0], coords[1])
+        return result
+
     if mode=="dasha_reading":
         moon_sid = norm360(body_longitudes(jd)[0]["Moon"] - ayanamsha_lahiri(jd))
         vim = vimshottari(moon_sid, birth_local, as_of_dt=target_eval_dt)
@@ -5710,6 +5724,184 @@ def compute_astrodynes(natal_jd, lat, lng, time_known=True):
                       "net_harmony": round(sign_harmony[s], 2)} for s in SIGNS},
         "note": ("Astrodynes quantitatively measure planetary drive (Power) and emotional ease vs struggle "
                  "(Harmony/Discord). Highest power house represents the primary life focus.")
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — ELECTIONAL SEARCH & RELOCATION ANALYSIS (Ibn Ezra & Jim Lewis)
+# ═════════════════════════════════════════════════════════════════════════════
+
+BODY_PARTS_BY_SIGN = {
+    "Aries": "head, brain, eyes, face",
+    "Taurus": "neck, throat, vocal cords, thyroid",
+    "Gemini": "shoulders, arms, hands, lungs, nervous system",
+    "Cancer": "chest, breasts, stomach, digestion",
+    "Leo": "heart, spine, upper back",
+    "Virgo": "abdomen, intestines, digestive system",
+    "Libra": "kidneys, lower back, buttocks",
+    "Scorpio": "reproductive organs, genitals, excretory system",
+    "Sagittarius": "hips, thighs, sciatic nerve, liver",
+    "Capricorn": "knees, joints, bones, teeth, skin",
+    "Aquarius": "calves, ankles, circulatory system",
+    "Pisces": "feet, toes, lymphatic system"
+}
+
+ELECTION_CRITERIA = {
+    "business_commerce": {"target_houses": [2, 10, 11], "significators": ["Jupiter", "Mercury"], "prohibit_saturn": False},
+    "marriage_partnership": {"target_houses": [7], "significators": ["Venus", "Moon"], "prohibit_saturn": True},
+    "property_building": {"target_houses": [4], "significators": ["Saturn", "Venus"], "prohibit_mars": True},
+    "travel_journey": {"target_houses": [9, 3], "significators": ["Moon", "Mercury"], "prohibit_saturn": True},
+    "medical_surgery": {"target_houses": [1, 6], "significators": ["Sun", "Jupiter"], "prohibit_mars": True},
+}
+
+def evaluate_election_moment(jd, lat, lng, activity="business_commerce", organ_sign=None):
+    """Evaluate an electional moment per Abraham Ibn Ezra (Book of Elections / Sefer ha-Mivharim).
+    Returns an objective score (0 to 100) and actionable classical insights."""
+    ch = western_chart(jd, lat, lng, time_known=True)
+    lons = {p: b["abs_lon"] for p, b in ch["planets"].items()}
+    speed = {p: 1.0 for p in lons}
+    lons_swe, sp_swe, _ = body_longitudes(jd)
+
+    score = 0.0
+    strengths = []
+    cautions = []
+
+    # 1. MOON CONDITION (Max: 35 points)
+    sun_lon = lons["Sun"]; moon_lon = lons["Moon"]
+    elong = norm360(moon_lon - sun_lon)
+    is_waxing = elong < 180.0
+    if is_waxing:
+        score += 7.0
+        strengths.append("Moon is waxing (increasing in light) — ideal for growth and progress")
+    else:
+        cautions.append("Moon is waning (decreasing in light) — suited for reduction/closing rather than expansion")
+
+    # Combustion check (within 12° of Sun)
+    is_combust = abs(norm180(moon_lon - sun_lon)) < 12.0
+    if not is_combust:
+        score += 7.0
+    else:
+        score -= 10.0
+        cautions.append("Moon is combust (too close to Sun's rays) — signifies obscurity or impediment")
+
+    # Void-of-course check
+    voc = void_of_course_moon(jd, lat, lng, True)
+    if not voc.get("is_void"):
+        score += 6.0
+        strengths.append("Moon is active and making applying aspects (not Void-of-Course)")
+    else:
+        score -= 8.0
+        cautions.append("Moon is Void-of-Course — classical election rule: 'nothing comes of the matter'")
+
+    # Moon sign dignity & Via Combusta
+    moon_sign = ch["planets"]["Moon"]["sign"]
+    if moon_sign == "Taurus": # Moon exaltation
+        score += 7.0; strengths.append("Moon is exalted in Taurus (supreme stability)")
+    elif moon_sign == "Cancer": # Moon domicile
+        score += 5.0; strengths.append("Moon is in own domicile (Cancer)")
+    elif moon_sign == "Scorpio":
+        score -= 6.0; cautions.append("Moon is in fall in Scorpio (intense/turbulent emotional climate)")
+
+    # 2. ASCENDANT & ASC LORD (Max: 30 points)
+    asc_sign = ch["ascendant"]["sign"]
+    asc_lord = SIGN_DATA[asc_sign]["ruler"]
+    h1_planets = [p for p, b in ch["planets"].items() if b["house"] == 1]
+    if "Saturn" not in h1_planets and "Mars" not in h1_planets:
+        score += 8.0
+    else:
+        score -= 10.0
+        cautions.append("Malefic in 1st house — obstacles in initial execution")
+
+    asc_lord_house = ch["planets"].get(asc_lord, {}).get("house", 6)
+    if asc_lord_house in (1, 10, 7, 4, 11, 5):
+        score += 12.0
+        strengths.append(f"Ascendant Lord ({asc_lord}) is strong in house {asc_lord_house}")
+    else:
+        score -= 5.0
+        cautions.append(f"Ascendant Lord ({asc_lord}) is placed in a weak/cadent house ({asc_lord_house})")
+
+    # 3. ACTIVITY TARGET CRITERIA (Max: 35 points)
+    crit = ELECTION_CRITERIA.get(activity, ELECTION_CRITERIA["business_commerce"])
+    for th in crit["target_houses"]:
+        th_planets = [p for p, b in ch["planets"].items() if b["house"] == th]
+        if "Jupiter" in th_planets or "Venus" in th_planets:
+            score += 10.0
+            strengths.append(f"Benefic in target house {th} — strengthens the core objective")
+        if "Saturn" in th_planets and crit.get("prohibit_saturn"):
+            score -= 8.0; cautions.append(f"Saturn in target house {th} causes delays or burdens")
+        if "Mars" in th_planets and crit.get("prohibit_mars"):
+            score -= 8.0; cautions.append(f"Mars in target house {th} brings haste, conflict, or hazard")
+
+    # Medical surgery special rule (Ibn Ezra Sefer ha-Me'orot)
+    if activity == "medical_surgery" and organ_sign:
+        if moon_sign.lower() == organ_sign.lower():
+            score -= 30.0
+            cautions.append(f"CRITICAL MEDICAL RULE: Moon is in {moon_sign} which governs {BODY_PARTS_BY_SIGN.get(moon_sign,'')}. Avoid surgical intervention on this organ while Moon transits here.")
+
+    final_score = max(0, min(100, round(score)))
+    rating = "Excellent (Golden Window)" if final_score >= 80 else "Favorable" if final_score >= 65 else "Moderate" if final_score >= 50 else "Challenging"
+
+    return {
+        "score": final_score,
+        "rating": rating,
+        "moon_status": {"sign": moon_sign, "is_waxing": is_waxing, "void_of_course": voc.get("is_void", False)},
+        "ascendant": {"sign": asc_sign, "lord": asc_lord, "lord_house": asc_lord_house},
+        "strengths": strengths,
+        "cautions": cautions,
+    }
+
+def find_best_electional_windows(lat, lng, start_dt, days_ahead=30, activity="business_commerce", organ_sign=None):
+    """Scan upcoming days and rank the top 3 golden time windows for a specified initiative
+    per Ibn Ezra's electional scoring system."""
+    start_jd = julian_day(start_dt)
+    candidates = []
+    # Evaluate at solar noon and mid-morning/mid-afternoon for each day
+    for day_i in range(days_ahead):
+        curr_dt = start_dt + timedelta(days=day_i)
+        for hour_opt in (10, 14, 18):
+            eval_dt = curr_dt.replace(hour=hour_opt, minute=0, second=0)
+            eval_jd = julian_day(eval_dt)
+            ev = evaluate_election_moment(eval_jd, lat, lng, activity, organ_sign)
+            candidates.append({
+                "datetime_utc": eval_dt.strftime("%Y-%m-%d %H:%M UTC"),
+                "score": ev["score"],
+                "rating": ev["rating"],
+                "moon_sign": ev["moon_status"]["sign"],
+                "ascendant_sign": ev["ascendant"]["sign"],
+                "strengths": ev["strengths"],
+                "cautions": ev["cautions"]
+            })
+
+    candidates.sort(key=lambda x: -x["score"])
+    top_windows = candidates[:3]
+    return {
+        "activity": activity,
+        "scan_period": f"{start_dt.strftime('%Y-%m-%d')} to {(start_dt + timedelta(days=days_ahead)).strftime('%Y-%m-%d')}",
+        "top_windows": top_windows,
+        "note": "Ranked per Abraham Ibn Ezra's Book of Elections (Sefer ha-Mivharim). Select windows with score >= 75 for major initiatives."
+    }
+
+def relocate_natal_chart(natal_jd, target_city, target_lat, target_lng):
+    """Calculate the Relocated Chart for living in a different city (Jim Lewis Astro*Carto*Graphy principle):
+    Planets remain in the same zodiac degrees, but house cusps and Asc/MC rotate based on the new geography.
+    Reveals how different global cities activate distinct life arenas."""
+    natal_chart = western_chart(natal_jd, target_lat, target_lng, time_known=True)
+    relocated_asc = natal_chart["ascendant"]["sign"]
+    relocated_mc = natal_chart["midheaven"]["sign"]
+
+    shifts = []
+    for p, b in natal_chart["planets"].items():
+        if p in ("Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"):
+            h = b["house"]
+            shifts.append(f"{p} in House {h} ({MUNDANE_HOUSE_MEANINGS.get(h,'')})")
+
+    return {
+        "target_city": target_city,
+        "coordinates": {"lat": target_lat, "lng": target_lng},
+        "relocated_ascendant": relocated_asc,
+        "relocated_midheaven": relocated_mc,
+        "activated_spheres": shifts,
+        "chart": natal_chart,
+        "note": f"In {target_city}, your Ascendant shifts to {relocated_asc} and Midheaven to {relocated_mc}. Planets in angular houses (1, 4, 7, 10) become dominant life themes in this location."
     }
 
 def _demo():
