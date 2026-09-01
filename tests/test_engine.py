@@ -775,6 +775,24 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestTriTraditionConsensus(unittest.TestCase):
+    """Wave 13: Tri-Tradition Convergence and Confidence Score Engine."""
+
+    def test_tri_tradition_consensus_calculation(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "tri_consensus"})
+        tc = r["tri_tradition_convergence"]
+        self.assertIn("consensus_label", tc)
+        self.assertIn("confidence_score_pct", tc)
+        self.assertTrue(45.0 <= tc["confidence_score_pct"] <= 98.0)
+        self.assertIn("tradition_signals", tc)
+        sig = tc["tradition_signals"]
+        for k in ("western_signal", "vedic_signal", "bazi_signal"):
+            self.assertIn(k, sig)
+            self.assertTrue(-1.0 <= sig[k] <= 1.0)
+        self.assertIn("synthesis_takeaway", tc)
+
+
 class TestRemediesAndUpayas(unittest.TestCase):
     """Wave 12: Scientific Vedic remedies (BPHS) and psychological grounding habits."""
 
