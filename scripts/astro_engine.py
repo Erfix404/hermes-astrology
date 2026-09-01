@@ -1528,6 +1528,7 @@ def vedic_chart(jd, lat, lng, birth_dt, time_known=True, as_of_dt=None):
                      "phase": sade_sati_phase,
                      "note":"Saturn's 7.5-yr transit over natal Moon ±1 sign; challenging but transformative"},
         "planets":planets,
+        "mangal_dosha":mangal_dosha(jd, lat, lng, time_known),
         "vimshottari_dasha":dasha,
         "yogas":yogas,
         "house_meanings":VEDIC_HOUSE,
@@ -2947,33 +2948,21 @@ def fixed_star_conjunctions(lons, max_orb=2.0):
 # ═════════════════════════════════════════════════════════════════════════════
 
 def mangal_dosha(jd, lat, lng, time_known=True):
-    """Check for Mangal (Kuja/Mars) Dosha — Mars in 1st, 2nd, 4th, 7th, 8th, or 12th house."""
+    """Check for Mangal (Kuja/Mars) Dosha with classical BPHS Ch.80 cancellation rules."""
     lons, _, _ = body_longitudes(jd)
     ayan = ayanamsha_lahiri(jd)
-    mars_sid = norm360(lons["Mars"] - ayan)
     if time_known:
         asc_lon, _ = ascendant_mc(jd, lat, lng, ayan)
     else:
         asc_lon = norm360(lons["Sun"] - ayan)
     asc_idx = int(asc_lon // 30)
-    mars_idx = int(mars_sid // 30)
-    mars_house = ((mars_idx - asc_idx) % 12) + 1
-    dosha_houses = [1, 2, 4, 7, 8, 12]
-    has_dosha = mars_house in dosha_houses
-    cancellations = []
-    mars_sign = SIGNS[mars_idx]
-    if mars_sign in ("Aries", "Scorpio"):
-        cancellations.append("Mars in own sign (Aries/Scorpio)")
-    if mars_sign == "Capricorn":
-        cancellations.append("Mars in exaltation (Capricorn)")
-    if mars_house in (2, 4) and mars_sign in ("Cancer", "Leo"):
-        cancellations.append("Mars in Cancer/Leo in 2nd/4th — partial cancellation")
-    return {"has_mangal_dosha": has_dosha,
-            "mars_house": mars_house,
-            "mars_sign": mars_sign,
-            "severity": "high" if mars_house in (1, 7, 8) else "moderate" if has_dosha else "none",
-            "cancellations": cancellations,
-            "note": "Mangal Dosha occurs when Mars occupies houses 1, 2, 4, 7, 8, or 12 from the ascendant. It affects marriage compatibility and can be cancelled by sign placements." if has_dosha else "No Mangal Dosha detected."}
+    sid_planets = {}
+    for p in ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"]:
+        p_sid = norm360(lons[p] - ayan)
+        s, idx, _ = sign_of(p_sid)
+        h = ((idx - asc_idx) % 12) + 1
+        sid_planets[p] = {"sign": s, "house": h}
+    return kuja_dosha_analysis(sid_planets, SIGNS[asc_idx])
 
 def kaalsarpa_dosha(jd, lat, lng, time_known=True):
     """Check for Kaalsarpa Dosha — all planets hemmed between Rahu and Ketu."""
@@ -4047,8 +4036,12 @@ def calculate_full_profile(data):
                 pass
         return result
 
+    if mode=="daily_panchang" or mode=="choghadiya":
+        result["daily_panchang_timing"] = daily_panchang_timing(target_eval_jd, lat, lng)
+        return result
+
     if mode=="gochara":
-        result["gochara"]=gochara(jd, target_eval_jd)
+        result["gochara"]=gochara(jd, target_eval_jd, lat=lat, lng=lng)
         return result
 
     if mode=="dasha_reading":
@@ -4721,37 +4714,55 @@ GOCHARA_GOOD_FROM_MOON = {
 }
 # Sade Sati handled in transits(); here: full gochara snapshot
 
-def gochara(natal_jd, transit_jd=None):
-    """Vedic transits counted from the natal Moon (Chandra Rashi).
-    Returns per-planet favorability + note. Sidereal (Lahiri)."""
+def gochara(natal_jd, transit_jd=None, lat=0.0, lng=0.0):
+    """Vedic transits counted from the natal Moon (Chandra Rashi) + Ashtakavarga
+    strength scores per BPHS Ch.72 (SAV threshold 28+ for fruitful transits).
+    Returns per-planet favorability, SAV score, and classical notes."""
     natal_lons, _, _ = body_longitudes(natal_jd)
     t_jd = transit_jd or julian_day(datetime.utcnow())
     t_lons, t_speed, _ = body_longitudes(t_jd)
     ayan = ayanamsha_lahiri(t_jd)
     moon_sign_idx = int(norm360(natal_lons["Moon"] - ayanamsha_lahiri(natal_jd)) // 30) % 12
+    # Compute Ashtakavarga for the chart
+    ashta = ashtakavarga(natal_jd, lat, lng, time_known=True)
+    sav_list = ashta.get("sarvashtakavarga", [28]*12)
+    bav_dict = ashta.get("bhinnashtakavarga", {})
     out = {}
     for p, good in GOCHARA_GOOD_FROM_MOON.items():
         if p not in t_lons:
             continue
         p_sid = norm360(t_lons[p] - ayan)
-        house_from_moon = ((int(p_sid // 30) % 12) - moon_sign_idx) % 12 + 1
-        favorable = house_from_moon in good
+        sign_idx = int(p_sid // 30) % 12
+        target_sign = SIGNS[sign_idx]
+        house_from_moon = ((sign_idx - moon_sign_idx) % 12) + 1
+        favorable_house = house_from_moon in good
+        sav_bindus = sav_list[sign_idx] if isinstance(sav_list, list) and len(sav_list) == 12 else 28
+        bav_p = bav_dict.get(p, [4]*12)
+        bav_bindus = bav_p[sign_idx] if isinstance(bav_p, list) and len(bav_p) == 12 else 4
+
+        # BPHS Ch.72 rules: SAV >= 28 is auspicious; < 25 is challenging
+        # BAV >= 4 is positive for the individual planet
+        sav_status = "Auspicious (SAV >= 28)" if sav_bindus >= 28 else "Challenging (SAV < 25)" if sav_bindus < 25 else "Neutral (SAV 25-27)"
         note = ""
         if p == "Saturn":
-            d = (int(p_sid // 30) % 12 - moon_sign_idx) % 12
+            d = (sign_idx - moon_sign_idx) % 12
             if d == 11: note = "Sade Sati rising phase"
             elif d == 0: note = "Sade Sati peak"
             elif d == 1: note = "Sade Sati setting phase"
             elif d == 4: note = "Ardha-ashtama (half)"
             elif d == 7: note = "Ashtama Shani"
         out[p] = {"house_from_moon": house_from_moon,
-                  "favorable": favorable,
+                  "transit_sign": target_sign,
+                  "sav_bindus": sav_bindus,
+                  "bav_bindus": bav_bindus,
+                  "sav_status": sav_status,
+                  "favorable": favorable_house and sav_bindus >= 25 and bav_bindus >= 4,
                   "retrograde": t_speed.get(p, 0) < 0,
                   "note": note,
                   "good_houses": list(good)}
     return {"from_moon_sign": SIGNS[moon_sign_idx], "transits": out,
-            "note": ("Gochara from the Chandra Lagna (natal Moon sign), sidereal "
-                     "Lahiri; favorable houses per Parashari convention.")}
+            "note": ("Gochara from Chandra Lagna per Parashari standard combined "
+                     "with BPHS Ch.72 Sarvashtakavarga scores (SAV >= 28 auspicious).")}
 
 
 DASHA_LORD_THEMES = {
@@ -5360,6 +5371,196 @@ def draconic_synastry(jdA, jdB, latA, lngA, latB, lngB):
         "karmic_aspects_count": len(karmic_bonds),
         "strongest_soul_contracts": karmic_bonds[:12],
         "note": "Draconic-to-Tropical contacts reveal underlying soul contracts and unconscious familiarity in relationships."
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — VEDIC DAILY TIMING: CHOGHADIYA, MUHURTA WINDOWS & ASHTAKAVARGA
+# ═════════════════════════════════════════════════════════════════════════════
+
+CHOGHADIYA_DAY = {
+    0: ["Udveg", "Char", "Labh", "Amrit", "Kaal", "Shubh", "Rog", "Udveg"],
+    1: ["Amrit", "Kaal", "Shubh", "Rog", "Udveg", "Char", "Labh", "Amrit"],
+    2: ["Rog", "Udveg", "Char", "Labh", "Amrit", "Kaal", "Shubh", "Rog"],
+    3: ["Labh", "Amrit", "Kaal", "Shubh", "Rog", "Udveg", "Char", "Labh"],
+    4: ["Shubh", "Rog", "Udveg", "Char", "Labh", "Amrit", "Kaal", "Shubh"],
+    5: ["Char", "Labh", "Amrit", "Kaal", "Shubh", "Rog", "Udveg", "Char"],
+    6: ["Kaal", "Shubh", "Rog", "Udveg", "Char", "Labh", "Amrit", "Kaal"],
+}
+
+CHOGHADIYA_NIGHT = {
+    0: ["Shubh", "Amrit", "Char", "Rog", "Kaal", "Labh", "Udveg", "Shubh"],
+    1: ["Char", "Rog", "Kaal", "Labh", "Udveg", "Shubh", "Amrit", "Char"],
+    2: ["Kaal", "Labh", "Udveg", "Shubh", "Amrit", "Char", "Rog", "Kaal"],
+    3: ["Udveg", "Shubh", "Amrit", "Char", "Rog", "Kaal", "Labh", "Udveg"],
+    4: ["Amrit", "Char", "Rog", "Kaal", "Labh", "Udveg", "Shubh", "Amrit"],
+    5: ["Rog", "Kaal", "Labh", "Udveg", "Shubh", "Amrit", "Char", "Rog"],
+    6: ["Labh", "Udveg", "Shubh", "Amrit", "Char", "Rog", "Kaal", "Labh"],
+}
+
+CHOGHADIYA_NATURE = {
+    "Amrit": ("Auspicious", "nectar, all auspicious endeavors and important beginnings"),
+    "Shubh": ("Auspicious", "good fortune, marriage, education, and spiritual work"),
+    "Labh":  ("Auspicious", "gain, commerce, business starts, and negotiations"),
+    "Char":  ("Neutral", "movement, journeys, transport, and dynamic tasks"),
+    "Rog":   ("Inauspicious", "disease, debility, avoid new commitments"),
+    "Kaal":  ("Inauspicious", "destruction, loss, only suitable for fierce tasks"),
+    "Udveg": ("Inauspicious", "anxiety, worry, dispute, avoid stressful negotiations"),
+}
+
+RAHU_KALAM_SEGMENT = {0: 7, 1: 1, 2: 6, 3: 4, 4: 5, 5: 3, 6: 2}
+YAMAGANDA_SEGMENT   = {0: 4, 1: 3, 2: 2, 3: 1, 4: 0, 5: 6, 6: 5}
+GULIKA_SEGMENT      = {0: 6, 1: 5, 2: 4, 3: 3, 4: 2, 5: 1, 6: 0}
+
+def daily_panchang_timing(jd, lat, lng):
+    """Daily Vedic timing windows: Choghadiya segments, Abhijit & Brahma Muhurta,
+    Rahu Kalam, Yamaganda, Gulika Kalam calculated dynamically from solar geometry."""
+    dt_utc = datetime(2000, 1, 1) + timedelta(days=jd - 2451544.5)
+    # Weekday index: Sunday=0 ... Saturday=6
+    weekday = (dt_utc.weekday() + 1) % 7
+
+    obliquity_rad = math.radians(23.4393 - 0.0130 * ((jd - 2451545.0) / 36525.0))
+    lat_rad = math.radians(lat)
+    sun_lon = tropical_longitudes(jd).get("Sun", 0)
+    sun_dec = math.asin(math.sin(obliquity_rad) * math.sin(math.radians(sun_lon)))
+    cos_ha = max(-1.0, min(1.0, -math.tan(lat_rad) * math.tan(sun_dec)))
+    ha_deg = math.degrees(math.acos(cos_ha))
+
+    # Times in hours relative to solar noon (approx 12h - lng/15 in UTC)
+    solar_noon_utc_h = (12.0 - lng / 15.0) % 24.0
+    day_half_len_h = ha_deg / 15.0
+    sunrise_h = (solar_noon_utc_h - day_half_len_h) % 24.0
+    sunset_h = (solar_noon_utc_h + day_half_len_h) % 24.0
+
+    day_dur_h = 2.0 * day_half_len_h
+    night_dur_h = 24.0 - day_dur_h
+    day_oct_h = day_dur_h / 8.0
+    night_oct_h = night_dur_h / 8.0
+
+    # 1. Choghadiya Day & Night
+    day_choghadiya = []
+    for k in range(8):
+        name = CHOGHADIYA_DAY[weekday][k]
+        nature, meaning = CHOGHADIYA_NATURE[name]
+        start_h = (sunrise_h + k * day_oct_h) % 24.0
+        end_h = (sunrise_h + (k + 1) * day_oct_h) % 24.0
+        day_choghadiya.append({
+            "segment": k + 1, "name": name, "nature": nature, "meaning": meaning,
+            "start_utc": f"{int(start_h):02d}:{int((start_h%1)*60):02d}",
+            "end_utc": f"{int(end_h):02d}:{int((end_h%1)*60):02d}"
+        })
+
+    night_choghadiya = []
+    for k in range(8):
+        name = CHOGHADIYA_NIGHT[weekday][k]
+        nature, meaning = CHOGHADIYA_NATURE[name]
+        start_h = (sunset_h + k * night_oct_h) % 24.0
+        end_h = (sunset_h + (k + 1) * night_oct_h) % 24.0
+        night_choghadiya.append({
+            "segment": k + 1, "name": name, "nature": nature, "meaning": meaning,
+            "start_utc": f"{int(start_h):02d}:{int((start_h%1)*60):02d}",
+            "end_utc": f"{int(end_h):02d}:{int((end_h%1)*60):02d}"
+        })
+
+    # 2. Auspicious & Inauspicious Muhurtas
+    day_muh_h = day_dur_h / 15.0
+    night_muh_h = night_dur_h / 15.0
+
+    # Abhijit Muhurta (midday ± 1/2 muhurta; invalid on Wednesday/Budhvar)
+    abhijit_valid = (weekday != 3)
+    abhijit_start = (solar_noon_utc_h - day_muh_h / 2.0) % 24.0
+    abhijit_end = (solar_noon_utc_h + day_muh_h / 2.0) % 24.0
+
+    # Brahma Muhurta (penultimate night muhurta: 2 to 1 muhurtas before sunrise)
+    brahma_start = (sunrise_h - 2.0 * night_muh_h) % 24.0
+    brahma_end = (sunrise_h - 1.0 * night_muh_h) % 24.0
+
+    # Inauspicious fixed 1/8th segments
+    rahu_k = RAHU_KALAM_SEGMENT[weekday]
+    rahu_s = (sunrise_h + rahu_k * day_oct_h) % 24.0
+    rahu_e = (sunrise_h + (rahu_k + 1) * day_oct_h) % 24.0
+
+    yama_k = YAMAGANDA_SEGMENT[weekday]
+    yama_s = (sunrise_h + yama_k * day_oct_h) % 24.0
+    yama_e = (sunrise_h + (yama_k + 1) * day_oct_h) % 24.0
+
+    guli_k = GULIKA_SEGMENT[weekday]
+    guli_s = (sunrise_h + guli_k * day_oct_h) % 24.0
+    guli_e = (sunrise_h + (guli_k + 1) * day_oct_h) % 24.0
+
+    def _fmt(h): return f"{int(h):02d}:{int((h%1)*60):02d} UTC"
+
+    return {
+        "date_utc": dt_utc.strftime("%Y-%m-%d"),
+        "sun_times": {"sunrise": _fmt(sunrise_h), "solar_noon": _fmt(solar_noon_utc_h), "sunset": _fmt(sunset_h)},
+        "auspicious_windows": {
+            "abhijit_muhurta": {"start": _fmt(abhijit_start), "end": _fmt(abhijit_end),
+                                "is_valid_today": abhijit_valid,
+                                "note": "Most powerful daily auspicious window (except Wednesday)"},
+            "brahma_muhurta": {"start": _fmt(brahma_start), "end": _fmt(brahma_end),
+                               "note": "Pre-dawn spiritual & meditation window"}
+        },
+        "inauspicious_windows": {
+            "rahu_kalam": {"start": _fmt(rahu_s), "end": _fmt(rahu_e), "note": "Avoid starting new ventures/travel"},
+            "yamaganda": {"start": _fmt(yama_s), "end": _fmt(yama_e), "note": "Unfavorable for financial commitments"},
+            "gulika_kalam": {"start": _fmt(guli_s), "end": _fmt(guli_e), "note": "Actions begun here repeat or cause delay"}
+        },
+        "choghadiya": {"day": day_choghadiya, "night": night_choghadiya},
+        "note": "Daily Vedic timing based on true local solar geometry. Choghadiya cycles govern hour-by-hour initiative."
+    }
+
+def kuja_dosha_analysis(planets, lagna_sign):
+    """Detailed Manglik (Kuja Dosha) detection with 6 classical BPHS Ch.80 cancellation rules.
+    Mars in 1st, 12th, 4th, 7th, 8th causes Kuja Dosha unless cancelled."""
+    mars = planets.get("Mars")
+    if not mars:
+        return {"has_dosha": False, "reason": "Mars not in chart"}
+
+    h = mars["house"]
+    dosha_houses = (1, 4, 7, 8, 12)
+    has_raw_dosha = h in dosha_houses
+
+    if not has_raw_dosha:
+        return {
+            "has_dosha": False,
+            "house": h,
+            "sign": mars["sign"],
+            "status": "No Kuja Dosha (Mars is not in houses 1, 4, 7, 8, or 12)"
+        }
+
+    cancellations = []
+    # 1. Mars in own sign (Aries/Scorpio) in 1st or 8th
+    if mars["sign"] in ("Aries", "Scorpio") and h in (1, 8):
+        cancellations.append("BPHS rule: Mars in own sign (Swakshetra) in house 1 or 8 cancels dosha")
+
+    # 2. Mars in Capricorn (exaltation) in house 4 or 7
+    if mars["sign"] == "Capricorn" and h in (4, 7):
+        cancellations.append("BPHS rule: Mars exalted in Capricorn in house 4 or 7 cancels dosha")
+
+    # 3. Mars in Leo or Aquarius in house 7 or 8
+    if mars["sign"] in ("Leo", "Aquarius") and h in (7, 8):
+        cancellations.append("BPHS rule: Mars in Leo/Aquarius in house 7 or 8 cancels dosha")
+
+    # 4. Mars in Sagittarius or Pisces in house 8 or 12
+    if mars["sign"] in ("Sagittarius", "Pisces") and h in (8, 12):
+        cancellations.append("BPHS rule: Mars in Jupiter signs (Sag/Pisces) in house 8 or 12 cancels dosha")
+
+    # 5. Benefic conjunction: Jupiter or Venus with Mars
+    jup = planets.get("Jupiter"); ven = planets.get("Venus")
+    if jup and jup["house"] == h:
+        cancellations.append("BPHS Shloka 47: Conjunction with benefic Jupiter cancels dosha")
+    if ven and ven["house"] == h:
+        cancellations.append("BPHS Shloka 47: Conjunction with benefic Venus cancels dosha")
+
+    is_cancelled = len(cancellations) > 0
+    return {
+        "has_dosha": not is_cancelled,
+        "raw_dosha": True,
+        "house": h,
+        "sign": mars["sign"],
+        "is_cancelled": is_cancelled,
+        "cancellation_reasons": cancellations,
+        "status": "Cancelled Kuja Dosha (Effective Non-Manglik)" if is_cancelled else "Active Kuja Dosha (Manglik)",
+        "note": "Per BPHS Chapter 80 Shloka 47-49: Kuja Dosha indicates intense relationship friction unless balanced by benefic aspects or partner parity."
     }
 
 def _demo():

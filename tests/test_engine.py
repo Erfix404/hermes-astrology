@@ -775,6 +775,53 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestDailyTimingAndKujaDosha(unittest.TestCase):
+    """Wave 8: Choghadiya, Daily Muhurtas, Ashtakavarga transit scores, Kuja Dosha cancellations."""
+
+    def test_daily_panchang_and_choghadiya(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "daily_panchang"})
+        dp = r["daily_panchang_timing"]
+        self.assertIn("sun_times", dp)
+        self.assertIn("auspicious_windows", dp)
+        self.assertIn("inauspicious_windows", dp)
+        self.assertIn("choghadiya", dp)
+        self.assertEqual(len(dp["choghadiya"]["day"]), 8)
+        self.assertEqual(len(dp["choghadiya"]["night"]), 8)
+        self.assertIn(dp["choghadiya"]["day"][0]["nature"], ["Auspicious", "Inauspicious", "Neutral"])
+
+    def test_gochara_with_ashtakavarga_sav_bav(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "gochara"})
+        g = r["gochara"]
+        for p in ("Sun", "Mars", "Jupiter", "Saturn"):
+            t = g["transits"][p]
+            self.assertIn("sav_bindus", t)
+            self.assertIn("bav_bindus", t)
+            self.assertIn("sav_status", t)
+            self.assertTrue(0 <= t["sav_bindus"] <= 56)
+            self.assertTrue(0 <= t["bav_bindus"] <= 8)
+
+    def test_bphs_kuja_dosha_cancellation_rules(self):
+        # 1. Mars in Aries in 1st house (Own sign cancellation)
+        planets_own = {"Mars": {"house": 1, "sign": "Aries"}}
+        res_own = ae.kuja_dosha_analysis(planets_own, "Aries")
+        self.assertTrue(res_own["is_cancelled"])
+        self.assertFalse(res_own["has_dosha"])
+
+        # 2. Mars in Cancer in 7th house (Active dosha)
+        planets_active = {"Mars": {"house": 7, "sign": "Cancer"}}
+        res_active = ae.kuja_dosha_analysis(planets_active, "Capricorn")
+        self.assertFalse(res_active["is_cancelled"])
+        self.assertTrue(res_active["has_dosha"])
+
+        # 3. Mars in Cancer in 7th with Jupiter (Benefic conjunction cancellation)
+        planets_jup = {"Mars": {"house": 7, "sign": "Cancer"}, "Jupiter": {"house": 7, "sign": "Cancer"}}
+        res_jup = ae.kuja_dosha_analysis(planets_jup, "Capricorn")
+        self.assertTrue(res_jup["is_cancelled"])
+        self.assertFalse(res_jup["has_dosha"])
+
+
 class TestDavisonAndDraconic(unittest.TestCase):
     """Wave 7: Davison Time-Space relationship chart and Draconic soul synastry."""
 
