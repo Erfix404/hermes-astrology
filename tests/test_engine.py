@@ -741,6 +741,29 @@ class TestCharaDasha(unittest.TestCase):
         self.assertEqual(yrs, 12)
 
 
+class TestDynamicTemporalResolution(unittest.TestCase):
+    """Universal dynamic date resolution across all forecasting systems."""
+
+    def test_historical_date_propagates_to_all_subsystems(self):
+        d = dict(ae._demo())
+        target = "2010-08-15"
+        # 1. Natal Vedic Dasha reflects 2010
+        r_nat = ae.calculate_full_profile({**d, "target_date": target})
+        v = r_nat["charts"]["vedic"]["vimshottari_dasha"]
+        self.assertEqual(v["as_of_date"], target)
+        self.assertEqual(v["current_mahadasha"]["lord"], "Saturn")
+
+        # 2. ZR reflects 2010
+        r_zr = ae.calculate_full_profile({**d, "mode": "zr", "as_of": target})
+        self.assertEqual(r_zr["zodiacal_releasing"]["as_of_date"], target)
+        self.assertEqual(r_zr["zodiacal_releasing"]["active_period"]["l1"], "Virgo")
+
+        # 3. Firdaria reflects 2010 (age ~20 -> Mercury period: 18-31)
+        r_fir = ae.calculate_full_profile({**d, "mode": "firdaria", "date": target})
+        self.assertEqual(r_fir["firdaria"]["as_of_date"], target)
+        self.assertEqual(r_fir["firdaria"]["major_firdar"]["lord"], "Mercury")
+
+
 class TestMundaneAstrology(unittest.TestCase):
     """Wave 3: ingress charts, eclipse activations, lunations (enriched with
     Skyscript/Lilly/Bonatti mundane canon)."""

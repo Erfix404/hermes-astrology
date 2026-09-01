@@ -631,6 +631,21 @@ def _moon_geo_lon(d, sun):
             -0.031*_sin(Mm+Ms) -0.015*_sin(2*F-2*D) +0.011*_sin(Mm-4*D))
     return norm360(lon + dlon)
 
+def _resolve_target_dt(data, default=None):
+    """Normalize user/agent date input (target_date, as_of, date) into a naive UTC datetime."""
+    for k in ("target_date", "as_of", "date"):
+        v = data.get(k)
+        if v:
+            if isinstance(v, datetime):
+                return v
+            try:
+                if len(str(v)) == 10:
+                    return datetime.strptime(str(v), "%Y-%m-%d")
+                return datetime.strptime(str(v), "%Y-%m-%d %H:%M")
+            except Exception:
+                pass
+    return default or datetime.now(timezone.utc).replace(tzinfo=None)
+
 def _node_lon(d):
     """Mean ascending lunar node (Rahu)."""
     return norm360(125.1228 - 0.0529538083*d)
@@ -1460,7 +1475,7 @@ def western_chart(jd, lat, lng, time_known=True, house_system="P"):
         "dominant_element":max(elem,key=elem.get),"lacking_element":min(elem,key=elem.get),
     }
 
-def vedic_chart(jd, lat, lng, birth_dt, time_known=True):
+def vedic_chart(jd, lat, lng, birth_dt, time_known=True, as_of_dt=None):
     lons, speed, backend = body_longitudes(jd)
     ayan = ayanamsha_lahiri(jd)
     asc_lon, mc_lon = ascendant_mc(jd, lat, lng, ayan) if time_known else (norm360(lons["Sun"]-ayan), 0)
@@ -1473,31 +1488,34 @@ def vedic_chart(jd, lat, lng, birth_dt, time_known=True):
     nak_i=int(moon_lon//NAK_ARC)%27
     pada=int((moon_lon%NAK_ARC)//PADA_ARC)+1
     nk=NAKSHATRAS[nak_i]
-    dasha=vimshottari(moon_lon, birth_dt)
+    eval_dt = as_of_dt or datetime.now(timezone.utc).replace(tzinfo=None)
+    eval_jd = julian_day(eval_dt)
+    dasha=vimshottari(moon_lon, birth_dt, as_of_dt=eval_dt)
     yogas=detect_yogas(planets, lagna_sign)
     # Atmakaraka: planet with highest degree in its sign (excludes Rahu/Ketu)
     atma_candidates = {p: planets[p]["deg_in_sign"] for p in
                        ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn"] if p in planets}
     atmakaraka = max(atma_candidates, key=atma_candidates.get) if atma_candidates else None
-    # Sade Sati: Saturn transiting Moon sign ±1 (7.5-yr period)
+    # Sade Sati: Saturn transiting Moon sign ±1 at evaluation date (dynamic)
     moon_sign_idx = SIGNS.index(sign_of(moon_lon)[0])
-    current_sat_lon = norm360(body_longitudes(julian_day(TODAY))[0]["Saturn"] - ayanamsha_lahiri(julian_day(TODAY)))
+    current_sat_lon = norm360(body_longitudes(eval_jd)[0]["Saturn"] - ayanamsha_lahiri(eval_jd))
     sat_sign_idx = SIGNS.index(sign_of(current_sat_lon)[0])
     sade_sati_phase = None
     delta = (sat_sign_idx - moon_sign_idx) % 12
     if delta == 11:   sade_sati_phase = "rising (Saturn in the sign before your Moon sign)"
     elif delta == 0:  sade_sati_phase = "peak (Saturn transiting your natal Moon sign directly)"
     elif delta == 1:  sade_sati_phase = "setting (Saturn in the sign after your Moon sign)"
-    
+
     # Tithi Calculation (Hindu Lunar Day)
     tithi_val = (lons["Moon"] - lons["Sun"]) % 360
     tithi_index = int(tithi_val / 12) + 1
     paksha = "Shukla" if tithi_index <= 15 else "Krishna"
     tithi_num = tithi_index if tithi_index <= 15 else tithi_index - 15
-    
+
     return {
         "tithi": f"{paksha} Paksha, Tithi {tithi_num}",
         "system":"Vedic / Jyotisha — Lahiri sidereal, whole-sign (rashi) houses",
+        "as_of_date": eval_dt.strftime("%Y-%m-%d"),
         "ayanamsha_deg":round(ayan,4),
         "lagna":{"sign":lagna_sign,"deg_in_sign":lagna_deg,"lord":RASHI_LORDS[lagna_sign]},
         "janma_rashi":{"sign":sign_of(moon_lon)[0]},
@@ -1515,8 +1533,10 @@ def vedic_chart(jd, lat, lng, birth_dt, time_known=True):
         "house_meanings":VEDIC_HOUSE,
     }
 
-def vimshottari(moon_lon, birth_dt):
-    """Full Vimshottari maha-dasha timeline + current antardasha (bhukti)."""
+def vimshottari(moon_lon, birth_dt, as_of_dt=None):
+    """Full Vimshottari maha-dasha timeline + active antardasha & pratyantardasha
+    calculated dynamically for as_of_dt (defaults to today)."""
+    target = as_of_dt or datetime.now(timezone.utc).replace(tzinfo=None)
     nak_i=int(moon_lon//NAK_ARC)%27
     lord=NAKSHATRAS[nak_i]["lord"]
     frac_elapsed=(moon_lon % NAK_ARC)/NAK_ARC
@@ -1529,22 +1549,25 @@ def vimshottari(moon_lon, birth_dt):
         end=cur+timedelta(days=yrs*365.25)
         timeline.append({"lord":L,"start":cur.strftime("%Y-%m-%d"),
                          "end":end.strftime("%Y-%m-%d"),"years":yrs,
-                         "is_current": cur<=TODAY<=end})
+                         "is_current": cur<=target<=end})
         cur=end
     current=next((d for d in timeline if d["is_current"]), None)
     bhukti=[]
     pratyantar=[]
     if current:
         antardasha=_antardasha(current["lord"],
-                               datetime.strptime(current["start"],"%Y-%m-%d"))
+                               datetime.strptime(current["start"],"%Y-%m-%d"),
+                               as_of_dt=target)
         bhukti=antardasha
         cur_antar=next((b for b in bhukti if b["is_current"]), None)
         if cur_antar:
             pratyantar=_pratyantardasha(
                 current["lord"], cur_antar["lord"],
                 datetime.strptime(cur_antar["start"],"%Y-%m-%d"),
-                datetime.strptime(cur_antar["end"],"%Y-%m-%d"))
+                datetime.strptime(cur_antar["end"],"%Y-%m-%d"),
+                as_of_dt=target)
     return {"birth_dasha_lord":lord,
+            "as_of_date": target.strftime("%Y-%m-%d"),
             "current_mahadasha":current,
             "current_antardasha":next((b for b in bhukti if b["is_current"]),None),
             "current_pratyantardasha":next((p for p in pratyantar
@@ -1553,8 +1576,9 @@ def vimshottari(moon_lon, birth_dt):
             "maha_timeline":timeline,
             "antardasha_in_current_maha":bhukti}
 
-def _antardasha(maha_lord, maha_start):
+def _antardasha(maha_lord, maha_start, as_of_dt=None):
     """Sub-periods within a maha-dasha."""
+    target = as_of_dt or datetime.now(timezone.utc).replace(tzinfo=None)
     start_idx=DASHA_SEQ.index(maha_lord)
     maha_years=DASHA_YEARS[maha_lord]
     out=[]; cur=maha_start
@@ -1563,14 +1587,13 @@ def _antardasha(maha_lord, maha_start):
         sub_years=maha_years*DASHA_YEARS[L]/DASHA_TOTAL
         end=cur+timedelta(days=sub_years*365.25)
         out.append({"lord":L,"start":cur.strftime("%Y-%m-%d"),"end":end.strftime("%Y-%m-%d"),
-                    "is_current":cur<=TODAY<=end})
+                    "is_current":cur<=target<=end})
         cur=end
     return out
 
-def _pratyantardasha(maha_lord, antar_lord, antar_start, antar_end):
-    """Third-level Vimshottari periods inside one antardasha: same proportional
-    rule — each pratyantar = maha_years * DASHA_YEARS[lord]^2 / DASHA_TOTAL^2,
-    sequenced from the antardasha lord."""
+def _pratyantardasha(maha_lord, antar_lord, antar_start, antar_end, as_of_dt=None):
+    """Third-level Vimshottari periods inside one antardasha."""
+    target = as_of_dt or datetime.now(timezone.utc).replace(tzinfo=None)
     start_idx=DASHA_SEQ.index(antar_lord)
     span=(antar_end-antar_start).total_seconds()
     out=[]; cur=antar_start
@@ -1580,7 +1603,7 @@ def _pratyantardasha(maha_lord, antar_lord, antar_start, antar_end):
         end=cur+timedelta(seconds=span*frac)
         out.append({"lord":L,"start":cur.strftime("%Y-%m-%d %H:%M"),
                     "end":end.strftime("%Y-%m-%d %H:%M"),
-                    "is_current":cur<=TODAY<=end})
+                    "is_current":cur<=target<=end})
         cur=end
     return out
 
@@ -3940,6 +3963,10 @@ def calculate_full_profile(data):
         result["shadbala"] = shadbala_sthana_dig(jd, lat, lng)
         return result
 
+    # Resolve target evaluation moment dynamically for any mode (target_date / as_of / date)
+    target_eval_dt = _resolve_target_dt(data)
+    target_eval_jd = julian_day(target_eval_dt)
+
     if mode=="mundane":
         cname = data.get("country", "iran").lower()
         if cname not in MUNDANE_CAPITALS:
@@ -3949,14 +3976,10 @@ def calculate_full_profile(data):
         lat_c, lng_c = MUNDANE_CAPITALS[cname]
 
         # Target date support for AI Agents: auto-resolve active ingress based on Bonatti/Lilly
-        if data.get("target_date"):
-            try:
-                target_dt = datetime.strptime(data["target_date"], "%Y-%m-%d")
-            except Exception:
-                target_dt = datetime.utcnow()
-            result["mundane"] = resolve_mundane_ingress_for_date(cname, lat_c, lng_c, target_dt)
+        if data.get("target_date") or data.get("as_of") or data.get("date"):
+            result["mundane"] = resolve_mundane_ingress_for_date(cname, lat_c, lng_c, target_eval_dt)
         else:
-            year = int(data.get("year", TODAY.year))
+            year = int(data.get("year", target_eval_dt.year))
             kind = data.get("ingress_kind", "aries")
             result["mundane"] = ingress_chart(cname, lat_c, lng_c, year, kind)
 
@@ -3969,26 +3992,24 @@ def calculate_full_profile(data):
         if data.get("include_lunations"):
             try:
                 result["lunations"] = lunation_cycle(lat_c, lng_c,
-                                                     count=int(data.get("lunation_count", 3)))
+                                                     count=int(data.get("lunation_count", 3)),
+                                                     start_jd=target_eval_jd)
             except Exception:
                 pass
         return result
 
     if mode=="gochara":
-        tdate=data.get("transit_date")
-        t_jd=julian_day(datetime.strptime(tdate,"%Y-%m-%d")) if tdate \
-            else julian_day(datetime.utcnow())
-        result["gochara"]=gochara(jd, t_jd)
+        result["gochara"]=gochara(jd, target_eval_jd)
         return result
 
     if mode=="dasha_reading":
         moon_sid = norm360(body_longitudes(jd)[0]["Moon"] - ayanamsha_lahiri(jd))
-        vim = vimshottari(moon_sid, birth_local)
+        vim = vimshottari(moon_sid, birth_local, as_of_dt=target_eval_dt)
         result["vimshottari_reading"] = interpret_vimshottari(vim)
         result["current_timeline"] = {
             "maha": vim["current_mahadasha"], "antar": vim["current_antardasha"],
             "pratyantar": vim["current_pratyantardasha"]}
-        result["chara_dasha"] = chara_dasha(jd, lat, lng, time_known)
+        result["chara_dasha"] = chara_dasha(jd, lat, lng, time_known, as_of_dt=target_eval_dt)
         return result
 
     if mode=="zr":
@@ -3998,9 +4019,10 @@ def calculate_full_profile(data):
         result["zodiacal_releasing"] = zodiacal_releasing(
             jd, lat, lng, time_known, topic,
             max_level=int(data.get("max_level", 3)),
-            until_age=min(int(data.get("until_age", 80)), 120))
+            until_age=min(int(data.get("until_age", 80)), 120),
+            as_of_dt=target_eval_dt)
         try:
-            result["zr_interpretation"] = interpret_zr(result["zodiacal_releasing"])
+            result["zr_interpretation"] = interpret_zr(result["zodiacal_releasing"], as_of_dt=target_eval_dt)
         except Exception:
             pass
         return result
@@ -4009,9 +4031,6 @@ def calculate_full_profile(data):
         asc_lon_f, _ = (ascendant_mc(jd, lat, lng) if time_known
                         else (lons["Sun"], 0))
         asc_sign_idx = int(norm360(asc_lon_f) // 30) % 12
-        target_date = None
-        if data.get("target_date"):
-            target_date = datetime.strptime(data["target_date"], "%Y-%m-%d")
         is_day_birth = True
         try:
             sun_alt_check = norm360(asc_lon_f - body_longitudes(jd)[0]["Sun"])
@@ -4020,10 +4039,10 @@ def calculate_full_profile(data):
             pass
         if mode in ("profections", "forecast"):
             result["annual_profections"] = annual_profections(
-                asc_sign_idx, birth_local, target_date)
+                asc_sign_idx, birth_local, target_eval_dt)
         if mode in ("firdaria", "forecast"):
             until_age = min(int(data.get("until_age", 75)), 100)
-            f = firdaria(birth_local, is_day_birth)
+            f = firdaria(birth_local, is_day_birth, as_of_dt=target_eval_dt)
             if data.get("until_age") and data["until_age"] < 75:
                 f["timeline_to_age_75"] = [
                     p for p in f["timeline_to_age_75"]
@@ -4040,7 +4059,7 @@ def calculate_full_profile(data):
                                                        data.get("house_system","P"))
         except Exception as e: result["charts"]["western"]={"error":repr(e)}
     if "vedic" in systems:
-        try: result["charts"]["vedic"]=vedic_chart(jd,lat,lng,birth_local,time_known)
+        try: result["charts"]["vedic"]=vedic_chart(jd,lat,lng,birth_local,time_known,as_of_dt=target_eval_dt)
         except Exception as e: result["charts"]["vedic"]={"error":repr(e)}
     if "bazi" in systems:
         try: result["charts"]["bazi"]=bazi_chart(jd,birth_local,data.get("gender","unknown"),lat)
@@ -4205,10 +4224,11 @@ FIRDARIA_YEARS = {"Sun":10,"Venus":8,"Mercury":13,"Moon":9,"Saturn":11,"Jupiter"
                   "Mars":7,"North Node":3,"South Node":2}
 # classical scheme: 66 main years then a universal final Moon firdar to 75
 
-def firdaria(birth_local, is_day_birth, until_age=75):
+def firdaria(birth_local, is_day_birth, until_age=75, as_of_dt=None):
     """Firdaria (medieval Persian): life split into 75 years —
     day births start with Sun, night births with Moon; each planet rules a
     'firdar' of fixed length, subdivided into sub-periods with partners in order."""
+    eval_dt = as_of_dt or datetime.now(timezone.utc).replace(tzinfo=None)
     order = FIRDARIA_DAY_ORDER if is_day_birth else FIRDARIA_NIGHT_ORDER
     periods = []
     age_cursor = 0.0
@@ -4227,7 +4247,7 @@ def firdaria(birth_local, is_day_birth, until_age=75):
             if pr["start_age"] <= age < pr["end_age"]:
                 return pr
         return periods[-1]
-    current_age = (TODAY - birth_local).days / 365.2425
+    current_age = (eval_dt - birth_local).days / 365.2425
     major = _active(current_age)
     # Sub-periods (Ibn Ezra, Reshit Hokhmah X / Sela p.602): each firdar divides
     # into SEVEN equal sub-periods; co-rulers descend in orb order from the
@@ -4249,6 +4269,7 @@ def firdaria(birth_local, is_day_birth, until_age=75):
     upcoming = [p for p in periods if p["start_age"] > current_age][:3]
     return {
         "sect": "day" if is_day_birth else "night",
+        "as_of_date": eval_dt.strftime("%Y-%m-%d"),
         "current_age": round(current_age, 1),
         "major_firdar": {k: major[k] for k in ("lord", "start_age", "end_age")},
         "sub_period": active_sub,
@@ -4453,29 +4474,25 @@ def _zr_release_sequence(start_sign, end_day, level):
     return seq
 
 def zodiacal_releasing(natal_jd, lat, lng, time_known=True, topic="spirit",
-                       max_level=3, until_age=80):
+                       max_level=3, until_age=80, as_of_dt=None):
     """Full ZR report. topic: 'spirit' (career/direction) or 'fortune'
     (body/circumstance). Levels 1..max_level nested; peaks = angular signs
     from the Lot of Fortune (whole-sign). Symbolic 360-day-year calendar."""
+    eval_dt = as_of_dt or datetime.now(timezone.utc).replace(tzinfo=None)
+    eval_s = eval_dt.strftime("%Y-%m-%d")
     lons, _, _ = body_longitudes(natal_jd)
     if time_known:
         asc_lon, _ = ascendant_mc(natal_jd, lat, lng)
     else:
         asc_lon = lons["Sun"]
     sun_tropical = lons["Sun"]
-    # sect: Sun above horizon → day (rough whole-sign-safe check via Asc)
-    asc_sign_idx = int(norm360(asc_lon) // 30) % 12
-    sun_sign_idx = int(sun_tropical // 30) % 12
-    # proper sect needs houses; Valens-style approximation: Asc-Sun semicircle
     rel = norm360(asc_lon - sun_tropical)
-    is_day_birth = 90 <= rel <= 270 or rel < 0 and rel < -90
     is_day_birth = 90 <= rel <= 270
     fortune = part_of_fortune(sun_tropical, lons["Moon"], asc_lon, is_day_birth)
     spirit_lon = norm360((asc_lon + sun_tropical - lons["Moon"]) if not is_day_birth
                          else (asc_lon - sun_tropical + lons["Moon"]))
     fortune_idx = int(fortune["longitude"] // 30) % 12
     spirit_idx = int(spirit_lon // 30) % 12
-    # Valens adjustment: Fortune==Spirit sign → release from next sign
     adjusted = False
     if topic == "fortune":
         start_idx = fortune_idx
@@ -4485,15 +4502,9 @@ def zodiacal_releasing(natal_jd, lat, lng, time_known=True, topic="spirit",
             start_idx = (start_idx + 1) % 12
             adjusted = True
     birth_dt = datetime(2000, 1, 1) + timedelta(days=natal_jd - 2451544.5)
-    end_days_real = until_age * 365.2425
-    end_symbolic = until_age * 360.0   # symbolic years of 360 days
-    # symbolic days track real days 1:1 (the YEAR unit is symbolic, the day isn't)
-    end_day = min(end_days_real, end_symbolic) if False else until_age * 365.2425
+    end_day = until_age * 365.2425
 
     def _nested(parent_start_day, parent_end_day, level, first_sign):
-        """Sub-periods inside a parent window: sequential signs starting at
-        first_sign, each lasting PERIODS[sign] * level-unit-days, with LOB.
-        Returns list trimmed to the parent's real-day window."""
         out = []
         cur = first_sign
         lb_landing = first_sign
@@ -4523,18 +4534,14 @@ def zodiacal_releasing(natal_jd, lat, lng, time_known=True, topic="spirit",
                  "start": sdt.strftime("%Y-%m-%d"),
                  "end": edt.strftime("%Y-%m-%d"),
                  "age_at_start": round(seg["start_day"] / 365.2425, 1)}
-        # peak: angular (1/4/7/10 whole-sign) from FORTUNE
         dist_from_fortune = (ZR_SIGNS.index(seg["sign"]) - fortune_idx) % 12
         entry["is_peak"] = dist_from_fortune in (0, 3, 6, 9)
         entry["peak_weight"] = ({0: "major", 6: "moderate", 9: "minor",
                                  3: "minor"}.get(dist_from_fortune))
-        # culminating: 10th from release point
         entry["is_culminating"] = ((ZR_SIGNS.index(seg["sign"]) - start_idx) % 12) == 9
-        # completion: second activation of the starting sign
         entry["is_completion"] = (seg["sign"] == ZR_SIGNS[start_idx]
                                   and len(l1) > 0
                                   and any(e["sign"] == seg["sign"] for e in l1))
-        # triad role relative to nearest peak
         nxt_peak_i = None
         for k in range(1, 4):
             cand = ZR_SIGNS[(ZR_SIGNS.index(seg["sign"]) + k) % 12]
@@ -4552,7 +4559,6 @@ def zodiacal_releasing(natal_jd, lat, lng, time_known=True, topic="spirit",
         if not entry["is_peak"]:
             if nxt_peak_i == 1: entry["triad_role"] = "build-up to peak"
             elif prv_peak_i == 1: entry["triad_role"] = "post-peak cool-down"
-        # L2 children (sequential months starting with the parent sign itself)
         if max_level >= 2:
             subs = _nested(seg["start_day"], seg["end_day"], 2, seg["sign"])
             entry["level2"] = [
@@ -4562,14 +4568,14 @@ def zodiacal_releasing(natal_jd, lat, lng, time_known=True, topic="spirit",
                  "is_lob": s["is_lob"]} for s in subs[:40]]
         l1.append(entry)
     active = next((e for e in reversed(l1)
-                   if e["start"] <= TODAY.strftime("%Y-%m-%d")), l1[0])
+                   if e["start"] <= eval_s), l1[0])
     active_l2 = None
     if max_level >= 2 and active.get("level2"):
-        today_s = TODAY.strftime("%Y-%m-%d")
         active_l2 = next((s for s in active["level2"]
-                          if s["start"] <= today_s < s["end"]), None)
+                          if s["start"] <= eval_s < s["end"]), None)
     return {
         "topic": topic,
+        "as_of_date": eval_s,
         "release_point": ZR_SIGNS[start_idx],
         "lot_of_fortune_sign": ZR_SIGNS[fortune_idx],
         "lot_of_spirit_sign": ZR_SIGNS[spirit_idx],
@@ -4593,19 +4599,19 @@ ZR_TOPIC_FRAME = {
                 "Fortune-releases track vitality, luck, and external events"),
 }
 
-def interpret_zr(zr_report):
-    """Readable narrative over zodiacal_releasing(): what the current L1/L2
-    mean, when the next peak/LOB hits, lifetime highlight reel."""
+def interpret_zr(zr_report, as_of_dt=None):
+    """Readable narrative over zodiacal_releasing(): what the active L1/L2
+    mean at as_of_dt, when the next peak/LOB hits, lifetime highlight reel."""
+    eval_dt = as_of_dt or datetime.now(timezone.utc).replace(tzinfo=None)
+    eval_s = eval_dt.strftime("%Y-%m-%d")
     topic_label, topic_note = ZR_TOPIC_FRAME.get(
         zr_report["topic"], ZR_TOPIC_FRAME["spirit"])
     tl = zr_report["timeline_level1"]
     active = next((e for e in reversed(tl)
-                   if e["start"] <= TODAY.strftime("%Y-%m-%d")), tl[0])
-    today_s = TODAY.strftime("%Y-%m-%d")
-    # find active L2
+                   if e["start"] <= eval_s), tl[0])
     l2_active = None
     for s in active.get("level2", []):
-        if s["start"] <= today_s < s["end"]:
+        if s["start"] <= eval_s < s["end"]:
             l2_active = s
             break
     readings = []
@@ -4618,7 +4624,7 @@ def interpret_zr(zr_report):
         readings.append(f"You are in {active['sign']} — {peak_txt}. "
                         f"Eminence markers in {topic_label} concentrate here.")
     elif role == "build-up to peak":
-        nxt = next((e for e in tl if e["start"] > today_s and e["is_peak"]), None)
+        nxt = next((e for e in tl if e["start"] > eval_s and e["is_peak"]), None)
         readings.append(f"{active['sign']} is a build-up period: momentum gathers "
                         f"toward the {nxt['sign']} peak starting {nxt['start']}."
                         if nxt else f"{active['sign']} builds toward an upcoming peak.")
@@ -4630,13 +4636,13 @@ def interpret_zr(zr_report):
                         f"ordinary time that sets up the extraordinary ones.")
     if l2_active:
         lob = " (Loosing of the Bond — a pivot point!)" if l2_active.get("is_lob") else ""
-        readings.append(f"Sub-period now: {l2_active['sign']} until "
+        readings.append(f"Sub-period at this moment: {l2_active['sign']} until "
                         f"{l2_active['end']}{lob}.")
     if active.get("is_lob"):
         readings.append("This major period itself began with a Loosing of the Bond — "
                         "expect its whole chapter to feel like a departure from the prior one.")
-    upcoming_peaks = [e for e in tl if e["is_peak"] and e["start"] > today_s][:3]
-    upcoming_lobs = [e for e in tl if e["is_lob"] and e["start"] > today_s][:3]
+    upcoming_peaks = [e for e in tl if e["is_peak"] and e["start"] > eval_s][:3]
+    upcoming_lobs = [e for e in tl if e["is_lob"] and e["start"] > eval_s][:3]
     highlights = []
     for e in tl:
         tag = []
@@ -4646,6 +4652,7 @@ def interpret_zr(zr_report):
         if tag:
             highlights.append(f"{e['start']}–{e['end']}  {e['sign']}: " + ", ".join(tag))
     return {
+        "as_of_date": eval_s,
         "current_reading": " ".join(readings),
         "upcoming_peaks": [{"sign": e["sign"], "from": e["start"],
                             "weight": e.get("peak_weight")} for e in upcoming_peaks],
@@ -4742,10 +4749,11 @@ def interpret_vimshottari(vim):
 # sequence starts from the Lagna sign and proceeds by "direction" (direct
 # if lagna in odd sign, reverse if even). 9th strongest etc. omitted —
 # we use the simple Rao duration rule.
-def chara_dasha(natal_jd, lat, lng, time_known=True, until_age=90):
+def chara_dasha(natal_jd, lat, lng, time_known=True, until_age=90, as_of_dt=None):
     """Chara (sign) dasha per K.N. Rao: periods of SIGNS not planets.
     Duration = count from the sign to its lord (min of direct/reverse counts,
     minus 1 when lord is IN that sign → 12 years). Starts from Lagna sign."""
+    eval_dt = as_of_dt or datetime.now(timezone.utc).replace(tzinfo=None)
     lons, _, _ = body_longitudes(natal_jd)
     if time_known:
         asc_lon, _ = ascendant_mc(natal_jd, lat, lng)
@@ -4759,8 +4767,6 @@ def chara_dasha(natal_jd, lat, lng, time_known=True, until_age=90):
                      "Libra":"Venus","Scorpio":"Mars","Sagittarius":"Jupiter",
                      "Capricorn":"Saturn","Aquarius":"Saturn","Pisces":"Jupiter"}
     def sign_years(sign_idx):
-        # dual lordship (Mercury/Venus/Saturn/Jupiter own two signs): Rao uses
-        # the stronger lord; simplification: nearest occurrence wins.
         sign_name = SIGNS[sign_idx]
         lord = RASHI_LORDS_J[sign_name]
         try:
@@ -4770,9 +4776,9 @@ def chara_dasha(natal_jd, lat, lng, time_known=True, until_age=90):
         fwd = ((lord_idx - sign_idx) % 12) or 12
         rev = ((sign_idx - lord_idx) % 12) or 12
         n = min(fwd, rev)
-        return 12 if n == 1 else n - 1   # lord in own sign → 12 years
+        return 12 if n == 1 else n - 1
     start_idx = int(asc_sid // 30) % 12
-    direction = 1 if start_idx % 2 == 0 else -1   # Aries-start odd/even rule
+    direction = 1 if start_idx % 2 == 0 else -1
     birth_dt = datetime(2000, 1, 1) + timedelta(days=natal_jd - 2451544.5)
     timeline = []
     idx = start_idx
@@ -4786,12 +4792,13 @@ def chara_dasha(natal_jd, lat, lng, time_known=True, until_age=90):
         timeline.append({"sign": SIGNS[idx], "years": yrs,
                          "start": sdt.strftime("%Y-%m-%d"),
                          "end": edt.strftime("%Y-%m-%d"),
-                         "is_current": sdt <= TODAY <= edt})
+                         "is_current": sdt <= eval_dt <= edt})
         cursor_days += yrs * 365.25
         idx = (idx + direction) % 12
         k += 1
     current = next((t for t in timeline if t["is_current"]), None)
     return {"system": "Chara Dasha (Jaimini/K.N. Rao)",
+            "as_of_date": eval_dt.strftime("%Y-%m-%d"),
             "starting_sign": SIGNS[start_idx],
             "current_dasha": current,
             "timeline": timeline[:16],
