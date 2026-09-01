@@ -3741,7 +3741,12 @@ def calculate_full_profile(data):
                     "sun": sign_of(body_longitudes(jd)[0]["Sun"])[0],
                     "moon": sign_of(body_longitudes(jd)[0]["Moon"])[0],
                     "ascendant": sign_of(ascendant_mc(jd, lat, lng)[0])[0]
-                }
+                },
+                "plain_takeaway": (
+                    f"هویت محوری در {sign_of(body_longitudes(jd)[0]['Sun'])[0]} (موتور اراده و انگیزه)، "
+                    f"امنیت عاطفی در {sign_of(body_longitudes(jd)[0]['Moon'])[0]} (نیازهای قلبی و ناخودآگاه)، "
+                    f"و نقاب بیرونی در {sign_of(ascendant_mc(jd, lat, lng)[0])[0]} (نحوه مواجهه با جهان)."
+                )
             },
             "mode":mode}
 
