@@ -1,24 +1,25 @@
-# 🔮 Hermes Astrology
+# 🔮 Hermes Astrology v3.0
 
-**Deterministic multi-tradition astrology engine** — Western tropical, Vedic/Jyotisha sidereal, Chinese BaZi (Four Pillars). Zero‑dependency pure‑Python ephemeris. 19 modes. CLI + API + MCP.
+**Deterministic multi-tradition astrology engine & AI-Agent backend** — Western tropical, Vedic/Jyotisha sidereal, Chinese BaZi (Four Pillars). Zero‑dependency pure‑Python ephemeris. 24+ modes. Full forecasting suite (Profections, Firdaria, Zodiacal Releasing, Progressions, Vimshottari, Chara Dasha, Mundane Ingresses, Eclipses, Ibn Ezra Lots). CLI + API + MCP.
 
 | Tradition | System | Basis |
 |-----------|--------|-------|
-| ♈ Western | Tropical (seasons) | Psychological, archetypal, personality‑focused |
-| ☪ Vedic / Jyotisha | Sidereal (Lahiri ~24°) | Karma, dasha timing, life events, nakshatras |
+| ♈ Western & Hellenistic | Tropical / Valens & Ptolemy | Psychological archetypes, Time-Lords (ZR, Profections, Firdaria), Progressions |
+| ☪ Vedic / Jyotisha | Sidereal (Lahiri ~24°) | BPHS Shadbala (6/6), Vimshottari (3 levels), Gochara (Moon transit), Jaimini Chara Dasha |
+| 🏛️ Mundane & Medieval | World charts / Ingresses | Bonatti/Lilly dynamic ingress validity, Carter eclipse triggers, Ibn Ezra marriage lots |
 | 木 Chinese BaZi | Four Pillars (solar terms) | Elemental balance, luck cycles, Ten Gods |
 
-## ✨ Features
+## ✨ Features (v3.0)
 
-- **Zero‑dependency** — pure Python geocentric ephemeris (Schlyter + perturbations). Only `math` / `datetime` / `json`. Works out‑of‑the‑box. No pip install required.
-- **Deterministic** — same input → same output, every time. No randomness, no LLM, no network.
-- **Arcsecond-accurate** — validated against NASA JPL DE421 (via Skyfield): all planets < 30″, Moon 2.3″, outer planets < 2″. Optional Swiss Ephemeris upgrade → arcsecond precision + Placidus/Koch/Equal/Regiomontanus houses.
-- **14‑function CLI** — `astro --json`, `astro --file`, `astro --summary`
-- **19 chart modes + 12 advanced** — natal, transit, synastry, compatibility, composite, solar/lunar/planetary return, navamsa, varga (D2–D60), panchang, moon phase, numerology, progressions, planetary hours, transit‑natal aspects, horary, astrocartography + eclipses, stations, upagrahas, ashtakavarga, VOC Moon, ashtottari, tajika, muhurta, shadbala, **node transit for all 12 signs (public — no birth data needed)**
-- **Auto‑enriched** — aspect patterns (Grand Trine, T‑Square, Yod, Kite, Grand Cross), Arabic Parts, fixed stars (60+), Black Moon Lilith, dignities (domicile/exalt + triplicity/term/decan), declination aspects, antiscia, Mangal Dosha, Kaalsarpa Dosha
-- **Swiss Ephemeris upgrade** — `pip install pyswisseph` → arcsecond precision + Placidus/Koch/Equal/Regiomontanus houses. No code change.
-- **8 reference rulesets** — grounded classical interpretation, no hallucinated Barnum fluff
-- **FastAPI REST** (19 routes + pricing/auth/rate‑limiting) + **MCP server** (18 tools, Claude Desktop / Cursor / Devin)
+- **Zero‑dependency & Robust Fallbacks** — pure Python geocentric ephemeris. Automatic Moshier/built-in resilience when Swiss Ephemeris data files are missing.
+- **Universal Dynamic Temporal Resolution** — all forecasting systems accept `target_date`/`as_of`/`date` to evaluate any historical or future life chapter on demand.
+- **Hellenistic Time-Lords** — Annual & Monthly Profections, Medieval Firdaria (day/night sect 75y), and Vettius Valens Zodiacal Releasing (L1-L4, Loosing-of-the-Bond, Fortune peak detection).
+- **Deep Vedic Forecasting** — Full 6-fold BPHS Shadbala (Cheshta from southern declination & apogees, Drik aspectual speculum), 3-level Vimshottari Dasha (Maha/Antar/Pratyantar), Gochara with Sade Sati, Jaimini Chara Dasha (K.N. Rao).
+- **Mundane & National Astrology** — Exact astronomical Ingresses (Aries/Cancer/Libra/Cap) with Bonatti/Lilly validity auto-resolution, Carter eclipse triggers, Lunations.
+- **Relationship Astrology** — 7 Medieval/Hebrew Marriage Lots (Abraham Ibn Ezra, *Reshit Hokhmah* IX), bi-directional house overlays, composite chart interpretation, 36-Guna Milan.
+- **Adaptive 3-Level Altitude Delivery** — `references/fa/metaphors.md` allows AI agents to translate complex mechanics into tangible, warm human metaphors (Level 1 Conversational, Level 2 Balanced, Level 3 Pro).
+- **Verified Accuracy** — 153 unit tests passing, validated against Astro-Databank Rodden Rating AA historical charts (Carl Jung, Albert Einstein, Steve Jobs).
+- **FastAPI REST + MCP Server** — Claude Desktop, Cursor, Devin, and headless agent integration.
 
 ## 🚀 Quick start
 
