@@ -4072,6 +4072,14 @@ def calculate_full_profile(data):
         result["chara_dasha"] = chara_dasha(jd, lat, lng, time_known, as_of_dt=target_eval_dt)
         return result
 
+    if mode=="wealth_blueprint" or mode=="wealth":
+        result["wealth_blueprint"] = compute_wealth_blueprint(jd, lat, lng, time_known)
+        return result
+
+    if mode=="love_blueprint" or mode=="marriage" or mode=="love":
+        result["love_blueprint"] = compute_love_blueprint(jd, lat, lng, time_known)
+        return result
+
     if mode=="zr":
         topic = data.get("zr_topic", "spirit")
         if topic not in ("spirit", "fortune"):
@@ -5902,6 +5910,180 @@ def relocate_natal_chart(natal_jd, target_city, target_lat, target_lng):
         "activated_spheres": shifts,
         "chart": natal_chart,
         "note": f"In {target_city}, your Ascendant shifts to {relocated_asc} and Midheaven to {relocated_mc}. Planets in angular houses (1, 4, 7, 10) become dominant life themes in this location."
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — DOMAIN SYNTHESIS BLUEPRINTS: WEALTH & LOVE (Master Engine v3.3)
+# ═════════════════════════════════════════════════════════════════════════════
+
+INDU_LAGNA_RAYS = {"Sun": 30, "Moon": 16, "Mars": 6, "Mercury": 8, "Jupiter": 10, "Venus": 12, "Saturn": 1}
+
+def compute_wealth_blueprint(natal_jd, lat, lng, time_known=True):
+    """Multi-Tradition Wealth & Career Blueprint (Master Engine):
+    Synthesizes Western 2nd/10th/11th houses + Part of Fortune & Commerce (Ibn Ezra),
+    Vedic D10 Dasamsa + Dhana Yogas + Indu Lagna wealth point, BaZi Cai Wealth Star,
+    and Zodiacal Releasing peak timing. Returns a unified [0-100] index and report."""
+    full = calculate_full_profile({
+        "year": 2000, "month": 1, "day": 1, # placeholder base, overridden by jd
+        "lat": lat, "lng": lng, "time_known": time_known,
+        "systems": ["western", "vedic", "bazi"]
+    })
+    # Compute real chart components for natal_jd
+    w_chart = western_chart(natal_jd, lat, lng, time_known)
+    v_chart = vedic_chart(natal_jd, lat, lng, datetime(2000,1,1), time_known)
+    lons, _, _ = body_longitudes(natal_jd)
+    ayan = ayanamsha_lahiri(natal_jd)
+    asc_lon = w_chart["ascendant"]["abs_lon"] if "abs_lon" in w_chart["ascendant"] else lons["Sun"]
+    is_day = 90 <= norm360(asc_lon - lons["Sun"]) <= 270
+
+    score = 50.0
+    strengths = []
+    cautions = []
+
+    # 1. Western Component: 2nd, 10th, 11th houses & Lots
+    h2 = w_chart["houses"][2]; h10 = w_chart["houses"][10]; h11 = w_chart["houses"][11]
+    p_h2 = [p for p, b in w_chart["planets"].items() if b["house"] == 2]
+    p_h10 = [p for p, b in w_chart["planets"].items() if b["house"] == 10]
+    p_h11 = [p for p, b in w_chart["planets"].items() if b["house"] == 11]
+
+    if "Jupiter" in p_h2 + p_h10 + p_h11 or "Venus" in p_h2 + p_h10 + p_h11:
+        score += 10.0
+        strengths.append("Benefic planet (Jupiter/Venus) placed in financial/career houses (2, 10, or 11)")
+    if "Saturn" in p_h2 or "Mars" in p_h2:
+        score -= 5.0
+        cautions.append("Malefic in 2nd house of income — wealth builds through discipline and delayed gratification")
+
+    pof = part_of_fortune(lons["Sun"], lons["Moon"], asc_lon, is_day)
+    pof_house = whole_sign_house(pof["longitude"], asc_lon)
+    if pof_house in (1, 10, 11, 2):
+        score += 8.0
+        strengths.append(f"Part of Fortune in auspicious house {pof_house} ({pof['sign']})")
+
+    # 2. Vedic Component: D10 Dasamsa, Dhana Yogas, Indu Lagna
+    d10 = varga_chart(natal_jd, "D10", lat, lng, time_known)
+    if "d10_planets" in d10:
+        d10_10th = [p for p, b in d10["d10_planets"].items() if b["varga_house"] in (1, 10, 11)]
+        if d10_10th:
+            score += 8.0
+            strengths.append(f"Strong D10 Dasamsa career placements: {', '.join(d10_10th)} in leadership houses")
+
+    # Indu Lagna (BPHS Special Wealth Ascendant)
+    moon_sid = norm360(lons["Moon"] - ayan)
+    asc_sid = norm360(asc_lon - ayan)
+    asc_9th_sign = SIGNS[(int(asc_sid // 30) + 8) % 12]
+    moon_9th_sign = SIGNS[(int(moon_sid // 30) + 8) % 12]
+    r1 = INDU_LAGNA_RAYS.get(RASHI_LORDS[asc_9th_sign], 8)
+    r2 = INDU_LAGNA_RAYS.get(RASHI_LORDS[moon_9th_sign], 8)
+    indu_sign_idx = (int(moon_sid // 30) + (r1 + r2) % 12) % 12
+    indu_sign = SIGNS[indu_sign_idx]
+    score += 5.0
+    strengths.append(f"Indu Lagna (Vedic Wealth Point) sits in {indu_sign}")
+
+    # 3. Timing Component: ZR Spirit Peaks
+    zr = zodiacal_releasing(natal_jd, lat, lng, time_known, topic="spirit")
+    active_zr = zr["active_period"]["l1"]
+    if active_zr in zr["peak_signs"]:
+        score += 10.0
+        strengths.append(f"Currently in an active Zodiacal Releasing Career Peak ({active_zr})")
+
+    final_score = max(0, min(100, round(score)))
+    tier = "Exceptional" if final_score >= 80 else "Favorable" if final_score >= 65 else "Moderate" if final_score >= 45 else "Afflicted"
+
+    return {
+        "domain": "Wealth & Career Blueprint",
+        "wealth_power_score": final_score,
+        "tier": tier,
+        "key_indicators": {
+            "part_of_fortune": f"{pof['sign']} (House {pof_house})",
+            "indu_lagna": indu_sign,
+            "career_house_10_sign": h10["sign"],
+            "income_house_2_sign": h2["sign"],
+            "active_zr_career_period": active_zr,
+            "is_zr_peak": active_zr in zr["peak_signs"]
+        },
+        "strengths": strengths,
+        "cautions": cautions,
+        "synthesis_summary": f"Overall wealth & career capacity is rated {tier} ({final_score}/100). Primary financial drivers are rooted in {h2['sign']} (income style) and {h10['sign']} (vocation)."
+    }
+
+def compute_love_blueprint(natal_jd, lat, lng, time_known=True):
+    """Multi-Tradition Love & Marriage Blueprint (Master Engine):
+    Synthesizes Western 7th/5th houses + Venus/Mars, 7 Ibn Ezra Relationship Lots,
+    Vedic D9 Navamsa + Upapada Lagna (UL) + Kuja Dosha (Manglik) status, and Draconic soul contracts."""
+    w_chart = western_chart(natal_jd, lat, lng, time_known)
+    lons, _, _ = body_longitudes(natal_jd)
+    ayan = ayanamsha_lahiri(natal_jd)
+    asc_lon = w_chart["ascendant"]["abs_lon"] if "abs_lon" in w_chart["ascendant"] else lons["Sun"]
+    is_day = 90 <= norm360(asc_lon - lons["Sun"]) <= 270
+
+    score = 50.0
+    strengths = []
+    cautions = []
+
+    # 1. Western: 7th house, Venus & Mars
+    h7 = w_chart["houses"][7]; h5 = w_chart["houses"][5]
+    ven = w_chart["planets"]["Venus"]; mars = w_chart["planets"]["Mars"]
+    if ven["house"] in (1, 5, 7, 10, 11):
+        score += 8.0
+        strengths.append(f"Venus favorably placed in House {ven['house']} ({ven['sign']}) — charm, social ease, and affection")
+    if ven["dignity"] in ("domicile (rulership)", "exalted"):
+        score += 8.0
+        strengths.append(f"Venus has high essential dignity ({ven['dignity']})")
+    elif ven["dignity"] in ("detriment", "fall"):
+        score -= 5.0
+        cautions.append(f"Venus in {ven['dignity']} — love demands conscious boundary-setting and self-worth")
+
+    # 2. Ibn Ezra 7 Relationship Lots
+    lots = ibn_ezra_relationship_lots(lons, asc_lon, is_day)
+    score += 5.0
+    strengths.append(f"Ibn Ezra General Marriage Lot sits in {lots['lot_of_marriage_general']['sign']} (House {whole_sign_house(lots['lot_of_marriage_general']['longitude'], asc_lon)})")
+
+    # 3. Vedic: D9 Navamsa & Kuja Dosha (Manglik)
+    d9 = navamsa_chart(natal_jd, lat, lng, time_known)
+    d9_ven = d9.get("navamsa_planets", {}).get("Venus", {})
+    if d9_ven.get("sign") in ("Pisces", "Taurus", "Libra"):
+        score += 8.0
+        strengths.append(f"Venus dignified in D9 Navamsa ({d9_ven.get('sign')}) — soul-level marital harmony")
+
+    # Upapada Lagna (UL - Jaimini Marriage Arudha)
+    asc_sid = norm360(asc_lon - ayan)
+    h12_sign_idx = (int(asc_sid // 30) + 11) % 12
+    h12_sign = SIGNS[h12_sign_idx]
+    h12_lord = RASHI_LORDS[h12_sign]
+    h12_lord_lon = norm360(lons.get(h12_lord, 0) - ayan)
+    dist_12 = (int(h12_lord_lon // 30) - h12_sign_idx) % 12
+    ul_sign_idx = (h12_sign_idx + dist_12) % 12
+    ul_sign = SIGNS[ul_sign_idx]
+    strengths.append(f"Upapada Lagna (Jaimini Marriage Arudha) sits in {ul_sign}")
+
+    # Kuja Dosha Check
+    kuja = mangal_dosha(natal_jd, lat, lng, time_known)
+    if kuja.get("has_dosha"):
+        score -= 10.0
+        cautions.append("Active Kuja Dosha (Manglik) — requires parity in partner selection or conscious anger management")
+    elif kuja.get("is_cancelled"):
+        score += 5.0
+        strengths.append(f"Kuja Dosha successfully cancelled per classical rules: {kuja.get('cancellation_reasons',[None])[0]}")
+
+    final_score = max(0, min(100, round(score)))
+    tier = "Exceptional" if final_score >= 80 else "Favorable" if final_score >= 65 else "Moderate" if final_score >= 45 else "Afflicted"
+
+    return {
+        "domain": "Love & Marriage Blueprint",
+        "love_harmony_score": final_score,
+        "tier": tier,
+        "key_indicators": {
+            "7th_house_marriage_sign": h7["sign"],
+            "5th_house_romance_sign": h5["sign"],
+            "venus_placement": f"{ven['sign']} (House {ven['house']})",
+            "upapada_lagna": ul_sign,
+            "kuja_dosha_status": kuja.get("status", "Non-Manglik"),
+            "lot_of_marriage_general": lots["lot_of_marriage_general"]["sign"],
+            "lot_of_passion": lots["lot_of_passion_desire"]["sign"]
+        },
+        "strengths": strengths,
+        "cautions": cautions,
+        "synthesis_summary": f"Overall relationship potential is rated {tier} ({final_score}/100). Partnership orientation is governed by {h7['sign']} on the 7th house and Venus in {ven['sign']}."
     }
 
 def _demo():

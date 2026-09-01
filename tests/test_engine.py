@@ -775,6 +775,32 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestDomainBlueprints(unittest.TestCase):
+    """Wave 11: Multi-tradition Wealth and Love synthesis blueprints."""
+
+    def test_wealth_blueprint_synthesis(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "wealth_blueprint"})
+        wb = r["wealth_blueprint"]
+        self.assertIn("wealth_power_score", wb)
+        self.assertTrue(0 <= wb["wealth_power_score"] <= 100)
+        self.assertIn(wb["tier"], ["Exceptional", "Favorable", "Moderate", "Afflicted"])
+        self.assertIn("part_of_fortune", wb["key_indicators"])
+        self.assertIn("indu_lagna", wb["key_indicators"])
+        self.assertTrue(len(wb["strengths"]) >= 1)
+
+    def test_love_blueprint_synthesis(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "love_blueprint"})
+        lb = r["love_blueprint"]
+        self.assertIn("love_harmony_score", lb)
+        self.assertTrue(0 <= lb["love_harmony_score"] <= 100)
+        self.assertIn(lb["tier"], ["Exceptional", "Favorable", "Moderate", "Afflicted"])
+        self.assertIn("upapada_lagna", lb["key_indicators"])
+        self.assertIn("kuja_dosha_status", lb["key_indicators"])
+        self.assertTrue(len(lb["strengths"]) >= 1)
+
+
 class TestElectionalAndRelocation(unittest.TestCase):
     """Wave 10: Ibn Ezra electional search engine & Jim Lewis city relocation."""
 
