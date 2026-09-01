@@ -4102,6 +4102,10 @@ def calculate_full_profile(data):
             jd, lat, lng, time_known, max_age=max_a)
         return result
 
+    if mode=="medical" or mode=="prakriti" or mode=="dosha":
+        result["ayurvedic_medical_profile"] = compute_ayurvedic_medical_profile(jd, lat, lng, time_known)
+        return result
+
     if mode=="financial" or mode=="crypto":
         asset = data.get("asset", "BTC")
         result["financial_weather"] = crypto_financial_weather(asset, target_eval_dt)
@@ -6755,6 +6759,106 @@ def map_hermetic_tarot_profile(natal_jd, lat, lng, time_known=True):
         },
         "planetary_tarot_cards": decan_profile,
         "note": "Synthesized from Abraham Ibn Ezra (Reshit Hokhmah Chapter 2 Decan Images) and Golden Dawn / Book of Thoth Tarot correspondences."
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — MEDICAL ASTROLOGY & AYURVEDIC TRI-DOSHA (Culpeper & Charak)
+# ═════════════════════════════════════════════════════════════════════════════
+
+DOSHA_PLANET_MAP = {
+    "Sun": {"Pitta": 1.0, "Vata": 0.0, "Kapha": 0.0},
+    "Mars": {"Pitta": 1.0, "Vata": 0.0, "Kapha": 0.0},
+    "Ketu": {"Pitta": 1.0, "Vata": 0.0, "Kapha": 0.0},
+    "Saturn": {"Vata": 1.0, "Pitta": 0.0, "Kapha": 0.0},
+    "Rahu": {"Vata": 1.0, "Pitta": 0.0, "Kapha": 0.0},
+    "Moon": {"Kapha": 0.7, "Vata": 0.3, "Pitta": 0.0},
+    "Venus": {"Kapha": 0.7, "Vata": 0.3, "Pitta": 0.0},
+    "Jupiter": {"Kapha": 0.7, "Pitta": 0.3, "Vata": 0.0},
+    "Mercury": {"Vata": 0.4, "Pitta": 0.3, "Kapha": 0.3},
+}
+
+DOSHA_SIGN_MAP = {
+    "Aries": {"Pitta": 1.0}, "Leo": {"Pitta": 1.0}, "Sagittarius": {"Pitta": 1.0},
+    "Gemini": {"Vata": 1.0}, "Libra": {"Vata": 1.0}, "Aquarius": {"Vata": 1.0},
+    "Cancer": {"Kapha": 1.0}, "Scorpio": {"Kapha": 0.7, "Pitta": 0.3}, "Pisces": {"Kapha": 1.0},
+    "Taurus": {"Kapha": 0.7, "Vata": 0.3}, "Virgo": {"Vata": 0.7, "Kapha": 0.3}, "Capricorn": {"Vata": 0.8, "Kapha": 0.2},
+}
+
+def compute_ayurvedic_medical_profile(natal_jd, lat, lng, time_known=True):
+    """Ayurvedic Medical Astrology Engine (Charak & Culpeper canon):
+    1. Quantitative Prakriti (Constitutional Tri-Dosha Balance: Vata %, Pitta %, Kapha %).
+    2. Organ Vulnerability Scoring from 6th & 8th houses.
+    3. Surgical Timing Guidelines and Hippocratic anatomical taboos."""
+    w_chart = western_chart(natal_jd, lat, lng, time_known)
+    v_chart = vedic_chart(natal_jd, lat, lng, datetime(2000,1,1), time_known)
+    lons, _, _ = body_longitudes(natal_jd)
+
+    scores = {"Vata": 0.0, "Pitta": 0.0, "Kapha": 0.0}
+
+    def _add(comp_dict, weight):
+        for d, v in comp_dict.items():
+            scores[d] += v * weight
+
+    # 1. Ascendant / Lagna (25%)
+    asc_s = w_chart["ascendant"]["sign"]
+    _add(DOSHA_SIGN_MAP.get(asc_s, {"Vata": 0.33, "Pitta": 0.33, "Kapha": 0.34}), 15.0)
+    asc_ruler = SIGN_DATA[asc_s]["ruler"]
+    _add(DOSHA_PLANET_MAP.get(asc_ruler, {"Vata": 0.33, "Pitta": 0.33, "Kapha": 0.34}), 10.0)
+
+    # 2. Moon (25%)
+    moon_s = w_chart["planets"]["Moon"]["sign"]
+    _add(DOSHA_SIGN_MAP.get(moon_s, {"Kapha": 0.5, "Vata": 0.5}), 10.0)
+    _add(DOSHA_PLANET_MAP["Moon"], 15.0)
+
+    # 3. Sun (15%)
+    sun_s = w_chart["planets"]["Sun"]["sign"]
+    _add(DOSHA_SIGN_MAP.get(sun_s, {"Pitta": 1.0}), 5.0)
+    _add(DOSHA_PLANET_MAP["Sun"], 10.0)
+
+    # 4. 6th House & Remaining Planets (35%)
+    h6_s = w_chart["houses"][6]["sign"]
+    _add(DOSHA_SIGN_MAP.get(h6_s, {}), 10.0)
+
+    for p in ("Mars", "Mercury", "Jupiter", "Venus", "Saturn"):
+        if p in w_chart["planets"]:
+            ps = w_chart["planets"][p]["sign"]
+            _add(DOSHA_SIGN_MAP.get(ps, {}), 2.5)
+            _add(DOSHA_PLANET_MAP.get(p, {}), 2.5)
+
+    tot = sum(scores.values()) or 1.0
+    v_pct = round((scores["Vata"] / tot) * 100.0, 1)
+    p_pct = round((scores["Pitta"] / tot) * 100.0, 1)
+    k_pct = round((scores["Kapha"] / tot) * 100.0, 1)
+
+    dominant_dosha = max(scores, key=scores.get)
+    dosha_desc = {
+        "Vata": "Air & Ether dominance: Quick, creative, prone to dryness, anxiety, joint sensitivity, and nervous system fatigue.",
+        "Pitta": "Fire & Water dominance: Sharp intelligence, strong metabolism, prone to inflammation, acidity, skin heat, and impatience.",
+        "Kapha": "Earth & Water dominance: Strong endurance, calm temperament, prone to sluggish digestion, congestion, fluid retention, and weight gain."
+    }[dominant_dosha]
+
+    # Vulnerability from 6th House (Acute) and 8th House (Chronic)
+    h6_sign = w_chart["houses"][6]["sign"]
+    h8_sign = w_chart["houses"][8]["sign"]
+
+    return {
+        "domain": "Ayurvedic Medical Astrology & Tri-Dosha Profile",
+        "constitutional_prakriti": {
+            "vata_percentage": v_pct,
+            "pitta_percentage": p_pct,
+            "kapha_percentage": k_pct,
+            "dominant_dosha": dominant_dosha,
+            "clinical_archetype": dosha_desc
+        },
+        "vulnerability_zones": {
+            "acute_6th_house_area": f"{h6_sign} -> {BODY_PARTS_BY_SIGN.get(h6_sign, '')}",
+            "chronic_8th_house_area": f"{h8_sign} -> {BODY_PARTS_BY_SIGN.get(h8_sign, '')}"
+        },
+        "surgical_guidelines": {
+            "hippocratic_rule": "Never make surgical incisions on the body part ruled by the sign the Moon is currently transiting.",
+            "avoidance_windows": "Avoid major surgeries within 48h of Full Moon (high fluid/hemorrhage risk) and during Moon Void-of-Course."
+        },
+        "note": "Based on Dr. K.S. Charak (Essentials of Medical Astrology) and Nicholas Culpeper (1655)."
     }
 
 def _demo():

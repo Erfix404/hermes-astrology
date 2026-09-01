@@ -775,6 +775,26 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestMedicalAndAyurvedic(unittest.TestCase):
+    """Deep Medical Astrology and Ayurvedic Tri-Dosha balance (Charak & Culpeper)."""
+
+    def test_ayurvedic_medical_profile_calculation(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "medical"})
+        med = r["ayurvedic_medical_profile"]
+        self.assertIn("constitutional_prakriti", med)
+        pk = med["constitutional_prakriti"]
+        self.assertIn("vata_percentage", pk)
+        self.assertIn("pitta_percentage", pk)
+        self.assertIn("kapha_percentage", pk)
+        # Sum of dosha percentages equals ~100%
+        tot = pk["vata_percentage"] + pk["pitta_percentage"] + pk["kapha_percentage"]
+        self.assertAlmostEqual(tot, 100.0, delta=0.5)
+        self.assertIn(pk["dominant_dosha"], ["Vata", "Pitta", "Kapha"])
+        self.assertIn("vulnerability_zones", med)
+        self.assertIn("surgical_guidelines", med)
+
+
 class TestMasterV4Features(unittest.TestCase):
     """Wave 14-17: Master Engine v4.0 suite (BTR, Master Chronology, Crypto, Davison Progression, Hermetic Tarot)."""
 
