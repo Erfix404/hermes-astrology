@@ -3750,6 +3750,10 @@ def calculate_full_profile(data):
             },
             "mode":mode}
 
+    # Resolve target evaluation moment dynamically for any mode (target_date / as_of / date)
+    target_eval_dt = _resolve_target_dt(data)
+    target_eval_jd = julian_day(target_eval_dt)
+
     if mode=="transit":
         result["natal_brief"]=western_chart(jd,lat,lng,time_known)["big_three"]
         tdate=data.get("transit_date")
@@ -3826,6 +3830,24 @@ def calculate_full_profile(data):
         target_year=data.get("target_year", birth_local.year)
         target_month=data.get("target_month", birth_local.month)
         result["lunar_return"]=lunar_return(jd, target_year, target_month, lat, lng)
+        return result
+
+    if mode=="davison":
+        p=data["partner"]
+        p_utc,_=to_utc(p); jdB=julian_day(p_utc)
+        latB = p.get("lat", 0.0); lngB = p.get("lng", 0.0)
+        result["davison"] = davison_chart(jd, jdB, lat, lng, latB, lngB, as_of_dt=target_eval_dt)
+        return result
+
+    if mode=="draconic":
+        result["draconic"] = draconic_chart(jd, lat, lng, time_known)
+        return result
+
+    if mode=="draconic_synastry":
+        p=data["partner"]
+        p_utc,_=to_utc(p); jdB=julian_day(p_utc)
+        latB = p.get("lat", 0.0); lngB = p.get("lng", 0.0)
+        result["draconic_synastry"] = draconic_synastry(jd, jdB, lat, lng, latB, lngB)
         return result
 
     if mode=="compatibility":
@@ -5216,6 +5238,128 @@ def interpret_composite_chart(comp_chart):
         "relationship_identity": readings,
         "dominant_house": sun["house"] if sun else None,
         "note": "The composite chart is the chart of the relationship itself — what the two people become together."
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — ADVANCED SYNASTRY: DAVISON CHART & DRACONIC ASTROLOGY
+# ═════════════════════════════════════════════════════════════════════════════
+
+def davison_chart(jdA, jdB, latA, lngA, latB, lngB, as_of_dt=None):
+    """Davison Time-Space Relationship Chart (Ronald C. Davison method):
+    Unlike the midpoint composite (which is an unphysical spatial abstraction),
+    the Davison chart is calculated for the exact mathematical midpoint in time
+    (JD_mid) and geographic coordinates (Lat_mid, Lng_mid).
+    This creates a true physical birth chart for the relationship itself,
+    allowing real planetary transits and secondary progressions to be cast upon it."""
+    mid_jd = (jdA + jdB) / 2.0
+    mid_lat = (latA + latB) / 2.0
+    mid_lng = (lngA + lngB) / 2.0
+    # Normalize longitude midpoint
+    diff_lng = abs(lngA - lngB)
+    if diff_lng > 180:
+        mid_lng = norm180(mid_lng + 180.0)
+
+    mid_dt = datetime(2000, 1, 1) + timedelta(days=mid_jd - 2451544.5)
+    chart = western_chart(mid_jd, mid_lat, mid_lng, time_known=True)
+    chart["system"] = "Davison Time-Space Chart"
+
+    # Optional: evaluate transits to the Davison relationship chart
+    eval_dt = as_of_dt or datetime.now(timezone.utc).replace(tzinfo=None)
+    eval_jd = julian_day(eval_dt)
+    rel_transits = transits(mid_jd, mid_lat, mid_lng, eval_dt)
+
+    return {
+        "davison_midpoint": {
+            "datetime_utc": mid_dt.strftime("%Y-%m-%d %H:%M UTC"),
+            "julian_day": round(mid_jd, 5),
+            "latitude": round(mid_lat, 4),
+            "longitude": round(mid_lng, 4)
+        },
+        "chart": chart,
+        "relationship_transits": interpret_transits(rel_transits),
+        "note": ("The Davison chart represents the relationship as a true event in space-time. "
+                 "Current relationship weather is tracked via real transits to the Davison midpoint chart.")
+    }
+
+def draconic_chart(natal_jd, lat, lng, time_known=True):
+    """Calculate the Draconic Chart (Nodal Soul Chart):
+    Shifts the entire zodiac so that the True North Node becomes 0° Aries.
+    Formula: lambda_draconic = (lambda_tropical - lambda_TrueNode) % 360.
+    In psychological and karmic astrology, the Draconic chart reflects the soul's
+    spiritual blueprint, core motivations, and unconscious contracts."""
+    lons_trop, speed, backend = body_longitudes(natal_jd)
+    node_lon = lons_trop.get("North Node", 0.0)
+
+    drac_lons = {}
+    for name, lon in lons_trop.items():
+        drac_lons[name] = norm360(lon - node_lon)
+
+    asc_trop, mc_trop = ascendant_mc(natal_jd, lat, lng) if time_known else (lons_trop["Sun"], 0.0)
+    drac_asc = norm360(asc_trop - node_lon)
+    drac_mc = norm360(mc_trop - node_lon)
+
+    planets = {}
+    for nm, d_lon in drac_lons.items():
+        s, idx, deg = sign_of(d_lon)
+        h = whole_sign_house(d_lon, drac_asc)
+        planets[nm] = {
+            "draconic_longitude": round(d_lon, 3),
+            "sign": s,
+            "deg_in_sign": round(deg, 2),
+            "house": h,
+            "tropical_equivalent": round(lons_trop[nm], 3)
+        }
+
+    asc_sign, _, asc_deg = sign_of(drac_asc)
+    mc_sign, _, mc_deg = sign_of(drac_mc)
+
+    aspects = compute_aspects(drac_lons)[:20]
+
+    return {
+        "system": "Draconic Astrology (Nodal Soul Blueprint)",
+        "true_north_node_tropical": round(node_lon, 3),
+        "ascendant": {"sign": asc_sign, "degree": round(asc_deg, 2)},
+        "midheaven": {"sign": mc_sign, "degree": round(mc_deg, 2)},
+        "planets": planets,
+        "aspects": aspects,
+        "note": ("Draconic positions reflect soul-level instincts and karmic purpose. "
+                 "When a partner's tropical planet hits your draconic planet, a soul-contract bond is felt.")
+    }
+
+def draconic_synastry(jdA, jdB, latA, lngA, latB, lngB):
+    """Draconic-to-Tropical Synastry (Soul-Contract Comparisons):
+    Compares Person A's Draconic placements against Person B's Tropical placements (and vice versa).
+    Aspects between Draconic and Tropical charts signify deep karmic resonance and past-life familiarity."""
+    lonsA_trop, _, _ = body_longitudes(jdA)
+    lonsB_trop, _, _ = body_longitudes(jdB)
+    nodeA = lonsA_trop.get("North Node", 0.0)
+    nodeB = lonsB_trop.get("North Node", 0.0)
+
+    lonsA_drac = {p: norm360(lon - nodeA) for p, lon in lonsA_trop.items()}
+    lonsB_drac = {p: norm360(lon - nodeB) for p, lon in lonsB_trop.items()}
+
+    pts = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "North Node"]
+    karmic_bonds = []
+
+    # A Draconic to B Tropical
+    for a in pts:
+        for b in pts:
+            sep = abs(norm180(lonsA_drac[a] - lonsB_trop[b]))
+            for asp, (ang, orb, desc) in ASPECTS.items():
+                if abs(sep - ang) <= min(orb, 2.5): # tighter orb for draconic contracts
+                    karmic_bonds.append({
+                        "personA_draconic": a,
+                        "personB_tropical": b,
+                        "aspect": asp,
+                        "orb": round(abs(sep - ang), 2),
+                        "reading": f"Person A's soul-instinct ({a}) directly connects with Person B's lived expression ({b}). {desc}"
+                    })
+
+    karmic_bonds.sort(key=lambda x: x["orb"])
+    return {
+        "karmic_aspects_count": len(karmic_bonds),
+        "strongest_soul_contracts": karmic_bonds[:12],
+        "note": "Draconic-to-Tropical contacts reveal underlying soul contracts and unconscious familiarity in relationships."
     }
 
 def _demo():

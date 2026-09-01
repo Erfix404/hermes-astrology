@@ -775,6 +775,42 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestDavisonAndDraconic(unittest.TestCase):
+    """Wave 7: Davison Time-Space relationship chart and Draconic soul synastry."""
+
+    def test_davison_time_space_calculation(self):
+        pA = dict(ae._demo())
+        pB = dict(ae._demo())
+        pB["year"] = 1992
+        pB["month"] = 10
+        pB["day"] = 24
+        pB["hour"] = 8
+        r = ae.calculate_full_profile({**pA, "mode": "davison", "partner": pB})
+        dav = r["davison"]
+        self.assertIn("davison_midpoint", dav)
+        self.assertIn("chart", dav)
+        self.assertIn("relationship_transits", dav)
+        self.assertEqual(dav["davison_midpoint"]["datetime_utc"], "1991-08-20 16:30 UTC")
+
+    def test_draconic_chart_and_synastry(self):
+        pA = dict(ae._demo())
+        pB = dict(ae._demo())
+        pB["year"] = 1992
+
+        # 1. Individual Draconic Chart
+        r_drac = ae.calculate_full_profile({**pA, "mode": "draconic"})
+        drac = r_drac["draconic"]
+        self.assertIn("true_north_node_tropical", drac)
+        self.assertIn("Sun", drac["planets"])
+        self.assertIn("draconic_longitude", drac["planets"]["Sun"])
+
+        # 2. Draconic Synastry (Soul Contracts)
+        r_dsyn = ae.calculate_full_profile({**pA, "mode": "draconic_synastry", "partner": pB})
+        dsyn = r_dsyn["draconic_synastry"]
+        self.assertIn("strongest_soul_contracts", dsyn)
+        self.assertTrue(dsyn["karmic_aspects_count"] > 0)
+
+
 class TestDynamicTemporalResolution(unittest.TestCase):
     """Universal dynamic date resolution across all forecasting systems."""
 
