@@ -3761,9 +3761,26 @@ def calculate_full_profile(data):
         p=data["partner"]
         p_utc,_=to_utc(p); jdB=julian_day(p_utc)
         result["synastry"]=synastry(jd,jdB)
-        result["personA"]={"big_three":western_chart(jd,lat,lng,time_known)["big_three"]}
-        result["personB"]={"big_three":western_chart(jdB,p.get("lat",0),p.get("lng",0),
-                                                      p.get("time_known",True))["big_three"]}
+        chA = western_chart(jd,lat,lng,time_known)
+        chB = western_chart(jdB,p.get("lat",0),p.get("lng",0),p.get("time_known",True))
+        result["personA"]={"big_three":chA["big_three"]}
+        result["personB"]={"big_three":chB["big_three"]}
+        # House Overlays: where A lands in B, and where B lands in A
+        lonsA, _, _ = body_longitudes(jd)
+        lonsB, _, _ = body_longitudes(jdB)
+        ascA = chA["ascendant"]["abs_lon"] if "abs_lon" in chA["ascendant"] else lonsA["Sun"]
+        ascB = chB["ascendant"]["abs_lon"] if "abs_lon" in chB["ascendant"] else lonsB["Sun"]
+        result["house_overlays"] = {
+            "personA_planets_in_personB_houses": synastry_house_overlays(lonsA, ascB),
+            "personB_planets_in_personA_houses": synastry_house_overlays(lonsB, ascA)
+        }
+        # Ibn Ezra Relationship Lots for both
+        is_dayA = 90 <= norm360(ascA - lonsA["Sun"]) <= 270
+        is_dayB = 90 <= norm360(ascB - lonsB["Sun"]) <= 270
+        result["ibn_ezra_lots"] = {
+            "personA": ibn_ezra_relationship_lots(lonsA, ascA, is_dayA),
+            "personB": ibn_ezra_relationship_lots(lonsB, ascB, is_dayB)
+        }
         if "bazi" in systems:
             result["personA"]["bazi_animal"]=bazi_chart(jd,birth_local,data.get("gender","unknown")).get("year_animal")
             pb_local=datetime(p["year"],p["month"],p["day"],int(p.get("hour",12)),int(p.get("minute",0)))
@@ -3829,7 +3846,12 @@ def calculate_full_profile(data):
     if mode=="composite":
         p=data["partner"]
         p_utc,_=to_utc(p); jdB=julian_day(p_utc)
-        result["composite"]=composite_chart(jd, jdB, lat, lng, p.get("lat",0), p.get("lng",0))
+        comp = composite_chart(jd, jdB, lat, lng, p.get("lat",0), p.get("lng",0))
+        result["composite"]=comp
+        try:
+            result["composite_interpretation"]=interpret_composite_chart(comp)
+        except Exception:
+            pass
         result["personA"]={"big_three":western_chart(jd,lat,lng,time_known)["big_three"]}
         result["personB"]={"big_three":western_chart(jdB,p.get("lat",0),p.get("lng",0),
                                                       p.get("time_known",True))["big_three"]}
@@ -5101,6 +5123,95 @@ def lunation_cycle(lat, lng, count=3, start_jd=None):
                      "(its Sun's house); the Full Moon two weeks later "
                      "brings the related matter to a head.")}
 
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — SYNASTRY & RELATIONSHIP ASTROLOGY (Ibn Ezra & Classical Overlays)
+# ═════════════════════════════════════════════════════════════════════════════
+
+def ibn_ezra_relationship_lots(lons, asc_lon, is_day_chart=True):
+    """Calculate the 7 primary Medieval/Hebrew relationship lots per Abraham Ibn Ezra,
+    Reshit Hokhmah (The Beginning of Wisdom, Chapter IX, Sela ed. pp. 244-246).
+    Distances are calculated as: Destination - Source, cast from Origin (Origin + Dest - Source)."""
+    desc_lon = norm360(asc_lon + 180.0)
+    sun = lons["Sun"]; moon = lons["Moon"]; ven = lons["Venus"]
+    mars = lons["Mars"]; sat = lons["Saturn"]; jup = lons["Jupiter"]
+
+    def _calc_lot(origin, source, dest):
+        val = norm360(origin + dest - source)
+        s, idx, deg = sign_of(val)
+        return {"longitude": round(val, 3), "sign": s, "deg_in_sign": round(deg, 2)}
+
+    lots = {
+        "lot_of_marriage_general": {
+            **_calc_lot(asc_lon, ven, desc_lon),
+            "formula": "Asc + Descendant - Venus (Day & Night)",
+            "meaning": "General marriage harmony, public union, and the contractual bond"
+        },
+        "lot_of_marriage_men_enoch": {
+            **_calc_lot(asc_lon, sat, ven),
+            "formula": "Asc + Venus - Saturn (Enoch tradition)",
+            "meaning": "Marriage condition and stability for men (endurance vs restriction)"
+        },
+        "lot_of_marriage_valens": {
+            **_calc_lot(asc_lon, sun, ven),
+            "formula": "Asc + Venus - Sun (Valens tradition)",
+            "meaning": "Vital affection, romantic initiation, and conscious desire"
+        },
+        "lot_of_marriage_timing": {
+            **_calc_lot(asc_lon, sun, moon),
+            "formula": "Asc + Moon - Sun (Day & Night)",
+            "meaning": "Timing and ripeness for long-term commitment"
+        },
+        "lot_of_chastity_loyalty": {
+            **_calc_lot(asc_lon, moon, ven),
+            "formula": "Asc + Venus - Moon (Day & Night)",
+            "meaning": "Fidelity, mutual trust, and devotion in relationship"
+        },
+        "lot_of_passion_desire": {
+            **_calc_lot(asc_lon, moon, mars),
+            "formula": "Asc + Mars - Moon (Day & Night)",
+            "meaning": "Physical chemistry, passion, drive, and sexual attraction"
+        },
+        "lot_of_marital_strife": {
+            **_calc_lot(asc_lon, mars, jup),
+            "formula": "Asc + Jupiter - Mars (Day & Night)",
+            "meaning": "Friction points, disputes over boundaries, and legal/ethical conflicts"
+        }
+    }
+    return lots
+
+def synastry_house_overlays(lonsA, asc_lonB, cuspsB=None):
+    """Determine which houses of Person B are activated by Person A's planets.
+    House overlays reveal where Person A's energy lands in Person B's lived experience."""
+    overlays = {}
+    for p, lon in lonsA.items():
+        if p not in PLANET_ARCHETYPES:
+            continue
+        h = placidus_house_of(lon, cuspsB) if cuspsB else whole_sign_house(lon, asc_lonB)
+        overlays[p] = {
+            "in_partner_house": h,
+            "sign": sign_of(lon)[0],
+            "experience": f"Person A's {p} activates Person B's {HOUSE_MEANINGS[h].split(',')[0].lower()}"
+        }
+    return overlays
+
+def interpret_composite_chart(comp_chart):
+    """Produce structured readings for the composite chart (the relationship as an entity):
+    Composite Sun (core purpose), Composite Moon (emotional bond), Composite Ascendant (social face)."""
+    ps = comp_chart["planets"]
+    sun = ps.get("Sun"); moon = ps.get("Moon"); asc = comp_chart.get("ascendant")
+    readings = []
+    if sun:
+        readings.append(f"Composite Sun in {sun['sign']} (house {sun['house']}): the relationship's core purpose centers on {HOUSE_MEANINGS[sun['house']].split(',')[0].lower()}.")
+    if moon:
+        readings.append(f"Composite Moon in {moon['sign']} (house {moon['house']}): emotional safety is found through {HOUSE_MEANINGS[moon['house']].split(',')[0].lower()}.")
+    if asc:
+        readings.append(f"Composite Rising in {asc['sign']}: the couple presents to the world with a {SIGN_DATA[asc['sign']]['keywords'].split(';')[0]} vibe.")
+    return {
+        "relationship_identity": readings,
+        "dominant_house": sun["house"] if sun else None,
+        "note": "The composite chart is the chart of the relationship itself — what the two people become together."
+    }
 
 def _demo():
     return {"name":"Demo","year":1990,"month":6,"day":15,"hour":14,"minute":30,

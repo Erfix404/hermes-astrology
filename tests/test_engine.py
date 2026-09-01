@@ -741,6 +741,40 @@ class TestCharaDasha(unittest.TestCase):
         self.assertEqual(yrs, 12)
 
 
+class TestSynastryAndComposite(unittest.TestCase):
+    """Wave 4: Synastry house overlays, Ibn Ezra relationship lots, composite interpretation."""
+
+    def test_ibn_ezra_lots_calculation(self):
+        d = dict(ae._demo())
+        lons, _, _ = ae.body_longitudes(ae.julian_day(datetime(1990, 6, 15, 11, 0)))
+        lots = ae.ibn_ezra_relationship_lots(lons, 180.0, is_day_chart=True)
+        self.assertIn("lot_of_marriage_general", lots)
+        self.assertIn("lot_of_passion_desire", lots)
+        self.assertIn("lot_of_marital_strife", lots)
+        for name, lot in lots.items():
+            self.assertTrue(0 <= lot["longitude"] < 360)
+            self.assertIn("formula", lot)
+
+    def test_synastry_house_overlays_and_composite_interpretation(self):
+        pA = dict(ae._demo())
+        pB = dict(ae._demo())
+        pB["year"] = 1992
+        pB["month"] = 10
+        pB["day"] = 24
+        pB["hour"] = 8
+
+        # Synastry mode includes overlays and lots
+        r_syn = ae.calculate_full_profile({**pA, "mode": "synastry", "partner": pB})
+        self.assertIn("house_overlays", r_syn)
+        self.assertIn("personA_planets_in_personB_houses", r_syn["house_overlays"])
+        self.assertIn("ibn_ezra_lots", r_syn)
+
+        # Composite mode includes readable interpretation
+        r_comp = ae.calculate_full_profile({**pA, "mode": "composite", "partner": pB})
+        self.assertIn("composite_interpretation", r_comp)
+        self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
+
+
 class TestDynamicTemporalResolution(unittest.TestCase):
     """Universal dynamic date resolution across all forecasting systems."""
 
