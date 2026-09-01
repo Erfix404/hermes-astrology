@@ -3947,9 +3947,19 @@ def calculate_full_profile(data):
                     f"unknown country '{cname}' — available: "
                     + ", ".join(sorted(MUNDANE_CAPITALS))}
         lat_c, lng_c = MUNDANE_CAPITALS[cname]
-        year = int(data.get("year", TODAY.year))
-        kind = data.get("ingress_kind", "aries")
-        result["mundane"] = ingress_chart(cname, lat_c, lng_c, year, kind)
+
+        # Target date support for AI Agents: auto-resolve active ingress based on Bonatti/Lilly
+        if data.get("target_date"):
+            try:
+                target_dt = datetime.strptime(data["target_date"], "%Y-%m-%d")
+            except Exception:
+                target_dt = datetime.utcnow()
+            result["mundane"] = resolve_mundane_ingress_for_date(cname, lat_c, lng_c, target_dt)
+        else:
+            year = int(data.get("year", TODAY.year))
+            kind = data.get("ingress_kind", "aries")
+            result["mundane"] = ingress_chart(cname, lat_c, lng_c, year, kind)
+
         try:
             result["eclipse_activations"] = eclipse_activations(
                 julian_day(datetime(2000, 1, 1)), lat_c, lng_c,
@@ -4875,6 +4885,88 @@ def ingress_validity_period(asc_sign):
     else:
         return {"validity_months": 3, "scope": "one quarter (3 months) — re-cast each cardinal ingress",
                 "note": "Cardinal rising: valid for one season; cast separate charts for Cancer, Libra, Capricorn."}
+
+def resolve_mundane_ingress_for_date(country_name, lat, lng, target_dt):
+    """Dynamic resolution for AI Agents (Bonatti/Lilly doctrine):
+    Given a country and a target date, accurately determines which solar ingress
+    chart is legally in force based on the Aries Ingress Ascendant modality.
+    Calculates exact astronomical transition points dynamically."""
+    # 1. Determine base solar year of the target date (Aries ingress occurs ~Mar 20)
+    year = target_dt.year
+    aries_jd = solar_ingress_jd(year, 0)
+    aries_dt = _jd_to_dt(aries_jd)
+    if target_dt < aries_dt:
+        # Before this year's Aries ingress -> governed by previous year's ingress cycle
+        year -= 1
+        aries_jd = solar_ingress_jd(year, 0)
+        aries_dt = _jd_to_dt(aries_jd)
+
+    # 2. Check Aries Ingress Ascendant modality for this location
+    asc_lon, _ = ascendant_mc(aries_jd, lat, lng)
+    asc_sign = sign_of(asc_lon)[0]
+    mod = SIGN_DATA[asc_sign]["modality"]
+
+    # 3. Calculate exact moments of all cardinal ingresses for the active solar year
+    cancer_dt = _jd_to_dt(solar_ingress_jd(year, 3))
+    libra_dt = _jd_to_dt(solar_ingress_jd(year, 6))
+    capricorn_dt = _jd_to_dt(solar_ingress_jd(year, 9))
+    next_aries_dt = _jd_to_dt(solar_ingress_jd(year + 1, 0))
+
+    # 4. Resolve active ingress and validity boundaries
+    if mod == "Fixed":
+        # Governs the entire 12-month solar year
+        active_kind = "aries"
+        v_start = aries_dt
+        v_end = next_aries_dt
+        reason = f"Aries Ingress has Fixed rising ({asc_sign}) -> valid for the entire 12-month solar year."
+    elif mod == "Mutable":
+        # 6-month validity: Aries covers spring/summer, Libra covers autumn/winter
+        if target_dt < libra_dt:
+            active_kind = "aries"
+            v_start = aries_dt
+            v_end = libra_dt
+            reason = f"Aries Ingress has Mutable rising ({asc_sign}) -> valid for 6 months (Spring/Summer)."
+        else:
+            active_kind = "libra"
+            v_start = libra_dt
+            v_end = next_aries_dt
+            reason = f"Aries Ingress has Mutable rising ({asc_sign}) -> Autumn/Winter governed by Libra Ingress."
+    else: # Cardinal
+        # 3-month seasonal validity: re-cast each cardinal ingress
+        if target_dt < cancer_dt:
+            active_kind = "aries"
+            v_start = aries_dt
+            v_end = cancer_dt
+            reason = f"Aries Ingress has Cardinal rising ({asc_sign}) -> valid for 1 season (Spring)."
+        elif target_dt < libra_dt:
+            active_kind = "cancer"
+            v_start = cancer_dt
+            v_end = libra_dt
+            reason = f"Aries Ingress has Cardinal rising ({asc_sign}) -> Summer governed by Cancer Ingress."
+        elif target_dt < capricorn_dt:
+            active_kind = "libra"
+            v_start = libra_dt
+            v_end = capricorn_dt
+            reason = f"Aries Ingress has Cardinal rising ({asc_sign}) -> Autumn governed by Libra Ingress."
+        else:
+            active_kind = "capricorn"
+            v_start = capricorn_dt
+            v_end = next_aries_dt
+            reason = f"Aries Ingress has Cardinal rising ({asc_sign}) -> Winter governed by Capricorn Ingress."
+
+    # 5. Build the actively governing ingress chart
+    result = ingress_chart(country_name, lat, lng, year, active_kind)
+    result["agent_validity"] = {
+        "active_ingress": active_kind,
+        "governing_solar_year": year,
+        "valid_from": v_start.strftime("%Y-%m-%d %H:%M UTC"),
+        "valid_until": v_end.strftime("%Y-%m-%d %H:%M UTC"),
+        "next_recast_date": v_end.strftime("%Y-%m-%d"),
+        "resolution_reason": reason,
+        "ascendant_modality": mod,
+        "is_currently_valid": v_start <= target_dt < v_end
+    }
+    return result
 
 def ingress_chart(country_name, lat, lng, year=None, kind="aries"):
     """Aries ingress = solar year for the nation; cardinal ingresses seasonally.

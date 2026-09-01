@@ -792,6 +792,20 @@ class TestMundaneAstrology(unittest.TestCase):
             self.assertTrue(1 <= l["full_moon_climax_house"] <= 12)
 
 
+    def test_agent_dynamic_ingress_resolution(self):
+        d = dict(ae._demo())
+        # Iran 2026 Aries Asc is Virgo (Mutable -> 6m validity)
+        # May 2026 -> Aries Ingress
+        r_spring = ae.calculate_full_profile({**d, "mode": "mundane", "country": "iran", "target_date": "2026-05-15"})
+        self.assertEqual(r_spring["mundane"]["agent_validity"]["active_ingress"], "aries")
+        self.assertTrue(r_spring["mundane"]["agent_validity"]["is_currently_valid"])
+
+        # Nov 2026 -> Auto switches to Libra Ingress
+        r_autumn = ae.calculate_full_profile({**d, "mode": "mundane", "country": "iran", "target_date": "2026-11-15"})
+        self.assertEqual(r_autumn["mundane"]["agent_validity"]["active_ingress"], "libra")
+        self.assertIn("Libra Ingress", r_autumn["mundane"]["agent_validity"]["resolution_reason"])
+
+
 class TestZodiacalReleasing(unittest.TestCase):
     """Wave 1-5: ZR per Valens IV — periods, LOB, peaks, symbolic calendar."""
 
