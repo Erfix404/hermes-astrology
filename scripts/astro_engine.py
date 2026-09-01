@@ -6620,53 +6620,89 @@ def davison_progression_forecast(jdA, jdB, latA, lngA, latB, lngB, target_dt=Non
 
 HERMETIC_DECANS_TABLE = [
     # Aries
-    {"sign":"Aries","decan":1,"span":[0,10],"ruler":"Mars","tarot_card":"2 of Wands","title":"Dominion"},
-    {"sign":"Aries","decan":2,"span":[10,20],"ruler":"Sun","tarot_card":"3 of Wands","title":"Established Strength"},
-    {"sign":"Aries","decan":3,"span":[20,30],"ruler":"Venus","tarot_card":"4 of Wands","title":"Perfected Work"},
+    {"sign":"Aries","decan":1,"span":[0,10],"ruler":"Mars","tarot_card":"2 of Wands","title":"Dominion",
+     "ibn_ezra_image":"Figure of a shining woman in white cloak, holding authority; Indian: man with black eyes, strong-willed"},
+    {"sign":"Aries","decan":2,"span":[10,20],"ruler":"Sun","tarot_card":"3 of Wands","title":"Established Strength",
+     "ibn_ezra_image":"Woman wearing copper armor with comb on head; handsome face, courageous and noble minded"},
+    {"sign":"Aries","decan":3,"span":[20,30],"ruler":"Venus","tarot_card":"4 of Wands","title":"Perfected Work",
+     "ibn_ezra_image":"Man holding golden sphere and wooden staff; clever, capable of mastery and completed art"},
     # Taurus
-    {"sign":"Taurus","decan":1,"span":[0,10],"ruler":"Mercury","tarot_card":"5 of Pentacles","title":"Material Trouble"},
-    {"sign":"Taurus","decan":2,"span":[10,20],"ruler":"Moon","tarot_card":"6 of Pentacles","title":"Material Success"},
-    {"sign":"Taurus","decan":3,"span":[20,30],"ruler":"Saturn","tarot_card":"7 of Pentacles","title":"Success Unfulfilled"},
+    {"sign":"Taurus","decan":1,"span":[0,10],"ruler":"Mercury","tarot_card":"5 of Pentacles","title":"Material Trouble",
+     "ibn_ezra_image":"Woman with curly hair in linen robe; agriculture, sowing, and building foundations"},
+    {"sign":"Taurus","decan":2,"span":[10,20],"ruler":"Moon","tarot_card":"6 of Pentacles","title":"Material Success",
+     "ibn_ezra_image":"Man resembling ox/horse with great strength; mastery of land, trade, and productive gain"},
+    {"sign":"Taurus","decan":3,"span":[20,30],"ruler":"Saturn","tarot_card":"7 of Pentacles","title":"Success Unfulfilled",
+     "ibn_ezra_image":"Man holding staff with white limbs; physical labor, endurance, slow material ripening"},
     # Gemini
-    {"sign":"Gemini","decan":1,"span":[0,10],"ruler":"Jupiter","tarot_card":"8 of Swords","title":"Shortened Force"},
-    {"sign":"Gemini","decan":2,"span":[10,20],"ruler":"Mars","tarot_card":"9 of Swords","title":"Despair and Cruelty"},
-    {"sign":"Gemini","decan":3,"span":[20,30],"ruler":"Sun","tarot_card":"10 of Swords","title":"Ruin"},
+    {"sign":"Gemini","decan":1,"span":[0,10],"ruler":"Jupiter","tarot_card":"8 of Swords","title":"Shortened Force",
+     "ibn_ezra_image":"Beautiful woman standing in air, skilled in sewing, arts and intellectual agility"},
+    {"sign":"Gemini","decan":2,"span":[10,20],"ruler":"Mars","tarot_card":"9 of Swords","title":"Despair and Cruelty",
+     "ibn_ezra_image":"Eagle with copper beak; sharp mind, quick debate, sarcasm and intellectual drive"},
+    {"sign":"Gemini","decan":3,"span":[20,30],"ruler":"Sun","tarot_card":"10 of Swords","title":"Ruin",
+     "ibn_ezra_image":"Man in full armor holding bow and arrows; strategic calculation, music and severe resolve"},
     # Cancer
-    {"sign":"Cancer","decan":1,"span":[0,10],"ruler":"Venus","tarot_card":"2 of Cups","title":"Love"},
-    {"sign":"Cancer","decan":2,"span":[10,20],"ruler":"Mercury","tarot_card":"3 of Cups","title":"Abundance"},
-    {"sign":"Cancer","decan":3,"span":[20,30],"ruler":"Moon","tarot_card":"4 of Cups","title":"Blended Pleasure"},
+    {"sign":"Cancer","decan":1,"span":[0,10],"ruler":"Venus","tarot_card":"2 of Cups","title":"Love",
+     "ibn_ezra_image":"Young maiden adorned with leaves and flowers; grace, fertility, mutual affection and attraction"},
+    {"sign":"Cancer","decan":2,"span":[10,20],"ruler":"Mercury","tarot_card":"3 of Cups","title":"Abundance",
+     "ibn_ezra_image":"Woman with green wreath playing musical instrument; celebration, fruitful crops, social joy"},
+    {"sign":"Cancer","decan":3,"span":[20,30],"ruler":"Moon","tarot_card":"4 of Cups","title":"Blended Pleasure",
+     "ibn_ezra_image":"Man holding golden serpent and pearls; oceanic journeys, deep imagination and riches"},
     # Leo
-    {"sign":"Leo","decan":1,"span":[0,10],"ruler":"Saturn","tarot_card":"5 of Wands","title":"Strife"},
-    {"sign":"Leo","decan":2,"span":[10,20],"ruler":"Jupiter","tarot_card":"6 of Wands","title":"Victory"},
-    {"sign":"Leo","decan":3,"span":[20,30],"ruler":"Mars","tarot_card":"7 of Wands","title":"Valour"},
+    {"sign":"Leo","decan":1,"span":[0,10],"ruler":"Saturn","tarot_card":"5 of Wands","title":"Strife",
+     "ibn_ezra_image":"Man riding lion holding spear; courage, nobility, proud demeanor and martial contest"},
+    {"sign":"Leo","decan":2,"span":[10,20],"ruler":"Jupiter","tarot_card":"6 of Wands","title":"Victory",
+     "ibn_ezra_image":"Man crowned with laurel wreath holding cup; honor, regal victory and celebrated achievement"},
+    {"sign":"Leo","decan":3,"span":[20,30],"ruler":"Mars","tarot_card":"7 of Wands","title":"Valour",
+     "ibn_ezra_image":"Elderly fierce warrior with drawn sword; unyielding resolve, defense of realm and daring courage"},
     # Virgo
-    {"sign":"Virgo","decan":1,"span":[0,10],"ruler":"Sun","tarot_card":"8 of Pentacles","title":"Prudence"},
-    {"sign":"Virgo","decan":2,"span":[10,20],"ruler":"Venus","tarot_card":"9 of Pentacles","title":"Material Gain"},
-    {"sign":"Virgo","decan":3,"span":[20,30],"ruler":"Mercury","tarot_card":"10 of Pentacles","title":"Wealth"},
+    {"sign":"Virgo","decan":1,"span":[0,10],"ruler":"Sun","tarot_card":"8 of Pentacles","title":"Prudence",
+     "ibn_ezra_image":"Maiden holding ears of corn and oil vessel; meticulous craftsmanship, study and discipline"},
+    {"sign":"Virgo","decan":2,"span":[10,20],"ruler":"Venus","tarot_card":"9 of Pentacles","title":"Material Gain",
+     "ibn_ezra_image":"Man counting coins and inspecting goods; commerce, accurate accounting and material security"},
+    {"sign":"Virgo","decan":3,"span":[20,30],"ruler":"Mercury","tarot_card":"10 of Pentacles","title":"Wealth",
+     "ibn_ezra_image":"Elderly scholar with scroll and compass; inheritance, deep wisdom, institutions and legacy"},
     # Libra
-    {"sign":"Libra","decan":1,"span":[0,10],"ruler":"Moon","tarot_card":"2 of Swords","title":"Peace Restored"},
-    {"sign":"Libra","decan":2,"span":[10,20],"ruler":"Saturn","tarot_card":"3 of Swords","title":"Sorrow"},
-    {"sign":"Libra","decan":3,"span":[20,30],"ruler":"Jupiter","tarot_card":"4 of Swords","title":"Rest from Strife"},
+    {"sign":"Libra","decan":1,"span":[0,10],"ruler":"Moon","tarot_card":"2 of Swords","title":"Peace Restored",
+     "ibn_ezra_image":"Man holding balanced scales in right hand, book in left; justice, equity and civil mediation"},
+    {"sign":"Libra","decan":2,"span":[10,20],"ruler":"Saturn","tarot_card":"3 of Swords","title":"Sorrow",
+     "ibn_ezra_image":"Man looking into cracked mirror with sad gaze; ethical dilemmas, legal grief and painful clarity"},
+    {"sign":"Libra","decan":3,"span":[20,30],"ruler":"Jupiter","tarot_card":"4 of Swords","title":"Rest from Strife",
+     "ibn_ezra_image":"Youth holding flute and grape bunch; truce, harmonious recovery, music and restored ease"},
     # Scorpio
-    {"sign":"Scorpio","decan":1,"span":[0,10],"ruler":"Mars","tarot_card":"5 of Cups","title":"Loss in Pleasure"},
-    {"sign":"Scorpio","decan":2,"span":[10,20],"ruler":"Sun","tarot_card":"6 of Cups","title":"Pleasure"},
-    {"sign":"Scorpio","decan":3,"span":[20,30],"ruler":"Venus","tarot_card":"7 of Cups","title":"Illusionary Success"},
+    {"sign":"Scorpio","decan":1,"span":[0,10],"ruler":"Mars","tarot_card":"5 of Cups","title":"Loss in Pleasure",
+     "ibn_ezra_image":"Man holding lance and poisonous adder; intense passion, martial stealth and secret warfare"},
+    {"sign":"Scorpio","decan":2,"span":[10,20],"ruler":"Sun","tarot_card":"6 of Cups","title":"Pleasure",
+     "ibn_ezra_image":"Woman riding camel holding mirror; secret affection, deep emotional ties and magnetic charm"},
+    {"sign":"Scorpio","decan":3,"span":[20,30],"ruler":"Venus","tarot_card":"7 of Cups","title":"Illusionary Success",
+     "ibn_ezra_image":"Two dogs fighting over bone beneath full moon; intense desire, occult secrets and transformation"},
     # Sagittarius
-    {"sign":"Sagittarius","decan":1,"span":[0,10],"ruler":"Mercury","tarot_card":"8 of Wands","title":"Swiftness"},
-    {"sign":"Sagittarius","decan":2,"span":[10,20],"ruler":"Moon","tarot_card":"9 of Wands","title":"Great Strength"},
-    {"sign":"Sagittarius","decan":3,"span":[20,30],"ruler":"Saturn","tarot_card":"10 of Wands","title":"Oppression"},
+    {"sign":"Sagittarius","decan":1,"span":[0,10],"ruler":"Mercury","tarot_card":"8 of Wands","title":"Swiftness",
+     "ibn_ezra_image":"Man in hunter cloak firing arrow; swift communications, exploration and pioneering quest"},
+    {"sign":"Sagittarius","decan":2,"span":[10,20],"ruler":"Moon","tarot_card":"9 of Wands","title":"Great Strength",
+     "ibn_ezra_image":"Centaur galloping across mountain ridge; philosophical endurance, defense of faith and stamina"},
+    {"sign":"Sagittarius","decan":3,"span":[20,30],"ruler":"Saturn","tarot_card":"10 of Wands","title":"Oppression",
+     "ibn_ezra_image":"Man bearing heavy golden bundle toward temple; heavy responsibility, noble purpose and duty"},
     # Capricorn
-    {"sign":"Capricorn","decan":1,"span":[0,10],"ruler":"Jupiter","tarot_card":"2 of Pentacles","title":"Harmonious Change"},
-    {"sign":"Capricorn","decan":2,"span":[10,20],"ruler":"Mars","tarot_card":"3 of Pentacles","title":"Material Works"},
-    {"sign":"Capricorn","decan":3,"span":[20,30],"ruler":"Sun","tarot_card":"4 of Pentacles","title":"Earthly Power"},
+    {"sign":"Capricorn","decan":1,"span":[0,10],"ruler":"Jupiter","tarot_card":"2 of Pentacles","title":"Harmonious Change",
+     "ibn_ezra_image":"Man holding reed pen and parchment; administrative mastery, organizing kingdoms and state laws"},
+    {"sign":"Capricorn","decan":2,"span":[10,20],"ruler":"Mars","tarot_card":"3 of Pentacles","title":"Material Works",
+     "ibn_ezra_image":"Architect holding iron square and level; building enduring stone monuments and engineering"},
+    {"sign":"Capricorn","decan":3,"span":[20,30],"ruler":"Sun","tarot_card":"4 of Pentacles","title":"Earthly Power",
+     "ibn_ezra_image":"King seated on granite throne holding orb; supreme earthly authority, wealth preservation and rule"},
     # Aquarius
-    {"sign":"Aquarius","decan":1,"span":[0,10],"ruler":"Venus","tarot_card":"5 of Swords","title":"Defeat"},
-    {"sign":"Aquarius","decan":2,"span":[10,20],"ruler":"Mercury","tarot_card":"6 of Swords","title":"Earned Success"},
-    {"sign":"Aquarius","decan":3,"span":[20,30],"ruler":"Moon","tarot_card":"7 of Swords","title":"Unstable Effort"},
+    {"sign":"Aquarius","decan":1,"span":[0,10],"ruler":"Venus","tarot_card":"5 of Swords","title":"Defeat",
+     "ibn_ezra_image":"Man pouring water from two silver urns; humanitarian vision, revolutionary ideas and social reform"},
+    {"sign":"Aquarius","decan":2,"span":[10,20],"ruler":"Mercury","tarot_card":"6 of Swords","title":"Earned Success",
+     "ibn_ezra_image":"Scholar with astrolabe gazing at stars; scientific breakthroughs, astrology and astronomical skill"},
+    {"sign":"Aquarius","decan":3,"span":[20,30],"ruler":"Moon","tarot_card":"7 of Swords","title":"Unstable Effort",
+     "ibn_ezra_image":"Man walking through windy desert with lamp; eccentric genius, unconventional freedom and independence"},
     # Pisces
-    {"sign":"Pisces","decan":1,"span":[0,10],"ruler":"Saturn","tarot_card":"8 of Cups","title":"Abandoned Success"},
-    {"sign":"Pisces","decan":2,"span":[10,20],"ruler":"Jupiter","tarot_card":"9 of Cups","title":"Material Happiness"},
-    {"sign":"Pisces","decan":3,"span":[20,30],"ruler":"Mars","tarot_card":"10 of Cups","title":"Perfected Success"}
+    {"sign":"Pisces","decan":1,"span":[0,10],"ruler":"Saturn","tarot_card":"8 of Cups","title":"Abandoned Success",
+     "ibn_ezra_image":"Man diving into ocean depths with net; mystic renunciation, search for sunken treasures and spirit"},
+    {"sign":"Pisces","decan":2,"span":[10,20],"ruler":"Jupiter","tarot_card":"9 of Cups","title":"Material Happiness",
+     "ibn_ezra_image":"Woman holding seashell and pearl necklace; supreme emotional contentment, bliss and artistic vision"},
+    {"sign":"Pisces","decan":3,"span":[20,30],"ruler":"Mars","tarot_card":"10 of Cups","title":"Perfected Success",
+     "ibn_ezra_image":"Two dolphins swimming in golden circle; spiritual union, completion of zodiacal journey and grace"}
 ]
 
 HERMETIC_MAJOR_ARCANA = {
@@ -6697,6 +6733,7 @@ def map_hermetic_tarot_profile(natal_jd, lat, lng, time_known=True):
                 "decan_ruler": match["ruler"],
                 "tarot_card": match["tarot_card"],
                 "hermetic_title": match["title"],
+                "ibn_ezra_classical_image": match.get("ibn_ezra_image", ""),
                 "major_arcana_sign": HERMETIC_MAJOR_ARCANA.get(s, ""),
                 "major_arcana_planet": HERMETIC_MAJOR_ARCANA.get(p, "")
             }
@@ -6713,10 +6750,11 @@ def map_hermetic_tarot_profile(natal_jd, lat, lng, time_known=True):
             "decan": asc_decan,
             "tarot_card": asc_match["tarot_card"] if asc_match else "",
             "hermetic_title": asc_match["title"] if asc_match else "",
+            "ibn_ezra_classical_image": asc_match.get("ibn_ezra_image", "") if asc_match else "",
             "major_arcana_ruler": HERMETIC_MAJOR_ARCANA.get(asc_sign, "")
         },
         "planetary_tarot_cards": decan_profile,
-        "note": "Golden Dawn / Book of Thoth canon: Each 10° decan embodies a Minor Arcana card, expressing the lived mystical archetype of that degree."
+        "note": "Synthesized from Abraham Ibn Ezra (Reshit Hokhmah Chapter 2 Decan Images) and Golden Dawn / Book of Thoth Tarot correspondences."
     }
 
 def _demo():
