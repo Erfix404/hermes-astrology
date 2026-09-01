@@ -4036,6 +4036,10 @@ def calculate_full_profile(data):
                 pass
         return result
 
+    if mode=="astrodynes" or mode=="cosmodynes":
+        result["astrodynes"] = compute_astrodynes(jd, lat, lng, time_known)
+        return result
+
     if mode=="daily_panchang" or mode=="choghadiya":
         result["daily_panchang_timing"] = daily_panchang_timing(target_eval_jd, lat, lng)
         return result
@@ -5561,6 +5565,151 @@ def kuja_dosha_analysis(planets, lagna_sign):
         "cancellation_reasons": cancellations,
         "status": "Cancelled Kuja Dosha (Effective Non-Manglik)" if is_cancelled else "Active Kuja Dosha (Manglik)",
         "note": "Per BPHS Chapter 80 Shloka 47-49: Kuja Dosha indicates intense relationship friction unless balanced by benefic aspects or partner parity."
+    }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  SECTION — ASTRODYNES & COSMODYNES (Elbert Benjamine / Church of Light)
+# ═════════════════════════════════════════════════════════════════════════════
+
+ASTRODYNE_HOUSE_POWER = {
+    1: 15.0, 10: 15.0, 4: 14.0, 7: 14.0,
+    2: 10.0, 5: 10.0, 8: 10.0, 11: 10.0,
+    3: 6.0, 6: 6.0, 9: 6.0, 12: 6.0
+}
+
+ASTRODYNE_PLANET_NATURE = {
+    "Venus": 2.0, "Jupiter": 2.0, "Sun": 1.0, "Moon": 1.0,
+    "Mercury": 0.0, "Uranus": -1.0, "Neptune": -1.0, "Pluto": -1.0,
+    "Mars": -2.0, "Saturn": -2.0, "North Node": 0.5, "South Node": -0.5, "Chiron": 0.0
+}
+
+ASTRODYNE_ASPECT_RULES = {
+    "conjunction": {"base_power": 15.0, "orb_lum": 15.0, "orb_pl": 12.0, "type": "variable"},
+    "opposition":  {"base_power": 14.0, "orb_lum": 15.0, "orb_pl": 12.0, "type": "discord"},
+    "trine":       {"base_power": 12.0, "orb_lum": 12.0, "orb_pl": 10.0, "type": "harmony"},
+    "square":      {"base_power": 10.0, "orb_lum": 12.0, "orb_pl": 10.0, "type": "discord"},
+    "sextile":     {"base_power": 6.0,  "orb_lum": 8.0,  "orb_pl": 6.0,  "type": "harmony"},
+    "inconjunct":  {"base_power": 3.0,  "orb_lum": 4.0,  "orb_pl": 3.0,  "type": "discord"},
+    "semisquare":  {"base_power": 3.0,  "orb_lum": 4.0,  "orb_pl": 3.0,  "type": "discord"},
+    "sesquisquare":{"base_power": 3.0,  "orb_lum": 4.0,  "orb_pl": 3.0,  "type": "discord"},
+    "semisextile": {"base_power": 2.0,  "orb_lum": 3.0,  "orb_pl": 2.0,  "type": "harmony"},
+}
+
+def compute_astrodynes(natal_jd, lat, lng, time_known=True):
+    """Calculates Astrodynes (Cosmodynes) per Elbert Benjamine (C.C. Zain / Church of Light):
+    Quantitative power (Astrodynes), harmony (Harmodynes), and discord (Discordynes)
+    for all planets, houses, and zodiac signs."""
+    ch = western_chart(natal_jd, lat, lng, time_known)
+    planets = ch["planets"]
+    aspects_list = ch["aspects"]
+
+    planet_power = {}
+    planet_harmony = {}
+
+    # 1. Base Planet Power from House Placements
+    for p, b in planets.items():
+        if p not in ASTRODYNE_PLANET_NATURE:
+            continue
+        h = b.get("house", 1)
+        base_p = ASTRODYNE_HOUSE_POWER.get(h, 6.0)
+        planet_power[p] = base_p
+        planet_harmony[p] = ASTRODYNE_PLANET_NATURE.get(p, 0.0)
+
+    # 2. Aspect Contributions to Power & Harmony
+    for asp in aspects_list:
+        p1, p2 = asp["a"], asp["b"]
+        asp_name = asp["aspect"].lower()
+        if p1 not in planet_power or p2 not in planet_power or asp_name not in ASTRODYNE_ASPECT_RULES:
+            continue
+        rule = ASTRODYNE_ASPECT_RULES[asp_name]
+        is_lum = (p1 in ("Sun","Moon") or p2 in ("Sun","Moon"))
+        max_orb = rule["orb_lum"] if is_lum else rule["orb_pl"]
+        orb = asp["orb"]
+        if orb > max_orb:
+            continue
+
+        tightness = max(0.0, (max_orb - orb) / max_orb)
+        asp_power = rule["base_power"] * tightness
+
+        # Distribute power equally to both participating bodies
+        planet_power[p1] += asp_power / 2.0
+        planet_power[p2] += asp_power / 2.0
+
+        # Harmony / Discord
+        if rule["type"] == "harmony":
+            h_val = asp_power / 2.0
+        elif rule["type"] == "discord":
+            h_val = -asp_power / 2.0
+        else: # conjunction
+            coeff = max(-1.0, min(1.0, (ASTRODYNE_PLANET_NATURE.get(p1,0.0) + ASTRODYNE_PLANET_NATURE.get(p2,0.0)) / 2.0))
+            h_val = (asp_power / 2.0) * coeff
+
+        planet_harmony[p1] += h_val
+        planet_harmony[p2] += h_val
+
+    # 3. Aggregate House Power & Harmony
+    house_power = {h: ASTRODYNE_HOUSE_POWER.get(h, 6.0) for h in range(1, 13)}
+    house_harmony = {h: 0.0 for h in range(1, 13)}
+
+    for p, b in planets.items():
+        if p not in planet_power: continue
+        h = b.get("house", 1)
+        house_power[h] += planet_power[p]
+        house_harmony[h] += planet_harmony[p]
+
+    # Add 50% of House Ruler's power/harmony to the house
+    for h in range(1, 13):
+        h_sign = ch["houses"][h]["sign"]
+        ruler = SIGN_DATA[h_sign]["ruler"]
+        if ruler in planet_power:
+            house_power[h] += 0.5 * planet_power[ruler]
+            house_harmony[h] += 0.5 * planet_harmony[ruler]
+
+    # 4. Aggregate Sign Power & Harmony
+    sign_power = {s: 0.0 for s in SIGNS}
+    sign_harmony = {s: 0.0 for s in SIGNS}
+
+    for p, b in planets.items():
+        if p not in planet_power: continue
+        s = b["sign"]
+        sign_power[s] += planet_power[p]
+        sign_harmony[s] += planet_harmony[p]
+
+    for s in SIGNS:
+        ruler = SIGN_DATA[s]["ruler"]
+        if ruler in planet_power:
+            sign_power[s] += 0.5 * planet_power[ruler]
+            sign_harmony[s] += 0.5 * planet_harmony[ruler]
+
+    # Format Output
+    p_sorted = sorted(planet_power.keys(), key=lambda k: -planet_power[k])
+    most_powerful_planet = p_sorted[0] if p_sorted else "Sun"
+    most_harmonious_planet = max(planet_harmony.keys(), key=lambda k: planet_harmony[k])
+    most_discordant_planet = min(planet_harmony.keys(), key=lambda k: planet_harmony[k])
+
+    h_sorted = sorted(house_power.keys(), key=lambda k: -house_power[k])
+    most_powerful_house = h_sorted[0]
+
+    return {
+        "system": "Astrodynes / Cosmodynes (Church of Light)",
+        "summary": {
+            "most_powerful_planet": most_powerful_planet,
+            "most_powerful_house": most_powerful_house,
+            "most_harmonious_planet": most_harmonious_planet,
+            "most_discordant_planet": most_discordant_planet,
+            "strongest_life_arena": MUNDANE_HOUSE_MEANINGS.get(most_powerful_house, "")
+        },
+        "planets": {p: {"power": round(planet_power[p], 2),
+                        "harmony": round(max(0.0, planet_harmony[p]), 2),
+                        "discord": round(abs(min(0.0, planet_harmony[p])), 2),
+                        "net_harmony": round(planet_harmony[p], 2)} for p in planet_power},
+        "houses": {h: {"power": round(house_power[h], 2),
+                       "net_harmony": round(house_harmony[h], 2),
+                       "meaning": MUNDANE_HOUSE_MEANINGS.get(h, "")} for h in range(1, 13)},
+        "signs": {s: {"power": round(sign_power[s], 2),
+                      "net_harmony": round(sign_harmony[s], 2)} for s in SIGNS},
+        "note": ("Astrodynes quantitatively measure planetary drive (Power) and emotional ease vs struggle "
+                 "(Harmony/Discord). Highest power house represents the primary life focus.")
     }
 
 def _demo():

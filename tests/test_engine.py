@@ -775,6 +775,38 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestAstrodynes(unittest.TestCase):
+    """Wave 9: Astrodynes / Cosmodynes quantitative power and harmony scoring."""
+
+    def test_astrodynes_calculation(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "astrodynes"})
+        ad = r["astrodynes"]
+        self.assertIn("summary", ad)
+        self.assertIn("planets", ad)
+        self.assertIn("houses", ad)
+        self.assertIn("signs", ad)
+
+        # 1. Summary elements
+        summ = ad["summary"]
+        self.assertIn("most_powerful_planet", summ)
+        self.assertIn("most_powerful_house", summ)
+        self.assertIn("most_harmonious_planet", summ)
+        self.assertIn("most_discordant_planet", summ)
+
+        # 2. Power and harmony values are positive/consistent
+        for p, stats in ad["planets"].items():
+            self.assertGreater(stats["power"], 0)
+            self.assertGreaterEqual(stats["harmony"], 0)
+            self.assertGreaterEqual(stats["discord"], 0)
+            self.assertAlmostEqual(stats["harmony"] - stats["discord"], stats["net_harmony"], delta=0.01)
+
+        # 3. 12 houses calculated
+        self.assertEqual(len(ad["houses"]), 12)
+        for h, hstats in ad["houses"].items():
+            self.assertGreater(hstats["power"], 0)
+
+
 class TestDailyTimingAndKujaDosha(unittest.TestCase):
     """Wave 8: Choghadiya, Daily Muhurtas, Ashtakavarga transit scores, Kuja Dosha cancellations."""
 
