@@ -164,18 +164,21 @@ The engine returns `_meta.engine_backend` (`builtin` or `swisseph`). Builtin is 
 
 ### 3 — Ground interpretation
 
-Load the reference files from `${SKILL_DIR%%/SKILL.md}/references/` by topic:
+Load the reference files from `${SKILL_DIR%%/SKILL.md}/references/` (or `${SKILL_DIR%%/SKILL.md}/references/fa/` if the user interacts in Persian / Farsi) by topic:
 
-| Topic | File |
-|-------|------|
-| Natal, personality, Big Three, aspects, houses, dignities | `western.md` |
-| Karma, dasha timing, Kundli, nakshatra, yogas, remedies | `vedic.md` |
-| BaZi, Day Master, luck pillars, Ten Gods, elemental balance | `bazi.md` |
-| Tibetan/Buddhist — Losar, Mewa, Parkha, Kalachakra | `tibetan.md` |
-| Synastry, love match, transits, forecasting, electional | `synastry-and-timing.md` |
-| Health, body, surgical timing, Ayurvedic dosha | `health.md` |
-| Astrocartography, horary, electional, rectification, Nadi, curses | `specialty-systems.md` |
-| Counseling craft, ethics, anti-Barnum | `consultation.md` |
+| Topic | English Reference | Persian Reference (`references/fa/`) |
+|-------|-------------------|--------------------------------------|
+| Terminology & Glossaries | `glossary.md` | `glossary.md` |
+| Natal, personality, Big Three, aspects, houses, dignities | `western.md` | `western.md` |
+| Karma, dasha timing, Kundli, nakshatra, yogas, remedies | `vedic.md` | `vedic.md` |
+| Forecasting, timing, profections, firdaria, ZR, dasha | `forecasting.md` | `forecasting.md` |
+| Synastry, love match, composite, Ibn Ezra lots, overlays | `synastry.md` | `synastry.md` |
+| Mundane, national ingresses, eclipses, lunations | `mundane.md` | `mundane.md` |
+| BaZi, Day Master, luck pillars, Ten Gods, elemental balance | `bazi.md` | `bazi.md` |
+| Tibetan/Buddhist — Losar, Mewa, Parkha, Kalachakra | `tibetan.md` | `tibetan.md` |
+| Health, body, surgical timing, Ayurvedic dosha | `health.md` | `health.md` |
+| Astrocartography, horary, electional, rectification, Nadi | `specialty-systems.md` | `specialty-systems.md` |
+| Counseling craft, ethics, anti-Barnum | `consultation.md` | `consultation.md` |
 
 ### 4 — Synthesise
 
