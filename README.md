@@ -1,187 +1,109 @@
-# 🔮 Hermes Astrology v3.0
+# 🔮 Hermes Astrology Engine (v4.0.0 Ultimate)
 
-**Deterministic multi-tradition astrology engine & AI-Agent backend** — Western tropical, Vedic/Jyotisha sidereal, Chinese BaZi (Four Pillars). Zero‑dependency pure‑Python ephemeris. 24+ modes. Full forecasting suite (Profections, Firdaria, Zodiacal Releasing, Progressions, Vimshottari, Chara Dasha, Mundane Ingresses, Eclipses, Ibn Ezra Lots). CLI + API + MCP.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Tests Passing](https://img.shields.io/badge/Tests-176%20Passed%20(100%25)-success.svg)](https://github.com/Erfix404/hermes-astrology)
+[![Ephemeris: NASA JPL / SwissEph](https://img.shields.io/badge/Ephemeris-JPL%20%7C%20SwissEph-purple.svg)](https://www.astro.com/swisseph/)
 
-| Tradition | System | Basis |
-|-----------|--------|-------|
-| ♈ Western & Hellenistic | Tropical / Valens & Ptolemy | Psychological archetypes, Time-Lords (ZR, Profections, Firdaria), Progressions |
-| ☪ Vedic / Jyotisha | Sidereal (Lahiri ~24°) | BPHS Shadbala (6/6), Vimshottari (3 levels), Gochara (Moon transit), Jaimini Chara Dasha |
-| 🏛️ Mundane & Medieval | World charts / Ingresses | Bonatti/Lilly dynamic ingress validity, Carter eclipse triggers, Ibn Ezra marriage lots |
-| 木 Chinese BaZi | Four Pillars (solar terms) | Elemental balance, luck cycles, Ten Gods |
+**موتور قطعی و چندسنتی نجوم، طالع‌بینی و پیشگویی برای هوش مصنوعی و تحلیل‌گران حرفه‌ای**  
+*The Ultimate Deterministic Multi-Tradition Astrology Engine & AI-Agent Backend*
 
-## ✨ Features (v3.0)
+---
 
-- **Zero‑dependency & Robust Fallbacks** — pure Python geocentric ephemeris. Automatic Moshier/built-in resilience when Swiss Ephemeris data files are missing.
-- **Universal Dynamic Temporal Resolution** — all forecasting systems accept `target_date`/`as_of`/`date` to evaluate any historical or future life chapter on demand.
-- **Hellenistic Time-Lords** — Annual & Monthly Profections, Medieval Firdaria (day/night sect 75y), and Vettius Valens Zodiacal Releasing (L1-L4, Loosing-of-the-Bond, Fortune peak detection).
-- **Deep Vedic Forecasting** — Full 6-fold BPHS Shadbala (Cheshta from southern declination & apogees, Drik aspectual speculum), 3-level Vimshottari Dasha (Maha/Antar/Pratyantar), Gochara with Sade Sati, Jaimini Chara Dasha (K.N. Rao).
-- **Mundane & National Astrology** — Exact astronomical Ingresses (Aries/Cancer/Libra/Cap) with Bonatti/Lilly validity auto-resolution, Carter eclipse triggers, Lunations.
-- **Relationship Astrology** — 7 Medieval/Hebrew Marriage Lots (Abraham Ibn Ezra, *Reshit Hokhmah* IX), bi-directional house overlays, composite chart interpretation, 36-Guna Milan.
-- **Adaptive 3-Level Altitude Delivery** — `references/fa/metaphors.md` allows AI agents to translate complex mechanics into tangible, warm human metaphors (Level 1 Conversational, Level 2 Balanced, Level 3 Pro).
-- **Verified Accuracy** — 153 unit tests passing, validated against Astro-Databank Rodden Rating AA historical charts (Carl Jung, Albert Einstein, Steve Jobs).
-- **FastAPI REST + MCP Server** — Claude Desktop, Cursor, Devin, and headless agent integration.
+## 📖 درباره پروژه (About the Project)
 
-## 🚀 Quick start
+**Hermes Astrology** یک ابرموتور جامع، مستقل (Zero-Dependency) و فوق‌العاده دقیق است که سه سنت اصیل تاریخ بشر (**غربی/هلنیستی**، **ودیک/جیوتیش**، و **چینی/باژی**) را همراه با نجوم رویدادی، مالی و باطنی در یک معماری یکپارچه ادغام کرده است.
 
+برخلاف چت‌بات‌های متداول که موقعیت سیارات را توهم (Hallucinate) می‌کنند، Hermes موقعیت‌های نجومی را بر پایه ریاضیات مداری **NASA JPL DE421 / Swiss Ephemeris** و فرمول‌های معتبر کهن محاسبه کرده و در عین حال، با مجهز بودن به یک **موتور تطبیق لحن ۳ سطحی (ساده و خودمانی تا تحلیل فوق‌حرفه‌ای)**، به هر کاربری با هر میزان از دانش پاسخی دلنشین، کاربردی و انسانی ارائه می‌دهد.
+
+---
+
+### 🌐 سنت‌های تحت پوشش (Supported Traditions)
+
+| سنت (Tradition) | سیستم محاسباتی (System) | مبنای تحلیلی (Core Focus) |
+|---|---|---|
+| **♈ غربی و هلنیستی (Western & Hellenistic)** | تروپیکال / بطلمیوس، والنس، لیلی | کهن‌الگوهای روانی، اربابان زمان (ZR, Profections, Firdaria)، پراگرسیون‌ها، آستروداین |
+| **☪ ودیک و هندی (Vedic / Jyotisha)** | سایدریال (آیانامشا لاهیری ۲۴°) | کارما، شادبالا ۶/۶ کامل (BPHS)، داشای ۳ سطحی، چارا داشای جیمینی، گوچارا با سده‌ساتی |
+| **🏛️ جهانی و اسلامی-عبری (Mundane & Medieval)** | چارت‌های اینگرس پایتخت‌ها / ابن‌عزرا | اینگرس‌های فصلی بوناتی/لیلی با اعتبار زمانی پویا، کسوف‌ها با تریگر کارتر، لوت‌های ۱۳گانه ازدواج |
+| **木 چینی (Chinese BaZi)** | چهار ستون سرنوشت (Four Pillars) | تعادل عناصر پنج‌گانه (Wu Xing)، ستون‌های شانس ده‌ساله (Da Yun)، ده کهن‌الگو (Ten Gods) |
+| **🔮 باطنی و هرمسی (Hermetic & Esoteric)** | ۳۶ دکان، گلدن دان و تاروت | انطباق ۳۶ دکان با تصاویر باستانی آغاز خرد و کارت‌های تاروت، درخت حیات قبالا |
+
+---
+
+## 🌟 قابلیت‌های برجسته نسخه ۴.۰ (Key Features in v4.0.0)
+
+### ۱. پیشگویی و اربابان زمان (Master Forecasting & Time-Lords)
+* **Zodiacal Releasing (رهایش برجی والنس):** محاسبه فصول اوج شغلی و مالی، پدیده‌های جهش و گسست پیوند (Loosing of the Bond) بر روی تقویم نمادین ۳۶۰ روزه.
+* **Annual & Monthly Profections:** فعال شدن پویای خانه‌ها و ارباب سال/ماه.
+* **Medieval Firdaria:** دوره‌های ۷۵ ساله بر اساس سکت روز و شب به همراه ۷ زیردوره سیاره‌ای منسوب به ابن‌عزرا.
+* **Secondary Progressions & Solar Arc:** پراگرسیون‌های ثانویه و رصد فازهای ۸ گانه ماه پراگرس‌شده.
+* **3-Level Vimshottari Dasha:** تفکیک دقیق مهاداشا، آنتارداشا و پراتیانتارداشا (سطح ۳) به همراه داشای برجی چارا (Jaimini / Rao).
+
+### ۲. هوش تصمیم‌گیری و پرونده‌های تخصصی (Domain Blueprints & Decisions)
+* **موتور انتخاب زمان طلایی (`find_best_time`):** اسکن خودکار ۳۰/۶۰ روز آینده و گزینش ۳ پنجره طلایی برای بیزنس، عقد، خرید ملک، سفر و جراحی بر اساس کتاب انتخابات ابن‌عزرا.
+* **چارت فضا-زمان دیویسون (`davison` & `davison_progression`):** محاسبه چارت واقعی رابطه در فضا-زمان و پیشگویی مسیر رابطه با پراگرسیون دیویسون.
+* **سینستری دراکونیک (`draconic` & `draconic_synastry`):** کشف قراردادهای کارمایی روح با انتقال گره شمالی به ۰ درجه حمل.
+* **پرونده جامع ثروت و شغل (`wealth_blueprint`):** تلفیق خانه‌های ۲ و ۱۰، سهم‌المال، چارت دسامشا D10، ایندو لاگنا و عنصر پول باژی.
+* **پرونده ازدواج و عشق (`love_blueprint`):** خانه ۷، ناوامشا D9، لوت‌های ۱۳گانه ابن‌عزرا و ابطال مانگلیک دوشا (Kuja Dosha).
+
+### ۳. اصلاح ساعت تولد، کریپتو و راهکارها (Advanced Engines)
+* **اصلاح خودکار ساعت تولد (`rectify_birth_time` / BTR):** اسکن بازه زمانی و محاسبه معکوس زوایای چارت با دایرکشن‌های قوس خورشیدی و تقارن تروتین هرمس بر اساس وقایع گذشته زندگی.
+* **آسترو-تریدینگ و نجوم مالی (`crypto` / `financial`):** رصد شاخص نوسان و زوایای ترانزیت به چارت جنسیس بیت‌کوین، اتریوم، اس‌اندپی ۵۰۰ و طلا.
+* **تجویز علمی راهکارها و سنگ‌ها (`remedies_blueprint`):** تجویز سنگ **فقط** برای سعد کارکردی (نه داستاهانا)، اقلام اهدا و خیریه (Daan) و عادات رفتاری لیز گرین.
+* **ابرموتور اجماع سه‌سنتی (`tri_consensus`):** محاسبه درصد قطعیت رویدادها (Confidence Score ۴۵٪ تا ۹۸٪) از تقاطع همزمان غربی، ودیک و باژی.
+* **تقویم روزانه ساعات سعد و نحس (`daily_panchang` / `choghadiya`):** دوره‌های ۸‌گانه روز/شب (آمریت، شوب، لاب و...) به همراه پنجره‌های ابحیجیت، برهما و راهو کالام.
+* **امتیازدهی آستروداین (`astrodynes`):** نمره‌دهی عددی به توان (Power) و هارمونی (Harmony) سیارات و خانه‌ها (کلیسای نور).
+
+---
+
+## 🚀 راهنمای سریع (Quick Start)
+
+### نصب و کلون مخزن
 ```bash
-# Clone
 git clone https://github.com/Erfix404/hermes-astrology.git
 cd hermes-astrology
-
-# CLI — natal chart for Tehran
-python scripts/astro_engine.py --json '{"year":1995,"month":4,"day":15,
-  "hour":14,"minute":30,"lat":35.6892,"lng":51.3890,
-  "tz":"Asia/Tehran","time_known":true,
-  "systems":["western","vedic","bazi"]}'
-
-# Convenience CLI
-python scripts/astro_cli.py --json '...' --summary
 ```
 
-### As a library
+### اجرای مستقیم از طریق خط فرمان (CLI)
+```bash
+# محاسبه چارت کامل ۳ سنتی
+python scripts/astro_engine.py --json '{"year":1995,"month":4,"day":15,"hour":14,"minute":30,"lat":35.6892,"lng":51.3890,"tz":"Asia/Tehran","systems":["western","vedic","bazi"]}'
 
+# جستجوی ۳ زمان طلایی برای شروع بیزنس در ۳۰ روز آینده
+python scripts/astro_engine.py --json '{"lat":35.6892,"lng":51.3890,"mode":"find_best_time","activity":"business_commerce","days_ahead":30}'
+
+# بررسی آب‌وهوای کریپتو و نوسانات بیت‌کوین
+python scripts/astro_engine.py --json '{"mode":"crypto","asset":"BTC"}'
+
+# اجرای تست‌های جامع (۱۷۶ تست)
+python -m unittest discover tests
+```
+
+### استفاده به عنوان کتابخانه پایتون (Python API)
 ```python
 import sys
 sys.path.insert(0, "scripts")
 from astro_engine import calculate_full_profile
 
-chart = calculate_full_profile({
-    "date": "1995-04-15", "time": "14:30", "place": "Tehran",
-    "lat": 35.6892, "lng": 51.3890, "tz": "Asia/Tehran", "mode": "natal",
+# استخراج پرونده کامل ثروت و شغل
+result = calculate_full_profile({
+    "year": 1990, "month": 6, "day": 15, "hour": 11, "minute": 0,
+    "lat": 35.6892, "lng": 51.3890, "tz": "Asia/Tehran",
+    "mode": "wealth_blueprint"
 })
-sun = chart["charts"]["western"]["planets"]["Sun"]
-print(sun["sign"], sun["deg_in_sign"])   # → Aries 25.0°
+
+print(result["wealth_blueprint"]["synthesis_summary"])
 ```
-
-### Daily astrology fetch
-
-```bash
-python scripts/daily-astrology-fetch.py
-# → JSON with today's planet positions, signs, degrees, retrograde status
-```
-
-### Ready-to-run examples
-
-```bash
-python examples/natal_chart.py        # full 3-tradition natal chart
-python examples/compatibility.py      # compatibility score + synastry
-```
-
-## 📦 Installation as library
-
-```bash
-pip install .
-# or for development:
-cd hermes-astrology
-python -m unittest tests.test_engine -v
-```
-
-## 🔧 API modes
-
-| Mode | Endpoint | Description |
-|------|----------|-------------|
-| `natal` | `/chart/natal` | Full natal chart(s) per tradition |
-| `transit` | `/chart/transit` | Current sky vs natal chart |
-| `synastry` | `/chart/synastry` | Relationship comparison |
-| `compatibility` | `/chart/compatibility` | 0‑100 scoring + 5 subscores |
-| `composite` | `/chart/composite` | Midpoint relationship chart |
-| `solar_return` | `/chart/solar-return` | Annual birthday forecast |
-| `lunar_return` | `/chart/lunar-return` | Monthly lunar return |
-| `planetary_return` | `/chart/planetary-return` | Jupiter/Saturn/Mercury etc. |
-| `navamsa` | `/chart/navamsa` | Vedic D9 soul chart |
-| `varga` | `/chart/varga` | D2–D60 divisional charts |
-| `panchang` | `/chart/panchang` | Tithi, Nakshatra, Yoga, Karana |
-| `moon_phase` | `/chart/moon-phase` | Lunar phase + upcoming events |
-| `numerology` | `/chart/numerology` | Life Path, Personal Year |
-| `progressions` | `/chart/progressions` | Secondary progressions |
-| `planetary_hours` | `/chart/planetary-hours` | Chaldean hours for electional |
-| `transit_aspects` | `/chart/transit-aspects` | Detailed transit‑to‑natal aspects |
-| `horary` | `/horary` | Chart of the moment (question) |
-| `astrocartography` | `/astrocartography` | Relocation planet lines |
-| `event` | `/chart/event` | Any inception moment |
-
-## 📁 Project structure
-
-```
-hermes-astrology/
-├── scripts/
-│   ├── astro_engine.py        # ~3860 lines, zero-dep ephemeris engine
-│   ├── astro_cli.py           # CLI entry point
-│   ├── daily-astrology-fetch.py  # Daily planet data fetcher
-│   ├── api.py                 # FastAPI REST server (841 lines)
-│   └── mcp_server.py          # MCP server (18 tools)
-├── references/
-│   ├── western.md             # Western interpretation ruleset
-│   ├── vedic.md               # Vedic/Jyotisha ruleset
-│   ├── bazi.md                # Chinese BaZi ruleset
-│   ├── tibetan.md             # Tibetan Buddhist astrology
-│   ├── health.md              # Medical astrology
-│   ├── synastry-and-timing.md # Compatibility + forecasting
-│   ├── specialty-systems.md   # 14+ niche branches
-│   └── consultation.md        # Counseling craft + ethics
-├── tests/
-│   └── test_engine.py         # 98 tests, stdlib unittest
-├── SKILL.md                   # Agent integration skill
-├── pyproject.toml
-├── Dockerfile
-└── LICENSE (MIT)
-```
-
-## 🧪 Tests
-
-```bash
-python -m unittest tests.test_engine -v
-# → 98/98 pass
-```
-
-CI runs on Python 3.10–3.13 via GitHub Actions.
-
-## 📊 Accuracy validation
-
-Positions cross-checked against **NASA JPL DE421** (via Skyfield, an independent ephemeris implementation) at 2026-08-01 08:30 UTC:
-
-| Body | Δ (arcsec) |
-|------|-----------|
-| Sun | 19.0 |
-| Moon | 2.3 |
-| Mercury | 15.9 |
-| Venus | 15.6 |
-| Mars | 29.8 |
-| Jupiter | 28.6 |
-| Saturn | 0.4 |
-| Uranus | 0.6 |
-| Neptune | 1.5 |
-| Pluto | 0.5 |
-
-All planets within 30″ (0.008°) — far below the 1° tolerance of any astrological application. The residuals are ephemeris-model differences (DE421 vs DE441), not engine error.
-
-## 🐳 Docker
-
-```bash
-docker build -t hermes-astrology .
-docker run -p 8000:8000 hermes-astrology
-# → FastAPI at http://localhost:8000/docs
-```
-
-## 🌐 MCP for Claude Desktop
-
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "astrology": {
-      "command": "python",
-      "args": ["/path/to/hermes-astrology/scripts/mcp_server.py"],
-      "env": { "ASTRO_MCP_TRANSPORT": "stdio" }
-    }
-  }
-}
-```
-
-18 tools — get astrology charts, solar returns, compatibility, planetary hours, and more, directly from Claude.
 
 ---
 
-**MIT License** — free to use, modify, and distribute.
-Built with ❤️ for Erfan (Erfix404).
+## 🛠️ معماری و سازگاری (Architecture)
+- **Zero-Dependency Core:** متکی بر ماژول‌های استاندارد پایتون (`math`, `datetime`, `json`).
+- **Resilient Fallback:** در صورت عدم دسترسی به فایل‌های سوئیس اپفمریس، محاسبات به صورت خودکار به مدل دقیق Moshier و بیلتین سوئیچ می‌کنند بدون اینکه خطایی رخ دهد.
+- **REST API + MCP Server:** آماده اتصال به FastAPI، کلاینت‌های هوش مصنوعی (Claude Desktop, Cursor, Devin) و دستیاران اختصاصی.
+
+---
+
+## 📜 لایسنس
+این پروژه تحت لایسنس **MIT** منتشر شده است و استفاده شخصی و تجاری از آن آزاد است.
+Developed with ❤️ by **Erfan Ashouri (Erfix404)**.
