@@ -1,20 +1,20 @@
-# 🔮 Hermes Astrology Engine (v4.0.0 Ultimate)
+# ✨ Astraea — Celestial Intelligence Engine (v4.0.0)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Tests Passing](https://img.shields.io/badge/Tests-176%20Passed%20(100%25)-success.svg)](https://github.com/Erfix404/hermes-astrology)
 [![Ephemeris: NASA JPL / SwissEph](https://img.shields.io/badge/Ephemeris-JPL%20%7C%20SwissEph-purple.svg)](https://www.astro.com/swisseph/)
 
-**The Ultimate Deterministic Multi-Tradition Astrology Engine & AI-Agent Backend**  
+**Astraea — The Ultimate Deterministic Multi-Tradition Celestial Intelligence Engine & AI-Agent Backend**  
 *Grounded in Classical Texts (Valens, Ptolemy, Lilly, Parashara, Ibn Ezra, Golden Dawn, BaZi) with Zero-Dependency Pure Python Core.*
 
 ---
 
-## 📖 About Hermes Astrology
+## 📖 About Astraea
 
-**Hermes Astrology** is a comprehensive, deterministic, zero-dependency computational astrology engine and AI-agent knowledge framework. It unifies three major ancient civilizations' traditions (**Western/Hellenistic**, **Vedic/Jyotish**, and **Chinese BaZi**) alongside medieval mundane, financial astro-trading, and esoteric hermetic systems into a single high-performance library.
+Named after **Astraea**, the classical goddess of innocence, celestial stars, and cosmic justice, **Astraea** is a comprehensive, deterministic, zero-dependency computational astrology engine and AI-agent knowledge framework. It unifies three major ancient civilizations' traditions (**Western/Hellenistic**, **Vedic/Jyotish**, and **Chinese BaZi**) alongside medieval mundane, financial astro-trading, and esoteric hermetic systems into a single high-performance library.
 
-Unlike standard LLM chatbots that hallucinate planetary positions, Hermes computes mathematically verified orbital coordinates based on **NASA JPL DE421 / Swiss Ephemeris** models. Furthermore, it features an **Adaptive 3-Level Altitude Delivery System** (`references/fa/metaphors.md`) allowing AI agents to seamlessly deliver warm, human, everyday metaphors to beginners while providing rigorous degrees, virupas, and text citations to professional astrologers.
+Unlike standard LLM chatbots that hallucinate planetary positions, Astraea computes mathematically verified orbital coordinates based on **NASA JPL DE421 / Swiss Ephemeris** models. Furthermore, it features an **Adaptive 3-Level Altitude Delivery System** (`references/fa/metaphors.md`) allowing AI agents to seamlessly deliver warm, human, everyday metaphors to beginners while providing rigorous degrees, virupas, and text citations to professional astrologers.
 
 ---
 

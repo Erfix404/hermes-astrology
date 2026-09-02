@@ -1,13 +1,15 @@
 ---
-name: astrology
+name: astraea-astrology
 description: >-
-  Deterministic multi-tradition astrology engine. Casts mathematically real
-  charts (Western tropical, Vedic/Jyotish sidereal, Chinese BaZi) via a
-  zero-dependency Python ephemeris — never hallucinated positions.
-  Interpretations grounded in classical rulesets with anti-Barnum ethics.
-  19 chart modes: natal, transit, synastry, compatibility, composite,
-  solar/lunar/planetary return, navamsa, varga, panchang, moon phase,
-  numerology, progressions, planetary hours, horary, astrocartography.
+  Astraea — Deterministic Multi-Tradition Celestial Intelligence Engine. Casts mathematically
+  real charts (Western tropical, Vedic/Jyotish sidereal, Chinese BaZi, Hermetic Decans)
+  via a zero-dependency Python ephemeris — never hallucinated positions.
+  Interpretations grounded in classical rulesets (Valens, Ptolemy, Lilly, BPHS, Ibn Ezra, Golden Dawn)
+  with 3-level adaptive delivery (conversational to professional).
+  25+ modes: natal, transit, synastry, compatibility, composite, davison, draconic,
+  solar/lunar/planetary return, navamsa, varga, panchang, choghadiya, zr (zodiacal releasing),
+  firdaria, profections, progressions, astrodynes, wealth_blueprint, love_blueprint,
+  remedies_blueprint, tri_consensus, crypto, rectify_birth_time, find_best_time, hermetic_tarot.
 when_to_use: >-
   Astrology, horoscope, zodiac signs, birth/natal chart, kundli, nakshatra,
   moon/rising/sun sign, BaZi, four pillars, feng-shui, luck cycles.

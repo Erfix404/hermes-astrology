@@ -1,20 +1,20 @@
-# 🔮 Hermes Astrology Engine (v4.0.0 Ultimate)
+# ✨ Astraea — Celestial Intelligence Engine (v4.0.0)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Tests Passing](https://img.shields.io/badge/Tests-176%20Passed%20(100%25)-success.svg)](https://github.com/Erfix404/hermes-astrology)
 [![Ephemeris: NASA JPL / SwissEph](https://img.shields.io/badge/Ephemeris-JPL%20%7C%20SwissEph-purple.svg)](https://www.astro.com/swisseph/)
 
-**موتور قطعی و چندسنتی نجوم، طالع‌بینی و پیشگویی برای هوش مصنوعی و تحلیل‌گران حرفه‌ای**  
-*The Ultimate Deterministic Multi-Tradition Astrology Engine & AI-Agent Backend*
+**آستریا (Astraea) — ابرموتور قطعی و چندسنتی هوش کیهانی، آسترولوژی و پیشگویی برای هوش مصنوعی**  
+*Astraea — Deterministic Multi-Tradition Celestial Intelligence Engine & AI-Agent Backend*
 
 ---
 
-## 📖 درباره پروژه (About the Project)
+## 📖 درباره آستریا (About Astraea)
 
-**Hermes Astrology** یک ابرموتور جامع، مستقل (Zero-Dependency) و فوق‌العاده دقیق است که سه سنت اصیل تاریخ بشر (**غربی/هلنیستی**، **ودیک/جیوتیش**، و **چینی/باژی**) را همراه با نجوم رویدادی، مالی و باطنی در یک معماری یکپارچه ادغام کرده است.
+**Astraea (آستریا)** نام الهه باستانی ستارگان، حقیقت و پاکی کیهانی است. این پروژه یک ابرموتور جامع، مستقل (Zero-Dependency) و فوق‌العاده دقیق است که سه سنت اصیل تاریخ بشر (**غربی/هلنیستی**، **ودیک/جیوتیش**، و **چینی/باژی**) را همراه با نجوم رویدادی، مالی و باطنی در یک معماری یکپارچه ادغام کرده است.
 
-برخلاف چت‌بات‌های متداول که موقعیت سیارات را توهم (Hallucinate) می‌کنند، Hermes موقعیت‌های نجومی را بر پایه ریاضیات مداری **NASA JPL DE421 / Swiss Ephemeris** و فرمول‌های معتبر کهن محاسبه کرده و در عین حال، با مجهز بودن به یک **موتور تطبیق لحن ۳ سطحی (ساده و خودمانی تا تحلیل فوق‌حرفه‌ای)**، به هر کاربری با هر میزان از دانش پاسخی دلنشین، کاربردی و انسانی ارائه می‌دهد.
+برخلاف چت‌بات‌های متداول که موقعیت سیارات را توهم (Hallucinate) می‌کنند، Astraea موقعیت‌های نجومی را بر پایه ریاضیات مداری **NASA JPL DE421 / Swiss Ephemeris** و فرمول‌های معتبر کهن محاسبه کرده و در عین حال، با مجهز بودن به یک **موتور تطبیق لحن ۳ سطحی (ساده و خودمانی تا تحلیل فوق‌حرفه‌ای)**، به هر کاربری با هر میزان از دانش پاسخی دلنشین، کاربردی و انسانی ارائه می‌دهد.
 
 ---
 
