@@ -69,21 +69,39 @@
 
 ---
 
-## ۳. دستورات CLI و خروجی‌های ساختاریافته موتور
+## ۳. ماژول‌های پیشرفته (Advanced Quantum & Diurnal Modules)
+
+### ۱. امواج هارمونیک فوریه سیاره‌ای (Harmonic Composite Waves)
+برهم‌نهی دوره‌های تناوب مداری ۸ چرخه سینویک با فرمول:
+$$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
+تولید اسپارک‌لاین ۳۰ تا ۹۰ روزه روند آتی بازار.
+
+### ۲. چرخ ۲۴ ساعته گان (Gann Circle of 24 Diurnal Clock)
+محاسبه زاویه چرخش روزانه زمین ($15^\circ/\text{hr}$ و $1^\circ/\text{4 min}$) و تطبیق با سشن‌های معاملاتی لندن، نیویورک و توکیو جهت شکار پیوت‌های دقیق اینترادی.
+
+### ۳. هوروسکوپ بدو تأسیس دارایی‌ها (Asset Genesis Horoscopy)
+تحلیل کامل ترانزیت‌های لحظه‌ای به چارت پیدایش بیت‌کوین (۲۰۰۹)، اتریوم (۲۰۱۵)، بورس نیویورک (۱۷۹۲) و طلا (۱۹۷۱) و تطبیق زوایای کسوف با سیارات جنسیس.
+
+---
+
+## ۴. دستورات CLI و خروجی‌های ساختاریافته موتور
 
 ```bash
-# ۱. تولید ستاپ معاملاتی کامل برای یک دارایی بر پایه دیتای روز
-python scripts/astro_engine.py --json '{"mode":"astro_trading","asset":"BTC","price":65000}'
+# ۱. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
+python scripts/astro_engine.py --json '{"mode":"terminal_dashboard","asset":"BTC","price":65000}'
 
-# ۲. استخراج پتانسیل سایدروگراف بردلی (Bradley Siderograph)
-python scripts/astro_engine.py --json '{"mode":"bradley","target_date":"2026-09-02"}'
+# ۲. استخراج موج هارمونیک ۳۰ روزه آینده بازار
+python scripts/astro_engine.py --json '{"mode":"harmonic_wave","days":30}'
 
-# ۳. محاسبه سطوح مربع ۹ گن و خطوط قیمتی سیاره‌ای
+# ۳. محاسبه پیوت‌های ساعتی چرخ ۲۴ ساعته گان
+python scripts/astro_engine.py --json '{"mode":"gann_clock","price":65000,"hour_utc":13}'
+
+# ۴. بررسی ترانزیت‌ها به چارت بدو تأسیس (Genesis Chart)
+python scripts/astro_engine.py --json '{"mode":"genesis_transits","asset":"BTC"}'
+
+# ۵. محاسبه سطوح مربع ۹ گن و خطوط قیمتی سیاره‌ای
 python scripts/astro_engine.py --json '{"mode":"gann_sq9","asset":"BTC","price":65000}'
 
-# ۴. بررسی پنجره‌های بازگشت بحرانی مریمن (Merriman CRD)
-python scripts/astro_engine.py --json '{"mode":"crd_calendar","target_date":"2026-09-02"}'
-
-# ۵. تحلیل فاز چرخه ۱۸.۶ ساله مک‌ویرتر (McWhirter Node Cycle)
-python scripts/astro_engine.py --json '{"mode":"mcwhirter"}'
+# ۶. استخراج پتانسیل سایدروگراف بردلی (Bradley Siderograph)
+python scripts/astro_engine.py --json '{"mode":"bradley","target_date":"2026-09-02"}'
 ```

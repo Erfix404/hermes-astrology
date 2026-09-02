@@ -3730,8 +3730,10 @@ def calculate_full_profile(data):
     if mode in ("weekly_calendar", "eclipses", "stations", "moon_phase",
                 "planetary_hours", "void_of_course", "muhurta", "electional",
                 "astro_trading", "trade_setup", "bradley", "siderograph",
-                "gann_sq9", "square_of_9", "gann_angles", "bayer", "mercury_speed",
-                "crd_calendar", "geocosmic_crd", "mcwhirter", "node_cycle", "financial", "crypto"):
+                "gann_sq9", "square_of_9", "gann_angles", "gann_clock", "circle_24",
+                "harmonic_wave", "composite_wave", "genesis_transits", "terminal_dashboard",
+                "bayer", "mercury_speed", "crd_calendar", "geocosmic_crd",
+                "mcwhirter", "node_cycle", "financial", "crypto"):
         # Sky-now / Event modes: default anchor is today (UTC) or resolved target moment
         tdt = _resolve_target_dt(data)
         tjd = julian_day(tdt)
@@ -3851,6 +3853,48 @@ def calculate_full_profile(data):
             p_unit = float(data.get("price_unit", 100.0))
             direct = data.get("direction", "up")
             result["gann_angles"] = ate.GannAnglesEngine.project_angles(p_price, bars, p_unit, direct)
+            return result
+        if mode=="gann_clock" or mode=="circle_24":
+            import astro_trading_engine as ate
+            p_price = float(data.get("price", 65000.0))
+            h_utc = int(data.get("hour_utc", tdt.hour))
+            result["gann_circle_24"] = ate.GannCircle24ClockEngine.compute_intraday_pivots(p_price, h_utc)
+            return result
+        if mode=="harmonic_wave" or mode=="composite_wave":
+            import astro_trading_engine as ate
+            days_count = int(data.get("days", 30))
+            wave_series = ate.HarmonicCompositeWaveEngine.forecast_composite_series(tdt, days_count)
+            wave_vals = [d["composite_wave_value"] for d in wave_series]
+            result["harmonic_planetary_wave"] = {
+                "forecast_start_date": tdt.strftime("%Y-%m-%d"),
+                "forecast_days": days_count,
+                "sparkline": ate.HarmonicCompositeWaveEngine.render_sparkline(wave_vals),
+                "wave_series": wave_series,
+                "note": "Timing Solution Superposition Model: Multi-synodic planetary harmonic composite momentum curve."
+            }
+            return result
+        if mode=="genesis_transits":
+            import astro_trading_engine as ate
+            asset = data.get("asset", "BTC")
+            t_lons, _, _ = body_longitudes(tjd)
+            result["genesis_transits"] = ate.AssetGenesisHoroscopyEngine.evaluate_genesis_transits(asset, t_lons)
+            return result
+        if mode=="terminal_dashboard":
+            import astro_trading_engine as ate
+            asset = data.get("asset", "BTC")
+            price = float(data.get("price", 65000.0 if asset.upper()=="BTC" else 2500.0 if asset.upper()=="ETH" else 2500.0 if asset.upper()=="GOLD" else 5500.0))
+            t_lons, t_speed, _ = body_longitudes(tjd)
+            decls = body_declinations(tjd)
+            voc = void_of_course_moon(tjd, tlat, tlng, True)
+            is_voc = bool(voc.get("is_void", False))
+            setup = ate.AstroTradingStrategyEngine.generate_trade_setup(asset, price, t_lons, t_speed, is_moon_voc=is_voc)
+            pot = ate.BradleySiderographEngine.calculate_potential(t_lons, decls)["net_siderograph_potential"]
+            wave_series = ate.HarmonicCompositeWaveEngine.forecast_composite_series(tdt, 30)
+            dash = ate.AstroTerminalDashboard.render_dashboard(setup, pot, wave_series)
+            result["terminal_dashboard"] = {
+                "dashboard_view": dash,
+                "trade_setup": setup
+            }
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate

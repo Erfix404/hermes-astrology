@@ -140,6 +140,58 @@ class TestAstroTradingStrategyEngine(unittest.TestCase):
         res_by = ae.calculate_full_profile(data_bayer)
         self.assertIn("bayer_mercury_analysis", res_by)
 
+        data_wave = {"mode": "harmonic_wave", "days": 30}
+        res_w = ae.calculate_full_profile(data_wave)
+        self.assertIn("harmonic_planetary_wave", res_w)
+
+        data_clock = {"mode": "gann_clock", "price": 65000.0, "hour_utc": 13}
+        res_ck = ae.calculate_full_profile(data_clock)
+        self.assertIn("gann_circle_24", res_ck)
+
+        data_gt = {"mode": "genesis_transits", "asset": "BTC"}
+        res_gt = ae.calculate_full_profile(data_gt)
+        self.assertIn("genesis_transits", res_gt)
+
+        data_dash = {"mode": "terminal_dashboard", "asset": "BTC", "price": 65000.0}
+        res_dash = ae.calculate_full_profile(data_dash)
+        self.assertIn("terminal_dashboard", res_dash)
+
+
+class TestAstroTradingEliteModules(unittest.TestCase):
+    """Test Harmonic Waves, Circle of 24 Clock, Genesis Horoscopy & Terminal Dashboard."""
+
+    def test_harmonic_composite_wave(self):
+        w0 = ate.HarmonicCompositeWaveEngine.compute_wave_at_day(0.0)
+        self.assertIsInstance(w0, float)
+        series = ate.HarmonicCompositeWaveEngine.forecast_composite_series(datetime(2026, 9, 2), days=30)
+        self.assertEqual(len(series), 30)
+        spark = ate.HarmonicCompositeWaveEngine.render_sparkline([d["composite_wave_value"] for d in series])
+        self.assertEqual(len(spark), 30)
+
+    def test_gann_circle_24_clock(self):
+        pivots = ate.GannCircle24ClockEngine.compute_intraday_pivots(current_price=65000.0, session_hour_utc=13)
+        self.assertEqual(pivots["session_hour_utc"], 13)
+        self.assertEqual(pivots["diurnal_rotation_deg"], 195.0)
+        self.assertIn("+0h (0°)", pivots["intraday_price_ladder"])
+
+    def test_asset_genesis_horoscopy_btc(self):
+        t_lons = {"Jupiter": 283.5, "Saturn": 171.4, "Pluto": 271.3} # Exact conjunctions to BTC genesis
+        eclipses = [283.5]
+        res = ate.AssetGenesisHoroscopyEngine.evaluate_genesis_transits("BTC", t_lons, eclipses)
+        self.assertEqual(res["asset_name"], "Bitcoin")
+        self.assertGreater(res["active_transits_count"], 0)
+        self.assertEqual(len(res["eclipse_triggers"]), 1)
+
+    def test_terminal_dashboard_render(self):
+        lons = {"Sun": 160.0, "Mars": 90.5, "Jupiter": 120.0, "Saturn": 350.0}
+        speeds = {"Mars": 0.02, "Mercury": 1.2, "Venus": 1.0}
+        setup = ate.AstroTradingStrategyEngine.generate_trade_setup("BTC", 65000.0, lons, speeds)
+        wave_series = ate.HarmonicCompositeWaveEngine.forecast_composite_series(datetime(2026, 9, 2), 30)
+        view = ate.AstroTerminalDashboard.render_dashboard(setup, siderograph_pot=12.5, wave_forecast=wave_series)
+        self.assertIn("ASTRAEA CELESTIAL TRADING TERMINAL", view)
+        self.assertIn("Market Price", view)
+        self.assertIn("EXECUTION PARAMETERS", view)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

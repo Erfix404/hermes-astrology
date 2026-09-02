@@ -574,3 +574,227 @@ class AstroTradingStrategyEngine:
             "bearish_cosmic_drivers": bearish_factors,
             "operational_warnings": warnings
         }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  7. HARMONIC PLANETARY COMPOSITE WAVE ENGINE (Fourier Synodic Superposition)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class HarmonicCompositeWaveEngine:
+    """Fourier Planetary Synodic Cycle Composite Wave Engine.
+    Superimposes dominant astronomical synodic periods to construct continuous
+    predictive momentum and trend waves for financial markets (Timing Solution model)."""
+
+    SYNODIC_CYCLES = {
+        "Lunar_Synodic":    {"period_days": 29.5306,   "amplitude": 0.35, "phase": 0.0},
+        "Mercury_Synodic":  {"period_days": 115.8775,  "amplitude": 0.50, "phase": 0.5},
+        "Venus_Synodic":    {"period_days": 583.9214,  "amplitude": 0.75, "phase": 1.2},
+        "Mars_Synodic":     {"period_days": 779.9361,  "amplitude": 1.00, "phase": 2.1},
+        "Jupiter_Saturn":   {"period_days": 7253.45,   "amplitude": 2.20, "phase": 0.8},
+        "Jupiter_Uranus":   {"period_days": 5046.00,   "amplitude": 1.80, "phase": 3.0},
+        "Saturn_Pluto":     {"period_days": 12175.0,   "amplitude": 2.50, "phase": 1.5},
+        "Uranus_Pluto":     {"period_days": 47900.0,   "amplitude": 2.00, "phase": 0.0}
+    }
+
+    @staticmethod
+    def compute_wave_at_day(t_day_offset: float) -> float:
+        """Calculate superposition value W(t) = sum(A_k * cos(2*pi*t / T_k + phi_k))."""
+        val = 0.0
+        for info in HarmonicCompositeWaveEngine.SYNODIC_CYCLES.values():
+            t_k = info["period_days"]
+            a_k = info["amplitude"]
+            phi_k = info["phase"]
+            val += a_k * math.cos((2.0 * math.pi * t_day_offset / t_k) + phi_k)
+        return round(val, 3)
+
+    @staticmethod
+    def forecast_composite_series(start_date: datetime, days: int = 30) -> List[Dict[str, Any]]:
+        """Generate day-by-day harmonic wave values for the upcoming forecast window."""
+        series = []
+        for i in range(days):
+            cur_dt = start_date + timedelta(days=i)
+            w_val = HarmonicCompositeWaveEngine.compute_wave_at_day(float(i))
+            series.append({
+                "day_index": i,
+                "date": cur_dt.strftime("%Y-%m-%d"),
+                "composite_wave_value": w_val
+            })
+        return series
+
+    @staticmethod
+    def render_sparkline(values: List[float]) -> str:
+        """Render a clean Unicode sparkline from wave series."""
+        if not values:
+            return ""
+        bars = " ▂▃▄▅▆▇█"
+        mn = min(values)
+        mx = max(values)
+        rng = (mx - mn) if (mx - mn) > 0 else 1.0
+        return "".join(bars[min(7, int(((v - mn) / rng) * 7.0))] for v in values)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  8. GANN CIRCLE OF 24 & DIURNAL INTRADAY PLANETARY CLOCK
+# ═════════════════════════════════════════════════════════════════════════════
+
+class GannCircle24ClockEngine:
+    """W.D. Gann Circle of 24 Diurnal Intraday Planetary Clock.
+    Maps the 24-hour diurnal rotation of the Earth (360° / 24 hrs = 15° per hour = 1° per 4 min)
+    to calculate intraday price/time turning points across global trading sessions."""
+
+    MAJOR_SESSIONS = {
+        "Tokyo_Open":    {"hour_utc": 0,  "name": "Tokyo / Asian Session Open"},
+        "London_Open":   {"hour_utc": 7,  "name": "London / European Session Open"},
+        "NY_Open":       {"hour_utc": 13, "name": "New York / US Equities Open"},
+        "London_Close":  {"hour_utc": 16, "name": "London Fixing / European Close"},
+        "NY_Close":      {"hour_utc": 21, "name": "US Market Settlement / Close"}
+    }
+
+    @staticmethod
+    def compute_intraday_pivots(current_price: float, session_hour_utc: int = 13) -> Dict[str, Any]:
+        """Calculate 24-hour diurnal angle and intraday price harmonics."""
+        diurnal_angle = (session_hour_utc * 15.0) % 360.0
+        # Convert diurnal angle to price ladder via Square of 9
+        ladder = {}
+        for offset_hr in (0, 3, 6, 9, 12, 18):
+            deg = (offset_hr * 15.0)
+            ladder[f"+{offset_hr}h ({deg:.0f}°)"] = GannSquare9Engine.degree_to_price(current_price, deg)
+            if offset_hr > 0:
+                ladder[f"-{offset_hr}h (-{deg:.0f}°)"] = GannSquare9Engine.degree_to_price(current_price, -deg)
+
+        return {
+            "session_hour_utc": session_hour_utc,
+            "diurnal_rotation_deg": diurnal_angle,
+            "hourly_velocity_deg": "15.0°/hour (0.25°/min)",
+            "cardinal_hour_angles": {
+                "00:00_UTC": 0.0,
+                "06:00_UTC": 90.0,
+                "12:00_UTC": 180.0,
+                "18:00_UTC": 270.0
+            },
+            "intraday_price_ladder": ladder,
+            "rule": "W.D. Gann Circle of 24: High-frequency turning points align with 90° (6-hour) and 45° (3-hour) diurnal harmonics."
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  9. BILL MERIDIAN ASSET GENESIS HOROSCOPY & ECLIPSE ALIGNMENT ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class AssetGenesisHoroscopyEngine:
+    """Bill Meridian Planetary Stock Trading & Asset Genesis Horoscopy Engine.
+    Evaluates Transits to Natal Genesis Horoscopes and identifies Carter Eclipse Activations."""
+
+    ASPECT_ORBS = {
+        "conjunction": (0.0, 2.0, "Potent Initiation / Volatility Flash"),
+        "sextile":     (60.0, 1.5, "Opportunity / Smooth Liquidity"),
+        "square":      (90.0, 2.0, "Crisis / Severe Resistance / Sharp Correction"),
+        "trine":       (120.0, 2.0, "Effortless Expansion / Bullish Continuation"),
+        "opposition":  (180.0, 2.0, "Climax / Polarization / Major Trend Top or Bottom")
+    }
+
+    @staticmethod
+    def evaluate_genesis_transits(asset_key: str,
+                                 transit_longitudes: Dict[str, float],
+                                 active_eclipses: Optional[List[float]] = None) -> Dict[str, Any]:
+        """Evaluate real-time celestial transits to the asset's Genesis natal positions."""
+        asset_info = FINANCIAL_GENESIS_REGISTRY.get(asset_key.upper(), FINANCIAL_GENESIS_REGISTRY["BTC"])
+        # Approximate natal positions for Genesis assets (or derived from genesis epoch)
+        # Built-in high-precision Genesis anchor positions:
+        genesis_natal = {
+            "BTC": {"Sun": 283.5, "Moon": 12.0, "Mercury": 278.4, "Venus": 331.2, "Mars": 272.1, "Jupiter": 299.8, "Saturn": 171.4, "Pluto": 271.3},
+            "ETH": {"Sun": 127.2, "Moon": 296.5, "Mercury": 134.1, "Venus": 149.8, "Mars": 105.0, "Jupiter": 148.1, "Saturn": 238.2, "Pluto": 283.8},
+            "SPX": {"Sun": 57.0, "Moon": 358.2, "Mercury": 64.5, "Venus": 48.0, "Mars": 334.1, "Jupiter": 110.2, "Saturn": 344.0, "Pluto": 352.0},
+            "GOLD": {"Sun": 142.5, "Moon": 74.0, "Mercury": 151.2, "Venus": 115.4, "Mars": 322.0, "Jupiter": 240.1, "Saturn": 64.8, "Pluto": 178.5}
+        }.get(asset_key.upper(), {"Sun": 283.5, "Jupiter": 299.8, "Saturn": 171.4})
+
+        hits = []
+        for t_body, t_lon in transit_longitudes.items():
+            if t_body in ("North Node", "South Node"): continue
+            for n_body, n_lon in genesis_natal.items():
+                sep = abs((t_lon - n_lon + 180.0) % 360.0 - 180.0)
+                for asp_name, (target_ang, max_orb, desc) in AssetGenesisHoroscopyEngine.ASPECT_ORBS.items():
+                    dev = abs(sep - target_ang)
+                    if dev <= max_orb:
+                        hits.append({
+                            "transiting_planet": t_body,
+                            "genesis_natal_point": n_body,
+                            "aspect": asp_name,
+                            "exactness_orb": round(dev, 2),
+                            "interpretation": desc
+                        })
+
+        hits.sort(key=lambda x: x["exactness_orb"])
+
+        # Eclipse activations
+        eclipse_triggers = []
+        if active_eclipses:
+            for ecl_deg in active_eclipses:
+                for n_body, n_lon in genesis_natal.items():
+                    diff = abs((ecl_deg - n_lon + 180.0) % 360.0 - 180.0)
+                    if diff <= 2.0:
+                        eclipse_triggers.append({
+                            "eclipse_degree": round(ecl_deg, 2),
+                            "activated_genesis_point": n_body,
+                            "orb": round(diff, 2),
+                            "significance": f"CRITICAL ECLIPSE RESONANCE: Eclipse directly activates Genesis {n_body} — major multi-month inflection."
+                        })
+
+        return {
+            "asset_name": asset_info["name"],
+            "genesis_epoch": asset_info["date"],
+            "active_transits_count": len(hits),
+            "top_genesis_transits": hits[:5],
+            "eclipse_triggers": eclipse_triggers,
+            "method_source": "Bill Meridian, Planetary Stock Trading IV (2008)"
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  10. INTERACTIVE ASCII ASTRO-TRADING TERMINAL & DASHBOARD
+# ═════════════════════════════════════════════════════════════════════════════
+
+class AstroTerminalDashboard:
+    """Rich ASCII Astro-Trading Terminal & Quantitative Visualizer."""
+
+    @staticmethod
+    def render_dashboard(trade_setup: Dict[str, Any],
+                         siderograph_pot: float,
+                         wave_forecast: List[Dict[str, Any]]) -> str:
+        """Render a high-impact, box-drawn ASCII trading terminal view."""
+        asset = trade_setup["asset"]
+        price = trade_setup["current_price"]
+        action = trade_setup["recommended_action"]
+        conf = trade_setup["confluence_score"]
+        tp = trade_setup["trade_parameters"]
+        gann = trade_setup["gann_square_of_9"]
+
+        # Gauge bar (width 12)
+        filled = int((conf / 100.0) * 12)
+        gauge = "[" + "█" * filled + "░" * (12 - filled) + f"] {conf}%"
+
+        # Sparkline
+        wave_vals = [d["composite_wave_value"] for d in wave_forecast[:24]]
+        spark = HarmonicCompositeWaveEngine.render_sparkline(wave_vals)
+
+        s1 = gann["nearest_planetary_support"]
+        r1 = gann["nearest_planetary_resistance"]
+        s1_str = f"${s1['price_level']} ({s1['planet']})" if s1 else "N/A"
+        r1_str = f"${r1['price_level']} ({r1['planet']})" if r1 else "N/A"
+
+        out = [
+            "╔══════════════════════════════════════════════════════════════════════════════════╗",
+            f"║          ASTRAEA CELESTIAL TRADING TERMINAL — {asset.upper():<25} ║",
+            "╠══════════════════════════════════════════════════════════════════════════════════╣",
+            f"║  Market Price:     ${price:<15.2f}    Recommendation: {action:<22} ║",
+            f"║  Cosmic Confluence: {gauge:<18}   Bradley Sidero: {siderograph_pot:+.2f} Potential           ║",
+            "╟──────────────────────────────────────────────────────────────────────────────────╢",
+            f"║  30-Day Cycle Wave: {spark:<20}    Gann Angle:     {gann['current_spiral_angle']:<15}     ║",
+            f"║  Key Planetary S/R: [Sup] {s1_str:<18} [Res] {r1_str:<18}   ║",
+            "╟──────────────────────────────────────────────────────────────────────────────────╢",
+            f"║  EXECUTION PARAMETERS:                                                           ║",
+            f"║    • Entry: ${tp['entry_price']:<10.2f}   • Stop-Loss: ${tp['stop_loss']:<10.2f}                           ║",
+            f"║    • Target 1: ${tp['take_profit_1']:<10.2f} • Target 2:   ${tp['take_profit_2']:<10.2f}  • R/R: {tp['risk_reward_ratio']:<10} ║",
+            "╚══════════════════════════════════════════════════════════════════════════════════╝"
+        ]
+        return "\n".join(out)
+
