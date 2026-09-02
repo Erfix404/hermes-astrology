@@ -4191,6 +4191,33 @@ def calculate_full_profile(data):
             jd, jdB, lat, lng, latB, lngB, target_dt=target_eval_dt)
         return result
 
+    if mode=="tarot_celtic_cross":
+        import tarot_engine
+        q = data.get("question", "General guidance for my path")
+        seed = f"{data.get('year',2000)}-{data.get('month',1)}-{data.get('day',1)}:{q}"
+        result["tarot_celtic_cross"] = tarot_engine.celtic_cross_reading(q, seed)
+        return result
+
+    if mode=="tarot_3card":
+        import tarot_engine
+        q = data.get("question", "General path")
+        stype = data.get("spread_type", "past_present_future")
+        seed = f"{data.get('year',2000)}-{data.get('month',1)}-{data.get('day',1)}"
+        result["tarot_3card"] = tarot_engine.three_card_reading(q, spread_type=stype, seed=seed)
+        return result
+
+    if mode=="tarot_soul_personality":
+        import tarot_engine
+        y = int(data.get("year", 2000)); m = int(data.get("month", 1)); d = int(data.get("day", 1))
+        result["tarot_soul_personality"] = tarot_engine.calculate_soul_and_personality_cards(y, m, d)
+        return result
+
+    if mode=="tarot_12house":
+        import tarot_engine
+        seed = f"{data.get('year',2000)}-{data.get('month',1)}-{data.get('day',1)}"
+        result["tarot_12house"] = tarot_engine.astrological_12_house_spread(seed)
+        return result
+
     if mode=="hermetic_tarot" or mode=="tarot":
         result["hermetic_tarot_profile"] = map_hermetic_tarot_profile(jd, lat, lng, time_known)
         return result

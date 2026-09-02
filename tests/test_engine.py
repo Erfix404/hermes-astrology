@@ -775,6 +775,50 @@ class TestSynastryAndComposite(unittest.TestCase):
         self.assertTrue(len(r_comp["composite_interpretation"]["relationship_identity"]) >= 2)
 
 
+class TestRiderWaiteTarotSuite(unittest.TestCase):
+    """Complete 78-Card Rider-Waite-Smith Tarot Suite, Spreads, and Greer Soul Cards."""
+
+    def test_78_cards_canonical_deck_integrity(self):
+        import tarot_engine as te
+        self.assertEqual(len(te.ALL_78_CARDS), 78)
+        self.assertEqual(len(te.MAJOR_ARCANA_RWS), 22)
+        self.assertEqual(len(te.MINOR_PIPS_RWS), 40)
+        self.assertEqual(len(te.COURT_CARDS_RWS), 16)
+
+        # Check major arcana numbering
+        self.assertEqual(te.MAJOR_ARCANA_RWS[8]["name"], "Strength") # VIII in RWS
+        self.assertEqual(te.MAJOR_ARCANA_RWS[11]["name"], "Justice")  # XI in RWS
+
+    def test_celtic_cross_spread_structure(self):
+        d = dict(ae._demo())
+        r = ae.calculate_full_profile({**d, "mode": "tarot_celtic_cross", "question": "Project launch outcome"})
+        cc = r["tarot_celtic_cross"]
+        self.assertIn("cards", cc)
+        self.assertEqual(len(cc["cards"]), 10)
+        self.assertIn("central_cross_elemental_tension", cc)
+        self.assertIn("synthesis", cc)
+        # Position names match canonical 10 positions
+        self.assertEqual(cc["cards"][0]["position_name"], "The Heart / Present")
+        self.assertEqual(cc["cards"][9]["position_name"], "The Outcome / Culmination")
+
+    def test_three_card_spread_types(self):
+        d = dict(ae._demo())
+        for stype in ("past_present_future", "situation_obstacle_advice", "mind_body_spirit"):
+            r = ae.calculate_full_profile({**d, "mode": "tarot_3card", "spread_type": stype})
+            tc = r["tarot_3card"]
+            self.assertEqual(len(tc["cards"]), 3)
+            self.assertIn("synthesis", tc)
+
+    def test_mary_greer_soul_personality_cards(self):
+        # 1990-06-15 -> 1990 + 6 + 15 = 2011 -> 2+0+1+1 = 4 -> The Emperor
+        sp = ae.calculate_full_profile({
+            "year": 1990, "month": 6, "day": 15, "mode": "tarot_soul_personality"
+        })["tarot_soul_personality"]
+        self.assertEqual(sp["personality_card"]["number"], 4)
+        self.assertEqual(sp["personality_card"]["name"], "The Emperor")
+        self.assertEqual(sp["soul_card"]["number"], 4)
+
+
 class TestLillyAlmutenAndRamanYogas(unittest.TestCase):
     """William Lilly's Almuten Figuris & B.V. Raman's 300 Important Combinations."""
 
