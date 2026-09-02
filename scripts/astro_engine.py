@@ -3728,10 +3728,12 @@ def calculate_full_profile(data):
         return result
 
     if mode in ("weekly_calendar", "eclipses", "stations", "moon_phase",
-                "planetary_hours", "void_of_course", "muhurta", "electional"):
-        # Sky-now modes: default anchor is today (UTC), optional lat/lng for
-        # sunrise-dependent features; birth data is NOT required.
-        tdt = datetime.utcnow()
+                "planetary_hours", "void_of_course", "muhurta", "electional",
+                "astro_trading", "trade_setup", "bradley", "siderograph",
+                "gann_sq9", "square_of_9", "crd_calendar", "geocosmic_crd",
+                "mcwhirter", "node_cycle", "financial", "crypto"):
+        # Sky-now / Event modes: default anchor is today (UTC) or resolved target moment
+        tdt = _resolve_target_dt(data)
         tjd = julian_day(tdt)
         tlat = data.get("lat", 0.0); tlng = data.get("lng", 0.0)
         result = {"_meta": {"engine_backend": body_longitudes(tjd)[2],
@@ -3772,6 +3774,75 @@ def calculate_full_profile(data):
             result["muhurta"] = muhurta_finder(tjd, tlat, tlng,
                                                data.get("activity","marriage"),
                                                data.get("days_ahead", 14))
+            return result
+        if mode=="financial" or mode=="crypto":
+            asset = data.get("asset", "BTC")
+            result["financial_weather"] = crypto_financial_weather(asset, tdt)
+            return result
+        if mode=="astro_trading" or mode=="trade_setup":
+            import astro_trading_engine as ate
+            asset = data.get("asset", "BTC")
+            price = float(data.get("price", 65000.0 if asset.upper()=="BTC" else 2500.0 if asset.upper()=="ETH" else 2500.0 if asset.upper()=="GOLD" else 5500.0))
+            t_lons, t_speed, _ = body_longitudes(tjd)
+            voc = void_of_course_moon(tjd, tlat, tlng, True)
+            is_voc = bool(voc.get("is_void", False))
+            result["astro_trade_setup"] = ate.AstroTradingStrategyEngine.generate_trade_setup(
+                asset_key=asset,
+                current_price=price,
+                longitudes=t_lons,
+                speeds=t_speed,
+                is_moon_voc=is_voc
+            )
+            return result
+        if mode=="bradley" or mode=="siderograph":
+            import astro_trading_engine as ate
+            t_lons, _, _ = body_longitudes(tjd)
+            decls = body_declinations(tjd)
+            pot = ate.BradleySiderographEngine.calculate_potential(t_lons, decls)
+            result["bradley_siderograph"] = {
+                "evaluation_date": tdt.strftime("%Y-%m-%d"),
+                "potential_components": pot,
+                "note": "Donald Bradley Siderograph Potential: Peaks and troughs indicate macroeconomic turning points."
+            }
+            return result
+        if mode=="gann_sq9" or mode=="square_of_9":
+            import astro_trading_engine as ate
+            price = float(data.get("price", 100.0))
+            asset = data.get("asset", "BTC")
+            t_lons, _, _ = body_longitudes(tjd)
+            harmonics = ate.GannSquare9Engine.compute_harmonics(price)
+            lines = ate.GannSquare9Engine.planetary_price_lines(t_lons, price, asset)
+            result["gann_square_of_9"] = {
+                "price": price,
+                "harmonics": harmonics,
+                "active_planetary_price_lines": lines[:6],
+                "note": "W.D. Gann Square of 9 Spiral: 90°/180°/270°/360° geometry and planetary degree-price projections."
+            }
+            return result
+        if mode=="crd_calendar" or mode=="geocosmic_crd":
+            import astro_trading_engine as ate
+            t_lons, t_speed, _ = body_longitudes(tjd)
+            sigs = []
+            for p in ("Mars", "Mercury", "Venus"):
+                spd = t_speed.get(p, 1.0)
+                if abs(spd) <= 0.05:
+                    sigs.append({"level": 1, "description": f"{p} Stationary Turning Point (Speed = {spd:.3f}°/day)"})
+            for p in ("Sun", "Mars"):
+                lon = t_lons.get(p, 0.0)
+                if (lon % 90.0) <= 1.0 or (lon % 90.0) >= 89.0:
+                    sigs.append({"level": 1, "description": f"{p} Cardinal Ingress (0° {SIGNS[int(lon//30)%12]})"})
+            eval_crd = ate.MerrimanCRDEngine.evaluate_crd_cluster(sigs)
+            result["geocosmic_crd"] = {
+                "evaluation_date": tdt.strftime("%Y-%m-%d"),
+                "crd_evaluation": eval_crd,
+                "note": "Raymond Merriman Critical Reversal Date (CRD): Cluster score >= 15 signals high-probability pivot."
+            }
+            return result
+        if mode=="mcwhirter" or mode=="node_cycle":
+            import astro_trading_engine as ate
+            t_lons, _, _ = body_longitudes(tjd)
+            node_lon = t_lons.get("North Node", 0.0)
+            result["mcwhirter_cycle"] = ate.McWhirterCycleEngine.evaluate_node_cycle(node_lon)
             return result
 
     birth_utc, tinfo = to_utc(data)
