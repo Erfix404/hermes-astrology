@@ -193,5 +193,62 @@ class TestAstroTradingEliteModules(unittest.TestCase):
         self.assertIn("EXECUTION PARAMETERS", view)
 
 
+class TestSixResearchFrontiers(unittest.TestCase):
+    """Test 6 Ultra-Deep Financial Astrology Research Frontiers."""
+
+    def test_carolan_spiral_calendar(self):
+        p_dt = datetime(2026, 9, 2)
+        projs = ate.CarolanSpiralCalendarEngine.compute_spiral_projections(p_dt, max_index=5)
+        self.assertEqual(len(projs), 5)
+        # Fn = 1 -> days_offset = 29.53
+        self.assertAlmostEqual(projs[0]["days_offset"], 29.53, places=1)
+        # Clusters
+        clusters = ate.CarolanSpiralCalendarEngine.find_spiral_clusters([p_dt, datetime(2026, 8, 1)])
+        self.assertIsInstance(clusters, list)
+
+    def test_heliocentric_dynamics(self):
+        jd = ae.julian_day(datetime(2026, 9, 2))
+        helio_lons = ate.HeliocentricTradingEngine.compute_helio_longitudes(jd)
+        self.assertIn("Earth", helio_lons)
+        self.assertIn("Mars", helio_lons)
+        self.assertTrue(0 <= helio_lons["Mars"] <= 360.0)
+        aspects_h = ate.HeliocentricTradingEngine.detect_helio_aspects(jd)
+        self.assertIsInstance(aspects_h, list)
+
+    def test_solar_geomagnetic_cycle(self):
+        dt = datetime(2026, 9, 2)
+        sol = ate.SolarGeomagneticCycleEngine.evaluate_solar_regime(dt)
+        self.assertIn("sunspot_activity_intensity", sol)
+        self.assertIn("macro_liquidity_regime", sol)
+        self.assertIn("strategic_posture", sol)
+
+    def test_gann_advanced_matrices(self):
+        # Square of 144
+        sq144 = ate.GannAdvancedMatricesEngine.compute_square_of_144(6400.0) # root 80
+        self.assertIn("4/8_Octave (180°)", sq144["octave_levels"])
+        self.assertEqual(sq144["halfway_gravity_point"], 6561.0) # 81^2
+
+        # Square of 52
+        sq52 = ate.GannAdvancedMatricesEngine.compute_square_of_52(datetime(2026, 1, 1))
+        self.assertEqual(len(sq52["annual_time_squaring_dates"]), 4)
+
+        # Hexagon Chart
+        hex_c = ate.GannAdvancedMatricesEngine.compute_hexagon_chart(100.0) # root 10
+        self.assertIn("Hex_1_(60°)", hex_c["hexagon_harmonic_resistances"])
+
+    def test_sector_astro_resonance(self):
+        sec_crypto = ate.SectorAstroResonanceEngine.evaluate_sector("CRYPTO")
+        self.assertIn("Uranus", sec_crypto["cosmic_rulers"])
+        sec_oil = ate.SectorAstroResonanceEngine.evaluate_sector("CRUDE_OIL")
+        self.assertIn("Neptune", sec_oil["cosmic_rulers"])
+
+    def test_astro_statistical_significance(self):
+        # Highly positive abnormal returns
+        pos_rets = [0.035, 0.042, 0.028, 0.039, 0.031, 0.045, 0.029]
+        res_sig = ate.AstroStatisticalSignificanceEngine.calculate_z_score(pos_rets, baseline_mean=0.0005, baseline_std=0.015)
+        self.assertTrue(res_sig["is_statistically_significant"])
+        self.assertGreater(res_sig["z_score"], 2.0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

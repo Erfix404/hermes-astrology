@@ -3731,6 +3731,8 @@ def calculate_full_profile(data):
                 "planetary_hours", "void_of_course", "muhurta", "electional",
                 "astro_trading", "trade_setup", "bradley", "siderograph",
                 "gann_sq9", "square_of_9", "gann_angles", "gann_clock", "circle_24",
+                "spiral_calendar", "carolan", "helio_trading", "solar_cycles", "solar_regime",
+                "gann_matrices", "sector_astro", "astro_stats",
                 "harmonic_wave", "composite_wave", "genesis_transits", "terminal_dashboard",
                 "bayer", "mercury_speed", "crd_calendar", "geocosmic_crd",
                 "mcwhirter", "node_cycle", "financial", "crypto"):
@@ -3895,6 +3897,51 @@ def calculate_full_profile(data):
                 "dashboard_view": dash,
                 "trade_setup": setup
             }
+            return result
+        if mode=="spiral_calendar" or mode=="carolan":
+            import astro_trading_engine as ate
+            p_date_str = data.get("pivot_date", tdt.strftime("%Y-%m-%d"))
+            p_date = datetime.strptime(p_date_str, "%Y-%m-%d")
+            max_idx = int(data.get("max_fib_index", 12))
+            result["spiral_calendar_projections"] = {
+                "origin_pivot_date": p_date.strftime("%Y-%m-%d"),
+                "projections": ate.CarolanSpiralCalendarEngine.compute_spiral_projections(p_date, max_idx),
+                "rule": "Christopher Carolan Spiral Calendar: Time projections T_n = 29.530588 * sqrt(F_n)."
+            }
+            return result
+        if mode=="helio_trading":
+            import astro_trading_engine as ate
+            lons_h = ate.HeliocentricTradingEngine.compute_helio_longitudes(tjd)
+            aspects_h = ate.HeliocentricTradingEngine.detect_helio_aspects(tjd)
+            result["heliocentric_trading"] = {
+                "evaluation_date": tdt.strftime("%Y-%m-%d"),
+                "helio_longitudes": lons_h,
+                "active_helio_aspects": aspects_h,
+                "note": "Heliocentric coordinates eliminate geocentric retrograde distortion and reveal true gravitational market drivers."
+            }
+            return result
+        if mode=="solar_cycles" or mode=="solar_regime":
+            import astro_trading_engine as ate
+            result["solar_geomagnetic_regime"] = ate.SolarGeomagneticCycleEngine.evaluate_solar_regime(tdt)
+            return result
+        if mode=="gann_matrices":
+            import astro_trading_engine as ate
+            price = float(data.get("price", 65000.0))
+            result["gann_advanced_matrices"] = {
+                "square_of_144": ate.GannAdvancedMatricesEngine.compute_square_of_144(price),
+                "square_of_52": ate.GannAdvancedMatricesEngine.compute_square_of_52(tdt),
+                "hexagon_chart": ate.GannAdvancedMatricesEngine.compute_hexagon_chart(price)
+            }
+            return result
+        if mode=="sector_astro":
+            import astro_trading_engine as ate
+            sector = data.get("sector", "CRYPTO")
+            result["sector_astro_resonance"] = ate.SectorAstroResonanceEngine.evaluate_sector(sector)
+            return result
+        if mode=="astro_stats":
+            import astro_trading_engine as ate
+            sample_rets = data.get("returns", [0.012, 0.015, -0.005, 0.022, 0.018, 0.030, 0.011, 0.019])
+            result["astro_statistical_significance"] = ate.AstroStatisticalSignificanceEngine.calculate_z_score(sample_rets)
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate

@@ -798,3 +798,315 @@ class AstroTerminalDashboard:
         ]
         return "\n".join(out)
 
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  11. CHRISTOPHER CAROLAN SPIRAL CALENDAR ENGINE (Lunar-Fibonacci Harmonics)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class CarolanSpiralCalendarEngine:
+    """Christopher Carolan Spiral Calendar Engine (1992).
+    Calculates lunar-Fibonacci projected dates: T_n = L_s * sqrt(F_n).
+    Pinpoints future market inflection windows and multi-pivot resonance clusters."""
+
+    LUNAR_SYNODIC_MONTH = 29.530588853
+    FIBONACCI_NUMBERS = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765]
+
+    @staticmethod
+    def compute_spiral_projections(pivot_date: datetime, max_index: int = 15) -> List[Dict[str, Any]]:
+        """Calculate forward spiral dates from a key historical market pivot."""
+        projections = []
+        for idx in range(1, min(len(CarolanSpiralCalendarEngine.FIBONACCI_NUMBERS), max_index + 1)):
+            fn = CarolanSpiralCalendarEngine.FIBONACCI_NUMBERS[idx]
+            sqrt_fn = math.sqrt(fn)
+            days_delta = CarolanSpiralCalendarEngine.LUNAR_SYNODIC_MONTH * sqrt_fn
+            target_dt = pivot_date + timedelta(days=days_delta)
+            projections.append({
+                "fibonacci_index": idx,
+                "fibonacci_number": fn,
+                "sqrt_fibonacci": round(sqrt_fn, 4),
+                "days_offset": round(days_delta, 2),
+                "projected_date": target_dt.strftime("%Y-%m-%d"),
+                "synodic_cycles": round(sqrt_fn, 2)
+            })
+        return projections
+
+    @staticmethod
+    def find_spiral_clusters(pivot_dates: List[datetime], max_index: int = 12, cluster_window_days: int = 3) -> List[Dict[str, Any]]:
+        """Find convergence dates where multiple historical pivots project into the same narrow window."""
+        all_hits: List[Tuple[datetime, datetime, int]] = []
+        for p_dt in pivot_dates:
+            for pr in CarolanSpiralCalendarEngine.compute_spiral_projections(p_dt, max_index):
+                dt_obj = datetime.strptime(pr["projected_date"], "%Y-%m-%d")
+                all_hits.append((dt_obj, p_dt, pr["fibonacci_number"]))
+
+        all_hits.sort(key=lambda x: x[0])
+        clusters = []
+        used = set()
+
+        for i in range(len(all_hits)):
+            if i in used: continue
+            base_t, orig_p, fn = all_hits[i]
+            matched_group = [all_hits[i]]
+            for j in range(i + 1, len(all_hits)):
+                if abs((all_hits[j][0] - base_t).days) <= cluster_window_days:
+                    matched_group.append(all_hits[j])
+                    used.add(j)
+
+            if len(matched_group) >= 2: # Cluster of 2 or more hits
+                avg_timestamp = sum(m[0].timestamp() for m in matched_group) / len(matched_group)
+                avg_dt = datetime.fromtimestamp(avg_timestamp, tz=timezone.utc)
+                clusters.append({
+                    "cluster_date": avg_dt.strftime("%Y-%m-%d"),
+                    "hits_count": len(matched_group),
+                    "cluster_power_score": len(matched_group) * 10,
+                    "contributing_pivots": [m[1].strftime("%Y-%m-%d") for m in matched_group],
+                    "fibonacci_harmonics": [m[2] for m in matched_group]
+                })
+
+        clusters.sort(key=lambda x: -x["hits_count"])
+        return clusters
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  12. HELIOCENTRIC PLANETARY DYNAMICS & HARMONIC INGRESS ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class HeliocentricTradingEngine:
+    """Heliocentric Planetary Coordinates & Aspect Harmonic Engine.
+    Evaluates True Sun-centered celestial coordinates without Earth retrograde distortion.
+    Solves Kepler's equation for heliocentric longitude and calculates helio price lines."""
+
+    # Mean orbital elements (a: AU, e: eccentricity, i: incl deg, N: node deg, w: perihelion deg, M0: mean anom deg, n: daily motion deg)
+    HELIO_ELEMENTS = {
+        "Mercury": {"a": 0.387098, "e": 0.205630, "w": 77.456, "M0": 174.794, "n": 4.092334},
+        "Venus":   {"a": 0.723332, "e": 0.006773, "w": 131.572, "M0": 50.115,  "n": 1.602130},
+        "Earth":   {"a": 1.000000, "e": 0.016708, "w": 102.947, "M0": 357.517, "n": 0.985600},
+        "Mars":    {"a": 1.523679, "e": 0.093405, "w": 336.040, "M0": 19.373,  "n": 0.524033},
+        "Jupiter": {"a": 5.2044,   "e": 0.048498, "w": 14.728,  "M0": 20.020,  "n": 0.083085},
+        "Saturn":  {"a": 9.5826,   "e": 0.055546, "w": 92.598,  "M0": 317.020, "n": 0.033444},
+        "Uranus":  {"a": 19.2184,  "e": 0.046381, "w": 170.954, "M0": 142.238, "n": 0.011728},
+        "Neptune": {"a": 30.1104,  "e": 0.009456, "w": 44.971,  "M0": 256.228, "n": 0.005981},
+        "Pluto":   {"a": 39.4820,  "e": 0.248807, "w": 224.066, "M0": 14.882,  "n": 0.003960}
+    }
+
+    @staticmethod
+    def _solve_kepler(m_deg: float, e: float) -> float:
+        """Newton-Raphson solver for Kepler's Equation: M = E - e*sin(E)."""
+        m_rad = math.radians(m_deg % 360.0)
+        e_rad = m_rad
+        for _ in range(15):
+            delta = e_rad - e * math.sin(e_rad) - m_rad
+            if abs(delta) < 1e-7:
+                break
+            e_rad -= delta / (1.0 - e * math.cos(e_rad))
+        return e_rad
+
+    @staticmethod
+    def compute_helio_longitudes(jd: float) -> Dict[str, float]:
+        """Compute accurate Heliocentric Longitudes (0° to 360°) for all planets."""
+        d = jd - 2451545.0 # Days since J2000.0
+        helio_lons = {}
+        for p, elem in HeliocentricTradingEngine.HELIO_ELEMENTS.items():
+            m_curr = (elem["M0"] + elem["n"] * d) % 360.0
+            e_rad = HeliocentricTradingEngine._solve_kepler(m_curr, elem["e"])
+            # True anomaly v
+            sin_v = (math.sqrt(1.0 - elem["e"]**2) * math.sin(e_rad)) / (1.0 - elem["e"] * math.cos(e_rad))
+            cos_v = (math.cos(e_rad) - elem["e"]) / (1.0 - elem["e"] * math.cos(e_rad))
+            v_deg = math.degrees(math.atan2(sin_v, cos_v))
+            helio_lon = (v_deg + elem["w"]) % 360.0
+            helio_lons[p] = round(helio_lon, 2)
+        return helio_lons
+
+    @staticmethod
+    def detect_helio_aspects(jd: float, orb: float = 2.0) -> List[Dict[str, Any]]:
+        """Detect exact heliocentric aspects (Conjunction, Trine, Square, Opposition)."""
+        lons = HeliocentricTradingEngine.compute_helio_longitudes(jd)
+        aspects = []
+        bodies = list(lons.keys())
+        for i in range(len(bodies)):
+            for j in range(i + 1, len(bodies)):
+                p1, p2 = bodies[i], bodies[j]
+                sep = abs((lons[p1] - lons[p2] + 180.0) % 360.0 - 180.0)
+                for ang, name, bias in [(0.0, "Conjunction", "Initiation"), (60.0, "Sextile", "Smooth"),
+                                        (90.0, "Square", "Stress/Reversal"), (120.0, "Trine", "Expansion"),
+                                        (180.0, "Opposition", "Polarity/Climax")]:
+                    if abs(sep - ang) <= orb:
+                        aspects.append({
+                            "pair": f"{p1}-{p2}",
+                            "aspect": name,
+                            "exactness_orb": round(abs(sep - ang), 2),
+                            "helio_lons": f"{p1}:{lons[p1]}°, {p2}:{lons[p2]}°",
+                            "market_bias": bias
+                        })
+        return aspects
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  13. SOLAR SUNSPOT ACTIVITY & GEOMAGNETIC CYCLE ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class SolarGeomagneticCycleEngine:
+    """Solar Sunspot & Hale Magnetic Cycle Macroeconomic Engine.
+    Models the 11.07-year Schwabe sunspot wave and 22.14-year Hale magnetic wave.
+    Correlates solar maxima with speculative liquidity peaks and minima with accumulation."""
+
+    SCHWABE_CYCLE_YEARS = 11.07
+    HALE_CYCLE_YEARS = 22.14
+    SOLAR_CYCLE_25_MIN = datetime(2019, 12, 1) # Solar Cycle 25 minimum epoch
+
+    @staticmethod
+    def evaluate_solar_regime(target_date: datetime) -> Dict[str, Any]:
+        """Compute solar cycle phase, Hale magnetic polarity, and macroeconomic liquidity regime."""
+        dt_diff_years = (target_date - SolarGeomagneticCycleEngine.SOLAR_CYCLE_25_MIN).total_seconds() / (365.2422 * 86400)
+        phase_in_cycle = (dt_diff_years % SolarGeomagneticCycleEngine.SCHWABE_CYCLE_YEARS) / SolarGeomagneticCycleEngine.SCHWABE_CYCLE_YEARS
+
+        # Sine model of sunspot activity (0.0 to 1.0)
+        sunspot_activity_pct = round((math.sin(2.0 * math.pi * phase_in_cycle - math.pi / 2.0) + 1.0) * 50.0, 1)
+
+        # Hale magnetic polarity
+        hale_phase = (dt_diff_years % SolarGeomagneticCycleEngine.HALE_CYCLE_YEARS) / SolarGeomagneticCycleEngine.HALE_CYCLE_YEARS
+        polarity = "Positive (+ / North Polarity Leading)" if hale_phase < 0.5 else "Negative (- / South Polarity Leading)"
+
+        if sunspot_activity_pct >= 80.0:
+            regime = "Solar Maximum / Peak Speculative Expansion (High Volatility, Inflationary Liquidity)"
+            posture = "BULLISH_PEAK_DISTRIBUTION"
+        elif sunspot_activity_pct <= 25.0:
+            regime = "Solar Minimum / Deep Economic Accumulation (Low Volatility, Bedrock Value Formations)"
+            posture = "MACRO_ACCUMULATION"
+        else:
+            regime = "Mid-Cycle Transition Phase"
+            posture = "TREND_CONTINUATION"
+
+        return {
+            "target_date": target_date.strftime("%Y-%m-%d"),
+            "schwabe_cycle_progress": f"{round(phase_in_cycle * 100.0, 1)}%",
+            "sunspot_activity_intensity": f"{sunspot_activity_pct}%",
+            "hale_magnetic_polarity": polarity,
+            "macro_liquidity_regime": regime,
+            "strategic_posture": posture,
+            "reference": "Edward R. Dewey / Fed Reserve Geomagnetic & Solar Cycle Market Studies"
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  14. W.D. GANN ADVANCED GEOMETRIC MATRICES (Square of 144, 52 & Hexagon)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class GannAdvancedMatricesEngine:
+    """W.D. Gann Master Calculators: Square of 144, Square of 52 & Hexagon Chart."""
+
+    @staticmethod
+    def compute_square_of_144(base_price: float) -> Dict[str, Any]:
+        """Compute the Master Fibonacci 144 grid (12x12 price-time divisions)."""
+        root = math.sqrt(base_price)
+        # Fractional eighths of the 144 master circle
+        levels = {}
+        for n in range(1, 9):
+            deg_shift = (n / 8.0) * 360.0
+            levels[f"{n}/8_Octave ({deg_shift:.0f}°)"] = round((root + (deg_shift / 180.0)) ** 2, 2)
+        return {
+            "base_pivot_price": base_price,
+            "matrix_type": "W.D. Gann Square of 144 (Master Fibonacci Matrix)",
+            "octave_levels": levels,
+            "halfway_gravity_point": levels["4/8_Octave (180°)"]
+        }
+
+    @staticmethod
+    def compute_square_of_52(pivot_date: datetime, weeks_elapsed: int = 52) -> Dict[str, Any]:
+        """Compute Square of 52 (52 weeks = 1 solar time year squaring)."""
+        projections = {}
+        for quarter in (13, 26, 39, 52):
+            dt = pivot_date + timedelta(weeks=quarter)
+            projections[f"Quarter_{quarter//13}_({quarter}w)"] = dt.strftime("%Y-%m-%d")
+        return {
+            "pivot_origin": pivot_date.strftime("%Y-%m-%d"),
+            "weeks_elapsed": weeks_elapsed,
+            "annual_time_squaring_dates": projections,
+            "rule": "Square of 52: 13-week quarter cycles mark natural seasonal trend pivots."
+        }
+
+    @staticmethod
+    def compute_hexagon_chart(current_price: float) -> Dict[str, Any]:
+        """Compute Gann Hexagon Chart levels (60° sextile harmonics)."""
+        root = math.sqrt(current_price)
+        levels = {}
+        for k in range(1, 7):
+            deg = k * 60.0
+            levels[f"Hex_{k}_({deg:.0f}°)"] = round((root + (deg / 180.0)) ** 2, 2)
+        return {
+            "current_price": current_price,
+            "matrix_type": "W.D. Gann Hexagon Chart (60° Radial Ring)",
+            "hexagon_harmonic_resistances": levels
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  15. SECTOR & ASSET-SPECIFIC COSMIC RESONANCE ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class SectorAstroResonanceEngine:
+    """Specialized Sector & Asset Astro-Resonance Synthesizer."""
+
+    SECTOR_RULES = {
+        "CRYPTO": {
+            "primary_rulers": ["Uranus", "Pluto"],
+            "catalysts": "Mars-Uranus hard aspects (sudden massive liquidations/breakouts), Pluto transits (institutional liquidity).",
+            "volatility_driver": "Moon Out-of-Bounds & Mercury Retrograde."
+        },
+        "CRUDE_OIL": {
+            "primary_rulers": ["Mars", "Neptune"],
+            "catalysts": "Jupiter-Neptune aspects (supply gluts/liquidity surges), Mars-Pluto (geopolitical supply crunches).",
+            "volatility_driver": "Aries Cardinal Ingress."
+        },
+        "GOLD_SILVER": {
+            "primary_rulers": ["Sun", "Moon", "Venus"],
+            "catalysts": "Sun-Pluto aspects (currency devaluations/safe haven rushes), Venus Retrograde (cyclical price resets).",
+            "volatility_driver": "Eclipses on Taurus-Scorpio / Leo-Aquarius axis."
+        },
+        "TECH_SEMIS": {
+            "primary_rulers": ["Mercury", "Uranus"],
+            "catalysts": "Mercury speed blowout phases (AI/tech euphoric expansions), Uranus stations (paradigm shifts).",
+            "volatility_driver": "Gemini-Aquarius air trines."
+        }
+    }
+
+    @staticmethod
+    def evaluate_sector(sector_name: str) -> Dict[str, Any]:
+        s_key = sector_name.upper().replace(" ", "_")
+        info = SectorAstroResonanceEngine.SECTOR_RULES.get(s_key, SectorAstroResonanceEngine.SECTOR_RULES["CRYPTO"])
+        return {
+            "sector": s_key,
+            "cosmic_rulers": info["primary_rulers"],
+            "primary_catalysts": info["catalysts"],
+            "volatility_drivers": info["volatility_driver"]
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  16. ASTRO-STATISTICAL SIGNIFICANCE & EVENT-STUDY ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class AstroStatisticalSignificanceEngine:
+    """Astro-Statistical Permutation & Event-Study Anomaly Analyzer."""
+
+    @staticmethod
+    def calculate_z_score(sample_returns: List[float], baseline_mean: float = 0.0005, baseline_std: float = 0.015) -> Dict[str, Any]:
+        """Compute Welch's Z-Score to verify if astro-event returns deviate significantly from random noise."""
+        if not sample_returns:
+            return {"z_score": 0.0, "is_statistically_significant": False}
+        n = len(sample_returns)
+        sample_mean = sum(sample_returns) / n
+        std_err = baseline_std / math.sqrt(n)
+        z = (sample_mean - baseline_mean) / std_err if std_err > 0 else 0.0
+        is_sig = abs(z) >= 1.96 # 95% Confidence Level (p < 0.05)
+
+        return {
+            "sample_size": n,
+            "sample_mean_return": round(sample_mean, 5),
+            "z_score": round(z, 3),
+            "confidence_level": "99% (p < 0.01)" if abs(z) >= 2.58 else "95% (p < 0.05)" if is_sig else "Not Statistically Significant (Noise)",
+            "is_statistically_significant": is_sig,
+            "statistical_edge": f"Edge observed: {round((sample_mean - baseline_mean)*100, 3)}% abnormal return" if is_sig else "Within random distribution"
+        }
+
+
