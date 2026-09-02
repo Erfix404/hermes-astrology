@@ -3730,8 +3730,8 @@ def calculate_full_profile(data):
     if mode in ("weekly_calendar", "eclipses", "stations", "moon_phase",
                 "planetary_hours", "void_of_course", "muhurta", "electional",
                 "astro_trading", "trade_setup", "bradley", "siderograph",
-                "gann_sq9", "square_of_9", "crd_calendar", "geocosmic_crd",
-                "mcwhirter", "node_cycle", "financial", "crypto"):
+                "gann_sq9", "square_of_9", "gann_angles", "bayer", "mercury_speed",
+                "crd_calendar", "geocosmic_crd", "mcwhirter", "node_cycle", "financial", "crypto"):
         # Sky-now / Event modes: default anchor is today (UTC) or resolved target moment
         tdt = _resolve_target_dt(data)
         tjd = julian_day(tdt)
@@ -3843,6 +3843,20 @@ def calculate_full_profile(data):
             t_lons, _, _ = body_longitudes(tjd)
             node_lon = t_lons.get("North Node", 0.0)
             result["mcwhirter_cycle"] = ate.McWhirterCycleEngine.evaluate_node_cycle(node_lon)
+            return result
+        if mode=="gann_angles":
+            import astro_trading_engine as ate
+            p_price = float(data.get("pivot_price", 60000.0))
+            bars = int(data.get("bars_elapsed", 10))
+            p_unit = float(data.get("price_unit", 100.0))
+            direct = data.get("direction", "up")
+            result["gann_angles"] = ate.GannAnglesEngine.project_angles(p_price, bars, p_unit, direct)
+            return result
+        if mode=="bayer" or mode=="mercury_speed":
+            import astro_trading_engine as ate
+            _, t_speed, _ = body_longitudes(tjd)
+            merc_spd = t_speed.get("Mercury", 1.2)
+            result["bayer_mercury_analysis"] = ate.GeorgeBayerEngine.evaluate_mercury_speed(merc_spd)
             return result
 
     birth_utc, tinfo = to_utc(data)

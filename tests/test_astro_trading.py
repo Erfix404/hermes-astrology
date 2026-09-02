@@ -132,6 +132,14 @@ class TestAstroTradingStrategyEngine(unittest.TestCase):
         res_m = ae.calculate_full_profile(data_mcw)
         self.assertIn("mcwhirter_cycle", res_m)
 
+        data_angles = {"mode": "gann_angles", "pivot_price": 60000.0, "bars_elapsed": 10}
+        res_a = ae.calculate_full_profile(data_angles)
+        self.assertIn("gann_angles", res_a)
+
+        data_bayer = {"mode": "bayer", "year": 2026, "month": 9, "day": 2}
+        res_by = ae.calculate_full_profile(data_bayer)
+        self.assertIn("bayer_mercury_analysis", res_by)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

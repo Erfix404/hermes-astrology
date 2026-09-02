@@ -215,6 +215,81 @@ class GannSquare9Engine:
         lines.sort(key=lambda x: abs(x["distance_pct"]))
         return lines
 
+
+class GannAnglesEngine:
+    """W.D. Gann Geometric Price-Time Squaring & Angles Calculator.
+    Calculates the 9 canonical Gann Rays (1x8, 1x4, 1x3, 1x2, 1x1, 2x1, 3x1, 4x1, 8x1)
+    from a swing pivot point over time steps (bars/days)."""
+
+    GANN_RAY_RATIOS = {
+        "1x8": 8.0,    # 1 Unit Time = 8 Units Price (Ultra Fast)
+        "1x4": 4.0,    # 1 Unit Time = 4 Units Price
+        "1x3": 3.0,    # 1 Unit Time = 3 Units Price
+        "1x2": 2.0,    # 1 Unit Time = 2 Units Price
+        "1x1": 1.0,    # 1 Unit Time = 1 Unit Price (True Equilibrium / 45°)
+        "2x1": 0.5,    # 2 Units Time = 1 Unit Price (1/2)
+        "3x1": 0.3333, # 3 Units Time = 1 Unit Price (1/3)
+        "4x1": 0.25,   # 4 Units Time = 1 Unit Price (1/4)
+        "8x1": 0.125   # 8 Units Time = 1 Unit Price (1/8)
+    }
+
+    @staticmethod
+    def project_angles(pivot_price: float,
+                       bars_elapsed: int,
+                       price_unit: float = 1.0,
+                       direction: str = "up") -> Dict[str, float]:
+        """Project dynamic Gann Angle levels for a given number of bars elapsed from a pivot."""
+        levels = {}
+        sign = 1.0 if direction.lower() == "up" else -1.0
+        for name, ratio in GannAnglesEngine.GANN_RAY_RATIOS.items():
+            proj_p = pivot_price + (sign * ratio * price_unit * bars_elapsed)
+            levels[name] = round(max(0.0, proj_p), 2)
+        return {
+            "pivot_price": pivot_price,
+            "bars_elapsed": bars_elapsed,
+            "direction": direction,
+            "angles": levels,
+            "equilibrium_1x1": levels["1x1"],
+            "rule": "W.D. Gann Price and Time Balance: Market remains bullish above 1x1 and bearish below 1x1."
+        }
+
+
+class GeorgeBayerEngine:
+    """George Bayer Planetary Speed & 5-Fold Quintile Harmonic Engine (1937/1942).
+    Evaluates Mercury/Mars speeds, 5-fold Quintile harmonics (72°, 144°, 216°, 288°),
+    and Egg of Columbus acceleration inflection points."""
+
+    QUINTILE_ANGLES = [72.0, 144.0, 216.0, 288.0]
+
+    @staticmethod
+    def evaluate_mercury_speed(mercury_speed_lon: float) -> Dict[str, Any]:
+        """Classify Mercury speed relative to mean motion (~1.38°/day)."""
+        abs_spd = abs(mercury_speed_lon)
+        if abs_spd <= 0.05:
+            cond = "Stationary (Imminent Major Trend Reversal)"
+            action = "PREPARE_PIVOT"
+        elif mercury_speed_lon < 0:
+            cond = "Retrograde Motion (Choppy, Whipsaws, Counter-trend Rallies)"
+            action = "MEAN_REVERSION"
+        elif abs_spd >= 1.80:
+            cond = "Maximum Velocity (Blowout Climax Phase / Extreme Momentum)"
+            action = "TREND_ACCELERATION"
+        else:
+            cond = "Normal Direct Motion"
+            action = "TREND_FOLLOWING"
+
+        return {
+            "mercury_speed_deg_day": round(mercury_speed_lon, 3),
+            "condition": cond,
+            "recommended_strategy": action,
+            "source": "George Bayer, Time Factors in the Stock Market (1937)"
+        }
+
+    @staticmethod
+    def compute_quintile_levels(base_degree: float) -> List[float]:
+        """Compute the 5-fold Pentagram harmonics from a base degree."""
+        return [round((base_degree + ang) % 360.0, 2) for ang in GeorgeBayerEngine.QUINTILE_ANGLES]
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  3. DONALD BRADLEY SIDEROGRAPH ENGINE (Quantitative Planetary Potential)
 # ═════════════════════════════════════════════════════════════════════════════
