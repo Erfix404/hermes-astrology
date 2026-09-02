@@ -297,44 +297,95 @@ def evaluate_elemental_dignity(elem1: str, elem2: str) -> str:
         return "Strong Harmony (Same Element)"
     return ELEMENT_RELATIONS.get((elem1, elem2), "Neutral")
 
-def calculate_soul_and_personality_cards(year: int, month: int, day: int) -> Dict[str, Any]:
-    """Calculate Soul & Personality cards using Mary K. Greer's canonical formula."""
+def calculate_greer_lifepath_suite(year: int, month: int, day: int, target_year: Optional[int] = None) -> Dict[str, Any]:
+    """Calculate Mary K. Greer's Complete Karmic Lifepath Tarot Suite:
+    1. Personality Card (Outer persona, life lesson)
+    2. Soul Card (Core spiritual mission)
+    3. Year Card (Theme of the target year)
+    4. Shadow / Teacher Card (Hidden psychological blindspot & mentor archetype)
+    """
     raw_sum = year + month + day
-    # Sum digits of raw_sum
     p_base = sum(int(d) for d in str(raw_sum))
     if p_base > 22:
         p_card_num = sum(int(d) for d in str(p_base))
     else:
         p_card_num = p_base
 
-    # Soul card derivation
+    # Soul card derivation (Greer Rules)
     if p_card_num in range(1, 10):
         s_card_num = p_card_num # Unified Soul & Personality
     elif p_card_num == 19:
-        s_card_num = 1 # 19 Sun -> 10 Wheel -> 1 Magician triad
+        s_card_num = 1 # 19 Sun -> 10 Wheel of Fortune -> 1 Magician triad
     elif p_card_num == 22:
         s_card_num = 4 # 22/0 Fool -> 4 Emperor
     else:
         s_card_num = sum(int(d) for d in str(p_card_num))
 
+    # Shadow / Teacher Card: 22 - Personality Number (if p_card_num == 22/0, shadow is 22 Fool)
+    shadow_num = (22 - p_card_num) if p_card_num not in (0, 22) else 22
+    if shadow_num == 22:
+        shadow_num = 0
+
+    # Year Card
+    curr_y = target_year if target_year else 2026
+    y_sum = day + month + curr_y
+    y_base = sum(int(d) for d in str(y_sum))
+    if y_base > 22:
+        year_card_num = sum(int(d) for d in str(y_base))
+    else:
+        year_card_num = y_base
+    if year_card_num == 22:
+        year_card_num = 0
+
     p_info = MAJOR_ARCANA_RWS.get(p_card_num, MAJOR_ARCANA_RWS[0])
     s_info = MAJOR_ARCANA_RWS.get(s_card_num, MAJOR_ARCANA_RWS[0])
+    sh_info = MAJOR_ARCANA_RWS.get(shadow_num, MAJOR_ARCANA_RWS[0])
+    yr_info = MAJOR_ARCANA_RWS.get(year_card_num, MAJOR_ARCANA_RWS[0])
 
     return {
         "birth_date": f"{year:04d}-{month:02d}-{day:02d}",
         "raw_birth_sum": raw_sum,
+        "target_year": curr_y,
         "personality_card": {
             "number": p_card_num,
             "name": p_info["name"],
+            "hebrew": p_info["hebrew"],
             "astrology": p_info["astrology"],
             "life_lesson": p_info["upright"]
         },
         "soul_card": {
             "number": s_card_num,
             "name": s_info["name"],
+            "hebrew": s_info["hebrew"],
             "astrology": s_info["astrology"],
             "deep_calling": s_info["upright"]
         },
+        "shadow_card": {
+            "number": shadow_num,
+            "name": sh_info["name"],
+            "hebrew": sh_info["hebrew"],
+            "astrology": sh_info["astrology"],
+            "shadow_work_theme": sh_info["reversed"]
+        },
+        "year_card": {
+            "year": curr_y,
+            "number": year_card_num,
+            "name": yr_info["name"],
+            "hebrew": yr_info["hebrew"],
+            "astrology": yr_info["astrology"],
+            "annual_theme": yr_info["upright"]
+        },
+        "source": "Mary K. Greer, Tarot for Your Self (1984/2002)"
+    }
+
+def calculate_soul_and_personality_cards(year: int, month: int, day: int) -> Dict[str, Any]:
+    """Backward-compatible wrapper for calculate_greer_lifepath_suite."""
+    res = calculate_greer_lifepath_suite(year, month, day)
+    return {
+        "birth_date": res["birth_date"],
+        "raw_birth_sum": res["raw_birth_sum"],
+        "personality_card": res["personality_card"],
+        "soul_card": res["soul_card"],
         "note": "Per Mary K. Greer (Tarot for Your Self): Personality card shows how you operate in the outer world; Soul card reveals your core spiritual purpose."
     }
 
@@ -367,8 +418,10 @@ def generate_deterministic_draw(seed_str: str, count: int = 10) -> List[Tuple[st
         drawn.append((card_name, is_rev))
     return drawn
 
-def celtic_cross_reading(question: str, birth_data_seed: str) -> Dict[str, Any]:
-    """Generate a canonical 10-card Celtic Cross Tarot Reading."""
+def celtic_cross_reading(question: str, birth_data_seed: str, significator: Optional[str] = None) -> Dict[str, Any]:
+    """Generate a canonical 10-card Celtic Cross Tarot Reading per Arthur Edward Waite (1910, Part III § 7).
+    Includes Significator handling, 10 sequential stations, and central cross elemental tension.
+    """
     seed = f"celtic_cross:{question}:{birth_data_seed}"
     cards_drawn = generate_deterministic_draw(seed, count=10)
 
@@ -394,8 +447,8 @@ def celtic_cross_reading(question: str, birth_data_seed: str) -> Dict[str, Any]:
     e2 = ALL_78_CARDS[cards_drawn[1][0]].get("element", "Water")
     cross_dignity = evaluate_elemental_dignity(e1, e2)
 
-    return {
-        "spread": "Canonical 10-Card Celtic Cross (RWS / Waite)",
+    res = {
+        "spread": "Canonical 10-Card Celtic Cross (RWS / Waite 1910)",
         "question": question,
         "central_cross_elemental_tension": cross_dignity,
         "cards": spread_cards,
@@ -405,9 +458,149 @@ def celtic_cross_reading(question: str, birth_data_seed: str) -> Dict[str, Any]:
             f"{spread_cards[2]['card_name']}, leading toward the ultimate culmination of {spread_cards[9]['card_name']}."
         )
     }
+    if significator:
+        res["significator"] = significator
+    return res
+
+def evaluate_triad_elemental_dignity(left_elem: str, center_elem: str, right_elem: str) -> Dict[str, Any]:
+    """Evaluate Golden Dawn Book T Triad Elemental Dignities for 3-card spreads.
+    Center card is the subject; Left & Right cards are modifying influences.
+    """
+    left_rel = evaluate_elemental_dignity(left_elem, center_elem)
+    right_rel = evaluate_elemental_dignity(right_elem, center_elem)
+    flank_rel = evaluate_elemental_dignity(left_elem, right_elem)
+
+    # Calculate overall dignity score of center card
+    # Friendly = +1, Harmony = +2, Neutral = 0, Hostile = -1
+    def score_rel(rel_str: str) -> int:
+        if "Harmony" in rel_str: return 2
+        if "Friendly" in rel_str: return 1
+        if "Hostile" in rel_str: return -1
+        return 0
+
+    total_score = score_rel(left_rel) + score_rel(right_rel)
+    if total_score >= 2:
+        status = "Strongly Dignified (Enhanced by supportive surroundings)"
+    elif total_score == 1:
+        status = "Well Dignified (Supported by surroundings)"
+    elif total_score == 0:
+        status = "Moderately Dignified / Balanced"
+    elif total_score == -1:
+        status = "Ill-Dignified (Weakened or challenged by surroundings)"
+    else:
+        status = "Severely Ill-Dignified (Hostile elemental clash on both sides)"
+
+    return {
+        "triad_elements": [left_elem, center_elem, right_elem],
+        "left_to_center": left_rel,
+        "right_to_center": right_rel,
+        "flanking_interaction": flank_rel,
+        "dignity_score": total_score,
+        "center_status": status,
+        "rule_source": "Golden Dawn Book T (Elemental Dignities)"
+    }
+
+def select_significator_card(age: int = 30, gender: str = "male", temperament: str = "air") -> Dict[str, Any]:
+    """Select authentic Tarot Significator based on Arthur Edward Waite (1910, Part III § 7).
+    - Male >= 40: King
+    - Male < 40: Knight (in Waite 1910, Knight for mature / younger adult)
+    - Female >= 40: Queen
+    - Female < 40 / Youth: Page
+    Suit by temperament/physical:
+    - Fire (Wands): Fair, blond/auburn, energetic
+    - Water (Cups): Light brown/fair, calm, artistic
+    - Air (Swords): Dark hair, active, analytical/determined
+    - Earth (Pentacles): Dark/black hair, swarthy, grounded, practical
+    """
+    gender_norm = gender.lower().strip()
+    temp_norm = temperament.lower().strip()
+
+    suit_map = {
+        "fire": "Wands",
+        "wands": "Wands",
+        "water": "Cups",
+        "cups": "Cups",
+        "air": "Swords",
+        "swords": "Swords",
+        "earth": "Pentacles",
+        "pentacles": "Pentacles"
+    }
+    suit = suit_map.get(temp_norm, "Wands")
+
+    if gender_norm in ("male", "m", "man"):
+        rank = "King" if age >= 40 else "Knight"
+    elif gender_norm in ("female", "f", "woman"):
+        rank = "Queen" if age >= 40 else "Page"
+    else:
+        rank = "Queen" if age >= 40 else "Knight"
+
+    card_name = f"{rank} of {suit}"
+    card_info = COURT_CARDS_RWS.get(card_name, COURT_CARDS_RWS["King of Wands"])
+
+    return {
+        "significator_card": card_name,
+        "rank": rank,
+        "suit": suit,
+        "element": card_info["element"],
+        "astrology": card_info["astrology"],
+        "upright_meaning": card_info["upright"],
+        "rule": "Arthur Edward Waite, Pictorial Key to the Tarot (1910, Part III § 7)"
+    }
+
+def decanic_natal_resonance(planets_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Map Natal Planets/Ascendant in degrees to corresponding Tarot Decan Minor & Major Archetypes.
+    Accepts planets_data like {"Sun": {"sign": "Leo", "degree": 14.5}, "Ascendant": {"sign": "Cancer", "degree": 5.2}}.
+    """
+    sign_decan_cards = {
+        "Aries": ["2 of Wands", "3 of Wands", "4 of Wands"],
+        "Taurus": ["5 of Pentacles", "6 of Pentacles", "7 of Pentacles"],
+        "Gemini": ["8 of Swords", "9 of Swords", "10 of Swords"],
+        "Cancer": ["2 of Cups", "3 of Cups", "4 of Cups"],
+        "Leo": ["5 of Wands", "6 of Wands", "7 of Wands"],
+        "Virgo": ["8 of Pentacles", "9 of Pentacles", "10 of Pentacles"],
+        "Libra": ["2 of Swords", "3 of Swords", "4 of Swords"],
+        "Scorpio": ["5 of Cups", "6 of Cups", "7 of Cups"],
+        "Sagittarius": ["8 of Wands", "9 of Wands", "10 of Wands"],
+        "Capricorn": ["2 of Pentacles", "3 of Pentacles", "4 of Pentacles"],
+        "Aquarius": ["5 of Swords", "6 of Swords", "7 of Swords"],
+        "Pisces": ["8 of Cups", "9 of Cups", "10 of Cups"]
+    }
+
+    sign_major_parent = {
+        "Aries": "The Emperor", "Taurus": "The Hierophant", "Gemini": "The Lovers",
+        "Cancer": "The Chariot", "Leo": "Strength", "Virgo": "The Hermit",
+        "Libra": "Justice", "Scorpio": "Death", "Sagittarius": "Temperance",
+        "Capricorn": "The Devil", "Aquarius": "The Star", "Pisces": "The Moon"
+    }
+
+    results = []
+    for body_name, pos in planets_data.items():
+        if not isinstance(pos, dict) or "sign" not in pos:
+            continue
+        sign = pos["sign"]
+        deg = float(pos.get("degree", 0.0)) % 30.0
+        decan_idx = min(2, int(deg // 10))
+
+        decan_card_name = sign_decan_cards.get(sign, ["2 of Wands"])[decan_idx]
+        card_info = MINOR_PIPS_RWS.get(decan_card_name, {})
+        major_parent = sign_major_parent.get(sign, "The Fool")
+
+        results.append({
+            "celestial_body": body_name,
+            "sign": sign,
+            "degree": round(deg, 2),
+            "decan": f"{sign} {decan_idx + 1}",
+            "tarot_minor_card": decan_card_name,
+            "title": card_info.get("title", ""),
+            "chaldean_ruler": card_info.get("astrology", ""),
+            "archetypal_major_parent": major_parent,
+            "lived_archetype": card_info.get("upright", "")
+        })
+
+    return results
 
 def three_card_reading(question: str, spread_type: str = "past_present_future", seed: str = "") -> Dict[str, Any]:
-    """Generate a 3-Card Tarot Reading (past/present/future, situation/obstacle/advice, mind/body/spirit)."""
+    """Generate a 3-Card Tarot Reading with Golden Dawn Triad Elemental Dignities."""
     type_map = {
         "past_present_future": ["Past Influences", "Present Moment", "Future Trajectory"],
         "situation_obstacle_advice": ["Current Situation", "Core Obstacle", "Actionable Guidance"],
@@ -417,21 +610,29 @@ def three_card_reading(question: str, spread_type: str = "past_present_future", 
     draw = generate_deterministic_draw(f"3card:{spread_type}:{question}:{seed}", count=3)
 
     cards = []
+    card_elements = []
     for pos_title, (c_name, is_rev) in zip(positions, draw):
         info = ALL_78_CARDS[c_name]
         orientation = "Reversed" if is_rev else "Upright"
         reading = info["reversed"] if is_rev else info["upright"]
+        elem = info.get("element", "Fire")
+        card_elements.append(elem)
         cards.append({
             "position": pos_title,
             "card_name": c_name,
             "orientation": orientation,
-            "astrology": info.get("astrology", info.get("element", "")),
+            "element": elem,
+            "astrology": info.get("astrology", elem),
             "reading": reading
         })
+
+    # Triad Elemental Dignity
+    triad_dignity = evaluate_triad_elemental_dignity(card_elements[0], card_elements[1], card_elements[2])
 
     return {
         "spread": f"3-Card Spread ({spread_type.replace('_',' ').title()})",
         "question": question,
+        "elemental_dignity_triad": triad_dignity,
         "cards": cards,
         "synthesis": f"{cards[0]['position']}: {cards[0]['card_name']} -> {cards[1]['position']}: {cards[1]['card_name']} -> {cards[2]['position']}: {cards[2]['card_name']}."
     }

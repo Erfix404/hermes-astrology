@@ -1536,5 +1536,76 @@ class TestJPLValidation(unittest.TestCase):
         self.assertEqual(_sign_str(340.649), "Pisces")
 
 
+class TestTarotEngineCanonical(unittest.TestCase):
+    """Canonical Rider-Waite-Smith (RWS) 78-Card & Spreads Suite Tests."""
+
+    def test_all_78_cards_count_and_types(self):
+        import tarot_engine as te
+        self.assertEqual(len(te.ALL_78_CARDS), 78)
+        self.assertEqual(len(te.MAJOR_ARCANA_RWS), 22)
+        self.assertEqual(len(te.MINOR_PIPS_RWS), 40)
+        self.assertEqual(len(te.COURT_CARDS_RWS), 16)
+
+    def test_major_arcana_hebrew_and_rws_rectification(self):
+        import tarot_engine as te
+        # Strength must be VIII with Leo and Teth
+        self.assertEqual(te.MAJOR_ARCANA_RWS[8]["name"], "Strength")
+        self.assertEqual(te.MAJOR_ARCANA_RWS[8]["hebrew"], "Teth")
+        self.assertEqual(te.MAJOR_ARCANA_RWS[8]["astrology"], "Leo")
+        # Justice must be XI with Libra and Lamed
+        self.assertEqual(te.MAJOR_ARCANA_RWS[11]["name"], "Justice")
+        self.assertEqual(te.MAJOR_ARCANA_RWS[11]["hebrew"], "Lamed")
+        self.assertEqual(te.MAJOR_ARCANA_RWS[11]["astrology"], "Libra")
+
+    def test_mary_greer_karmic_lifepath_suite(self):
+        import tarot_engine as te
+        # Example: 1990-06-15 -> 1990+6+15 = 2011 -> 2+0+1+1 = 4 (The Emperor)
+        # Soul card: 4 (The Emperor)
+        # Shadow card: 22 - 4 = 18 (The Moon)
+        res = te.calculate_greer_lifepath_suite(1990, 6, 15, target_year=2026)
+        self.assertEqual(res["personality_card"]["number"], 4)
+        self.assertEqual(res["personality_card"]["name"], "The Emperor")
+        self.assertEqual(res["soul_card"]["number"], 4)
+        self.assertEqual(res["shadow_card"]["number"], 18)
+        self.assertEqual(res["shadow_card"]["name"], "The Moon")
+        self.assertIn("year_card", res)
+
+    def test_waite_significator_selection(self):
+        import tarot_engine as te
+        # Male 45, Air temperament -> King of Swords
+        sig_male = te.select_significator_card(age=45, gender="male", temperament="air")
+        self.assertEqual(sig_male["significator_card"], "King of Swords")
+        # Female 25, Water temperament -> Page of Cups
+        sig_fem = te.select_significator_card(age=25, gender="female", temperament="water")
+        self.assertEqual(sig_fem["significator_card"], "Page of Cups")
+
+    def test_golden_dawn_triad_elemental_dignity(self):
+        import tarot_engine as te
+        # Fire surrounded by Air & Air -> Strongly Dignified (+2)
+        d_strong = te.evaluate_triad_elemental_dignity("Air", "Fire", "Air")
+        self.assertIn("Strongly Dignified", d_strong["center_status"])
+        self.assertEqual(d_strong["dignity_score"], 2)
+        # Fire surrounded by Water & Water -> Severely Ill-Dignified (-2)
+        d_ill = te.evaluate_triad_elemental_dignity("Water", "Fire", "Water")
+        self.assertIn("Severely Ill-Dignified", d_ill["center_status"])
+        self.assertEqual(d_ill["dignity_score"], -2)
+
+    def test_celtic_cross_and_natal_resonance(self):
+        import tarot_engine as te
+        cc = te.celtic_cross_reading("Career trajectory", "1990-06-15", significator="King of Swords")
+        self.assertEqual(len(cc["cards"]), 10)
+        self.assertEqual(cc["significator"], "King of Swords")
+
+        # Decanic natal resonance
+        planets = {
+            "Sun": {"sign": "Leo", "degree": 14.5},
+            "Moon": {"sign": "Cancer", "degree": 2.1}
+        }
+        res = te.decanic_natal_resonance(planets)
+        self.assertEqual(len(res), 2)
+        self.assertEqual(res[0]["tarot_minor_card"], "6 of Wands") # Leo Decan 2
+        self.assertEqual(res[1]["tarot_minor_card"], "2 of Cups")  # Cancer Decan 1
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
