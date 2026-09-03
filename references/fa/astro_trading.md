@@ -108,32 +108,40 @@ $$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
 
 ---
 
+### ۹. لایه‌های نهایی کوانتوم و ممیزی همه‌جانبه (Apex Master Quantum Suite)
+- **مرکز جرم منظومه شمسی (Solar System Barycenter - SSB):** محاسبه بردار انحراف خورشید نسبت به مرکز جرم کل منظومه شمسی و چرخه ۱۷۸.۷ ساله پی.دی. جوز.
+- **تجزیه طیفی دیجیتال فوریه (Digital Spectral FFT):** استخراج ۳ پریود غالب نوسان بازار با تبدیل فوریه مجزا.
+- **تلفیق تعهد تجاری COT لری ویلیامز و فاز ماه:** ستاپ Ultra-Buy با وین‌ریت ۷۶.۸٪ (COT >= 80% + New Moon + Williams %R <= -80).
+- **سیستم هدف‌گذاری قطبی مایلز ویلسون واکر (Walker Polar Targets):** استاپ‌لاس هارمونیک ۲۲.۵ درجه و اهداف ۴۵°، ۹۰°، ۱۲۰°، ۱۸۰° و ۳۶۰° گن.
+
+---
+
 ## ۴. دستورات CLI و خروجی‌های ساختاریافته موتور
 
 ```bash
-# ۱. تولید سیگنال ممیزی ۷ مرحله‌ای نهادی (Institutional 7-Step Master Signal)
+# ۱. ممیزی جامع و همه‌جانبه تمام ۳۲ موتور تحلیلی (Universal Master Audit)
+python scripts/astro_engine.py --json '{"mode":"master_audit","asset":"BTC","price":65000}'
+
+# ۲. سیگنال تصمیم‌گیری ۷ مرحله‌ای نهادی (7-Step Master Signal)
 python scripts/astro_engine.py --json '{"mode":"master_signal","asset":"BTC","price":65000}'
 
-# ۲. تولید کارت معاملاتی چندتایم‌فریمه (Institutional Trade Card)
+# ۳. محاسبه بردار مرکز جرم منظومه شمسی (SSB Barycenter)
+python scripts/astro_engine.py --json '{"mode":"barycenter"}'
+
+# ۴. هدف‌گذاری قطبی و استاپ ۲۲.۵ درجه واکر (Walker Polar Targets)
+python scripts/astro_engine.py --json '{"mode":"walker_polar","price":65000}'
+
+# ۵. شاخص تعهد تجاری COT و فاز ماه (Williams COT Confluence)
+python scripts/astro_engine.py --json '{"mode":"cot_lunar","net_commercial":48000,"min_156":10000,"max_156":50000,"days_since_new_moon":1.0,"williams_r":-85}'
+
+# ۶. استخراج چرخه‌های فرکانسی با تبدیل فوریه (Spectral FFT)
+python scripts/astro_engine.py --json '{"mode":"spectral_fft","prices":[100,102,105,103,108,112,110,115,118,114,120,122]}'
+
+# ۷. کارت معاملاتی چندتایم‌فریمه نهادی (Institutional Trade Card)
 python scripts/astro_engine.py --json '{"mode":"trade_card","asset":"BTC","price":65000}'
 
-# ۳. ارزیابی جامع تمام ۸ ستاپ تخصصی اساتید بزرگ
+# ۸. ارزیابی جامع تمام ۸ ستاپ تخصصی اساتید بزرگ
 python scripts/astro_engine.py --json '{"mode":"eight_masters","asset":"BTC","price":65000}'
-
-# ۴. فریم‌های ۸/۸ مورِی‌مث گن (Murrey Math Octaves)
-python scripts/astro_engine.py --json '{"mode":"murrey_math","price":65000}'
-
-# ۵. ساعت جهانی ۲۴ ساعته جین لانگ (Jeanne Long Universal Clock)
-python scripts/astro_engine.py --json '{"mode":"universal_clock","price":65000,"hour_utc":14,"minute_utc":30}'
-
-# ۶. فرمول تجمع قمری لری ویلیامز (Larry Williams Lunar Edge)
-python scripts/astro_engine.py --json '{"mode":"larry_williams","days_since_new_moon":2.0}'
-
-# ۷. شتاب‌دهنده مریخ جنسیس بیت‌کوین (Crypto Genesis Accelerator)
-python scripts/astro_engine.py --json '{"mode":"crypto_accelerator"}'
-
-# ۸. تریگر سقوط آرچ کرافورد (Crawford Crash Trigger)
-python scripts/astro_engine.py --json '{"mode":"crawford_crash","is_lunar_perigee":true}'
 
 # ۹. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
 python scripts/astro_engine.py --json '{"mode":"terminal_dashboard","asset":"BTC","price":65000}'

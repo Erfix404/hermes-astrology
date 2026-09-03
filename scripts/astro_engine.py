@@ -3740,6 +3740,7 @@ def calculate_full_profile(data):
                 "eight_masters", "master_setups", "master_signal", "quant_signal",
                 "murrey_math", "murrey", "universal_clock", "jeanne_long",
                 "larry_williams", "lunar_edge", "bayer_polarity", "crypto_accelerator",
+                "barycenter", "ssb", "spectral_fft", "fft", "cot_lunar", "walker_polar", "master_audit",
                 "harmonic_wave", "composite_wave", "genesis_transits", "terminal_dashboard",
                 "bayer", "mercury_speed", "crd_calendar", "geocosmic_crd",
                 "mcwhirter", "node_cycle", "financial", "crypto"):
@@ -4074,6 +4075,50 @@ def calculate_full_profile(data):
                 atr14=atr_val,
                 is_moon_voc=is_voc
             )
+            return result
+        if mode=="barycenter" or mode=="ssb":
+            import astro_trading_engine as ate
+            helio_l = ate.HeliocentricTradingEngine.compute_helio_longitudes(tjd)
+            result["solar_system_barycenter"] = ate.SolarSystemBarycenterEngine.compute_barycenter_displacement(helio_l)
+            return result
+        if mode=="spectral_fft" or mode=="fft":
+            import astro_trading_engine as ate
+            p_series = data.get("prices", [100.0, 102.0, 105.0, 103.0, 108.0, 112.0, 110.0, 115.0, 118.0, 114.0, 120.0, 122.0])
+            result["digital_spectral_fft"] = {
+                "sample_bars": len(p_series),
+                "dominant_cycles": ate.DigitalSpectralFFTEngine.extract_dominant_cycles(p_series)
+            }
+            return result
+        if mode=="cot_lunar":
+            import astro_trading_engine as ate
+            net_c = float(data.get("net_commercial", 45000.0))
+            min_c = float(data.get("min_156", 10000.0))
+            max_c = float(data.get("max_156", 50000.0))
+            d_nm = float(data.get("days_since_new_moon", 2.0))
+            w_r = float(data.get("williams_r", -80.0))
+            result["williams_cot_lunar_confluence"] = ate.WilliamsCOTConfluenceEngine.evaluate_cot_lunar_signal(net_c, min_c, max_c, d_nm, w_r)
+            return result
+        if mode=="walker_polar":
+            import astro_trading_engine as ate
+            price = float(data.get("price", 65000.0))
+            result["walker_polar_targets"] = ate.WalkerPolarTargetEngine.compute_polar_harmonics(price)
+            return result
+        if mode=="master_audit":
+            import astro_trading_engine as ate
+            asset = data.get("asset", "BTC")
+            price = float(data.get("price", 65000.0 if asset.upper()=="BTC" else 2500.0))
+            t_lons, t_speed, _ = body_longitudes(tjd)
+            decls = body_declinations(tjd)
+            voc = void_of_course_moon(tjd, tlat, tlng, True)
+            is_voc = bool(voc.get("is_void", False))
+            helio_l = ate.HeliocentricTradingEngine.compute_helio_longitudes(tjd)
+
+            result["master_audit_suite"] = {
+                "master_signal": ate.InstitutionalMasterSignalEngine.generate_master_signal(asset, price, tdt, t_lons, t_speed, decls, 1200.0, is_voc),
+                "barycenter": ate.SolarSystemBarycenterEngine.compute_barycenter_displacement(helio_l),
+                "walker_polar": ate.WalkerPolarTargetEngine.compute_polar_harmonics(price),
+                "eight_masters": ate.EightMastersExhaustiveSetupsEngine.evaluate_all_eight_setups(asset, price, 1200.0)
+            }
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate

@@ -391,5 +391,47 @@ class TestUndergroundAndAdvancedMasters(unittest.TestCase):
         self.assertIn("institutional_master_signal", res_cli)
 
 
+class TestApexMasterSuiteEngines(unittest.TestCase):
+    """Test Solar System Barycenter, Digital Spectral FFT, Williams COT Confluence & Walker Polar Targets."""
+
+    def test_solar_system_barycenter(self):
+        helio_lons = {"Jupiter": 120.0, "Saturn": 10.0, "Uranus": 60.0, "Neptune": 0.0}
+        ssb = ate.SolarSystemBarycenterEngine.compute_barycenter_displacement(helio_lons)
+        self.assertIn("barycenter_distance_au", ssb)
+        self.assertIn("barycenter_displacement_solar_radii", ssb)
+        self.assertGreater(ssb["barycenter_displacement_solar_radii"], 0.0)
+
+    def test_digital_spectral_fft(self):
+        # Synthetic cyclical wave series with known length
+        prices = [100.0 + 10.0 * math.sin(2.0 * math.pi * i / 12.0) for i in range(48)]
+        cycles = ate.DigitalSpectralFFTEngine.extract_dominant_cycles(prices, top_k=3)
+        self.assertGreater(len(cycles), 0)
+        self.assertIn("period_bars", cycles[0])
+        self.assertAlmostEqual(cycles[0]["period_bars"], 12.0, delta=1.0)
+
+    def test_williams_cot_confluence(self):
+        cot_buy = ate.WilliamsCOTConfluenceEngine.evaluate_cot_lunar_signal(
+            net_commercial=48000.0, min_commercial_156=10000.0, max_commercial_156=50000.0,
+            days_since_new_moon=1.0, williams_r14=-85.0
+        )
+        self.assertIn("LARRY_WILLIAMS_ULTRA_BUY", cot_buy["institutional_confluence_signal"])
+        self.assertEqual(cot_buy["macro_bias"], "MAXIMUM_BULLISH_CONFLUENCE")
+
+    def test_walker_polar_targets(self):
+        p_targets = ate.WalkerPolarTargetEngine.compute_polar_harmonics(100.0) # root 10.0
+        self.assertEqual(p_targets["target_180deg_opposition"], 121.0) # (10 + 1)^2
+        self.assertEqual(p_targets["target_360deg_full_octave"], 144.0) # (10 + 2)^2
+        self.assertIn("sub_harmonic_stop_loss_22_5deg", p_targets)
+
+    def test_master_audit_cli(self):
+        res_audit = ae.calculate_full_profile({"mode": "master_audit", "asset": "BTC", "price": 65000.0})
+        self.assertIn("master_audit_suite", res_audit)
+        suite = res_audit["master_audit_suite"]
+        self.assertIn("master_signal", suite)
+        self.assertIn("barycenter", suite)
+        self.assertIn("walker_polar", suite)
+        self.assertIn("eight_masters", suite)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

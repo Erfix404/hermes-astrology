@@ -2017,6 +2017,188 @@ class InstitutionalMasterSignalEngine:
         }
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+#  33. SOLAR SYSTEM BARYCENTER (SSB) & TIDAL GRAVITATIONAL VECTOR ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class SolarSystemBarycenterEngine:
+    """Solar System Barycenter (SSB) & Gravitational Tidal Vector Engine.
+    Calculates the Sun's displacement vector from the Solar System Center of Mass:
+    R_SSB(t) = sum(M_i * r_i) / (M_Sun + sum(M_i)).
+    P.D. Jose 178.7-Year Cycle of Solar Angular Momentum Rate of Change (dL/dt)."""
+
+    # Planetary masses relative to Sun (M_Sun = 1.0)
+    PLANET_MASSES = {
+        "Jupiter": 0.0009547919,
+        "Saturn":  0.0002858857,
+        "Uranus":  0.0000436625,
+        "Neptune": 0.0000515139
+    }
+
+    # Mean semi-major axis (AU)
+    PLANET_DISTANCES = {
+        "Jupiter": 5.2044,
+        "Saturn":  9.5826,
+        "Uranus":  19.2184,
+        "Neptune": 30.1104
+    }
+
+    @staticmethod
+    def compute_barycenter_displacement(helio_longitudes: Dict[str, float]) -> Dict[str, Any]:
+        """Compute Sun displacement from Barycenter in Solar Radii (1 R_Sun ~ 0.00465 AU)."""
+        x_sum = 0.0
+        y_sum = 0.0
+        total_mass = 1.0 + sum(SolarSystemBarycenterEngine.PLANET_MASSES.values())
+
+        for p, mass in SolarSystemBarycenterEngine.PLANET_MASSES.items():
+            lon_deg = helio_longitudes.get(p, 0.0)
+            dist_au = SolarSystemBarycenterEngine.PLANET_DISTANCES.get(p, 5.0)
+            lon_rad = math.radians(lon_deg)
+            x_sum += mass * dist_au * math.cos(lon_rad)
+            y_sum += mass * dist_au * math.sin(lon_rad)
+
+        r_bary_au = math.sqrt(x_sum**2 + y_sum**2) / total_mass
+        r_bary_solar_radii = r_bary_au / 0.00465247 # Convert to Solar Radii (R_sun = 1.0)
+        bary_angle_deg = math.degrees(math.atan2(y_sum, x_sum)) % 360.0
+
+        if r_bary_solar_radii >= 1.8:
+            regime = "Extreme Barycentric Displacement (Max Solar Inertial Torque / Secular Volatility Cluster)"
+            bias = "SECULAR_EXPANSION_VOLATILITY"
+        elif r_bary_solar_radii <= 0.8:
+            regime = "Minimal Barycentric Displacement (Sun near Center of Mass / Bedrock Structural Baseline)"
+            bias = "SECULAR_CONSOLIDATION"
+        else:
+            regime = "Normal Barycentric Orbit"
+            bias = "NEUTRAL"
+
+        return {
+            "barycenter_distance_au": round(r_bary_au, 6),
+            "barycenter_displacement_solar_radii": round(r_bary_solar_radii, 3),
+            "barycenter_vector_angle_deg": round(bary_angle_deg, 2),
+            "macro_barycentric_regime": regime,
+            "secular_bias": bias,
+            "rule": "P.D. Jose & Theodor Landscheidt: Planetary center-of-mass motion modulates secular macroeconomic tides."
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  34. DIGITAL SPECTRAL FREQUENCY & FOURIER CYCLE DECOMPOSITION ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class DigitalSpectralFFTEngine:
+    """Discrete Fourier Transform & Spectral Cycle Isolation Engine (Zero External Dependencies).
+    Extracts the top dominant cyclical wavelengths (T_1, T_2, T_3) from price sequences."""
+
+    @staticmethod
+    def extract_dominant_cycles(price_series: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
+        """Perform Discrete Fourier Transform (DFT) to isolate dominant market cycle periods."""
+        n = len(price_series)
+        if n < 8:
+            return []
+
+        # Detrend and mean-center
+        mean_p = sum(price_series) / n
+        detrended = [p - mean_p for p in price_series]
+
+        spectral_powers = []
+        # Test cycle periods from 3 bars up to N/2 bars
+        for k in range(1, n // 2):
+            re_sum = 0.0
+            im_sum = 0.0
+            for t in range(n):
+                angle = 2.0 * math.pi * k * t / n
+                re_sum += detrended[t] * math.cos(angle)
+                im_sum -= detrended[t] * math.sin(angle)
+
+            power = (re_sum ** 2 + im_sum ** 2) / n
+            period_bars = n / float(k)
+            spectral_powers.append({
+                "period_bars": round(period_bars, 2),
+                "harmonic_frequency": round(k / float(n), 5),
+                "spectral_power": round(power, 2)
+            })
+
+        spectral_powers.sort(key=lambda x: -x["spectral_power"])
+        return spectral_powers[:top_k]
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  35. LARRY WILLIAMS COMMERCIAL COT & LUNAR CONFLUENCE SYNTHESIZER
+# ═════════════════════════════════════════════════════════════════════════════
+
+class WilliamsCOTConfluenceEngine:
+    """Larry Williams Commercial COT Index & Synodic Lunar Confluence Engine."""
+
+    @staticmethod
+    def evaluate_cot_lunar_signal(
+        net_commercial: float,
+        min_commercial_156: float,
+        max_commercial_156: float,
+        days_since_new_moon: float,
+        williams_r14: float = -50.0
+    ) -> Dict[str, Any]:
+        """Calculates 3-Year Commercial Index and determines Ultra-Buy / Ultra-Sell confluence."""
+        rng = max(1.0, max_commercial_156 - min_commercial_156)
+        cot_ci = round(min(100.0, max(0.0, (net_commercial - min_commercial_156) / rng * 100.0)), 1)
+
+        lunar_edge = LarryWilliamsLunarEdgeEngine.evaluate_lunar_phase_edge(days_since_new_moon)
+        is_new_moon_window = "New Moon" in lunar_edge["regime_description"]
+        is_full_moon_window = "Full Moon" in lunar_edge["regime_description"]
+
+        if cot_ci >= 80.0 and is_new_moon_window and williams_r14 <= -75.0:
+            signal = "LARRY_WILLIAMS_ULTRA_BUY (76.8% Historical Win Rate)"
+            bias = "MAXIMUM_BULLISH_CONFLUENCE"
+        elif cot_ci <= 20.0 and is_full_moon_window and williams_r14 >= -25.0:
+            signal = "LARRY_WILLIAMS_ULTRA_SELL (Commercial Distribution Climax)"
+            bias = "MAXIMUM_BEARISH_CONFLUENCE"
+        elif cot_ci >= 70.0:
+            signal = "COMMERCIAL_ACCUMULATION (Smart Money Long Bias)"
+            bias = "BULLISH_SMART_MONEY"
+        elif cot_ci <= 30.0:
+            signal = "COMMERCIAL_DISTRIBUTION (Smart Money Short Bias)"
+            bias = "BEARISH_SMART_MONEY"
+        else:
+            signal = "NEUTRAL_COT_EQUILIBRIUM"
+            bias = "NEUTRAL"
+
+        return {
+            "commercial_index_pct": f"{cot_ci}%",
+            "lunar_phase_regime": lunar_edge["regime_description"],
+            "williams_r14": round(williams_r14, 2),
+            "institutional_confluence_signal": signal,
+            "macro_bias": bias,
+            "source": "Larry Williams, Trade Stocks & Commodities with the Insiders / CFTC COT Analysis"
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  36. MYLES WILSON WALKER POLAR PRICE-TIME HARMONIC TARGET ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class WalkerPolarTargetEngine:
+    """Myles Wilson Walker Polar Price-Time Harmonic & Sub-Octave Target Engine."""
+
+    @staticmethod
+    def compute_polar_harmonics(price: float) -> Dict[str, Any]:
+        """Calculates Square of Nine polar angle theta(P) = [(sqrt(P)-1)*180] mod 360 and exact target ladders."""
+        if price <= 0: return {}
+        root_p = math.sqrt(price)
+        polar_angle = round(((root_p - 1.0) * 180.0) % 360.0, 2)
+
+        return {
+            "price": price,
+            "square_of_9_polar_angle": f"{polar_angle}°",
+            "sub_harmonic_stop_loss_22_5deg": round((root_p - 0.125) ** 2, 2), # 22.5° Sub-Harmonic SL
+            "target_45deg_octile": round((root_p + 0.250) ** 2, 2),
+            "target_90deg_square": round((root_p + 0.500) ** 2, 2),
+            "target_120deg_trine": round((root_p + 0.667) ** 2, 2),
+            "target_180deg_opposition": round((root_p + 1.000) ** 2, 2),
+            "target_360deg_full_octave": round((root_p + 2.000) ** 2, 2),
+            "source": "Myles Wilson Walker, Super Timing & The Square of Nine (1998)"
+        }
+
+
+
 
 
 
