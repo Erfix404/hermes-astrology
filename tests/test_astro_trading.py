@@ -250,5 +250,42 @@ class TestSixResearchFrontiers(unittest.TestCase):
         self.assertGreater(res_sig["z_score"], 2.0)
 
 
+class TestAstroTradingInstitutionalMasterTier(unittest.TestCase):
+    """Test Barbault BCI, Gann Mass Pressure, Sepharial Silver Key & Trade Card."""
+
+    def test_barbault_cyclical_index(self):
+        lons = {"Jupiter": 120.0, "Saturn": 10.0, "Uranus": 60.0, "Neptune": 0.0, "Pluto": 300.0}
+        bci = ate.BarbaultCyclicalIndexEngine.compute_bci(lons)
+        self.assertIn("bci_total_arc_degrees", bci)
+        self.assertEqual(len(bci["ten_planetary_arcs"]), 10)
+        self.assertGreater(bci["bci_total_arc_degrees"], 0)
+
+    def test_gann_mass_pressure(self):
+        mp_pt = ate.GannMassPressureEngine.compute_mass_pressure_point(0.0)
+        self.assertIsInstance(mp_pt, float)
+        forecast = ate.GannMassPressureEngine.generate_mass_pressure_forecast(datetime(2026, 9, 2), months_forward=12)
+        self.assertEqual(len(forecast), 12)
+        self.assertIn("mass_pressure_score", forecast[0])
+
+    def test_sepharial_silver_key(self):
+        tide = ate.SepharialTidalEngine.evaluate_lunar_tide(14.8) # High speed near perigee
+        self.assertIn("Lunar Perigee Climax", tide["market_condition"])
+        self.assertEqual(tide["tactical_posture"], "HIGH_VOLATILITY_BREAKOUT")
+
+    def test_institutional_trade_card(self):
+        card = ate.AstroTradeOrchestrator.generate_institutional_trade_card(
+            asset_key="BTC",
+            current_price=65000.0,
+            macro_bias_score=60.0,
+            swing_crd_score=80.0,
+            swing_direction=1,
+            intraday_score=50.0
+        )
+        self.assertEqual(card["asset"], "BTC")
+        self.assertIn("INSTITUTIONAL STRONG BUY", card["institutional_action"])
+        self.assertGreater(card["composite_confluence_score"], 50.0)
+        self.assertIn("stop_loss", card["order_matrix"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

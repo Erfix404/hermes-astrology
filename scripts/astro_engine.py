@@ -3733,6 +3733,8 @@ def calculate_full_profile(data):
                 "gann_sq9", "square_of_9", "gann_angles", "gann_clock", "circle_24",
                 "spiral_calendar", "carolan", "helio_trading", "solar_cycles", "solar_regime",
                 "gann_matrices", "sector_astro", "astro_stats",
+                "barbault_bci", "bci", "gann_mass_pressure", "mass_pressure",
+                "sepharial_tide", "silver_key", "trade_card", "institutional_card",
                 "harmonic_wave", "composite_wave", "genesis_transits", "terminal_dashboard",
                 "bayer", "mercury_speed", "crd_calendar", "geocosmic_crd",
                 "mcwhirter", "node_cycle", "financial", "crypto"):
@@ -3942,6 +3944,38 @@ def calculate_full_profile(data):
             import astro_trading_engine as ate
             sample_rets = data.get("returns", [0.012, 0.015, -0.005, 0.022, 0.018, 0.030, 0.011, 0.019])
             result["astro_statistical_significance"] = ate.AstroStatisticalSignificanceEngine.calculate_z_score(sample_rets)
+            return result
+        if mode=="barbault_bci" or mode=="bci":
+            import astro_trading_engine as ate
+            t_lons, _, _ = body_longitudes(tjd)
+            result["barbault_cyclical_index"] = ate.BarbaultCyclicalIndexEngine.compute_bci(t_lons)
+            return result
+        if mode=="gann_mass_pressure" or mode=="mass_pressure":
+            import astro_trading_engine as ate
+            m_count = int(data.get("months_forward", 24))
+            result["gann_mass_pressure"] = {
+                "forecast_start_date": tdt.strftime("%Y-%m-%d"),
+                "forecast_curve": ate.GannMassPressureEngine.generate_mass_pressure_forecast(tdt, m_count),
+                "rule": "W.D. Gann Mass Pressure: 60Y (40%), 20Y (25%), 10Y (20%), 1Y (15%) harmonic cycle superposition."
+            }
+            return result
+        if mode=="sepharial_tide" or mode=="silver_key":
+            import astro_trading_engine as ate
+            _, t_speed, _ = body_longitudes(tjd)
+            moon_spd = abs(t_speed.get("Moon", 13.176))
+            result["sepharial_lunar_tide"] = ate.SepharialTidalEngine.evaluate_lunar_tide(moon_spd)
+            return result
+        if mode=="trade_card" or mode=="institutional_card":
+            import astro_trading_engine as ate
+            asset = data.get("asset", "BTC")
+            price = float(data.get("price", 65000.0 if asset.upper()=="BTC" else 2500.0))
+            macro_score = float(data.get("macro_bias_score", 45.0))
+            swing_prob = float(data.get("swing_crd_score", 75.0))
+            swing_dir = int(data.get("swing_direction", 1))
+            intra_score = float(data.get("intraday_score", 30.0))
+            result["institutional_trade_card"] = ate.AstroTradeOrchestrator.generate_institutional_trade_card(
+                asset, price, macro_score, swing_prob, swing_dir, intra_score
+            )
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate

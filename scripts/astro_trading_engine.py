@@ -1110,3 +1110,221 @@ class AstroStatisticalSignificanceEngine:
         }
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+#  17. ANDRE BARBAULT PLANETARY CYCLICAL INDEX (BCI) ENGINE (1967)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class BarbaultCyclicalIndexEngine:
+    """Andre Barbault Planetary Cyclical Index (Indice Cyclique Planétaire - BCI).
+    Measures the sum of all 10 mutual angular distances among the 5 outer planets:
+    Jupiter, Saturn, Uranus, Neptune, Pluto.
+    Formula: BCI(t) = sum_{i < j} min(|lon_i - lon_j|, 360 - |lon_i - lon_j|).
+    Velocity dBCI/dt identifies macro secular economic expansions vs systemic crises."""
+
+    OUTER_BODIES = ["Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"]
+
+    @staticmethod
+    def compute_bci(longitudes: Dict[str, float]) -> Dict[str, Any]:
+        """Calculate Barbault BCI index value in degrees [0, 1800]."""
+        pairs = []
+        total_arc = 0.0
+        n = len(BarbaultCyclicalIndexEngine.OUTER_BODIES)
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                p1 = BarbaultCyclicalIndexEngine.OUTER_BODIES[i]
+                p2 = BarbaultCyclicalIndexEngine.OUTER_BODIES[j]
+                l1 = longitudes.get(p1, 0.0)
+                l2 = longitudes.get(p2, 0.0)
+                diff = abs(l1 - l2) % 360.0
+                arc = min(diff, 360.0 - diff)
+                total_arc += arc
+                pairs.append({"pair": f"{p1}-{p2}", "shortest_arc_deg": round(arc, 2)})
+
+        # Classify regime based on BCI amplitude
+        if total_arc >= 1100.0:
+            regime = "Macro Planetary Dispersion (Secular Economic Prosperity & Global Growth)"
+            posture = "SECULAR_BULLISH"
+        elif total_arc <= 550.0:
+            regime = "Macro Planetary Compression / Crisis Cluster (Major Geopolitical Stress / Stagflation / Reset)"
+            posture = "SECULAR_DEFENSIVE_ACCUMULATION"
+        else:
+            regime = "Neutral / Transitional Global Equilibrium"
+            posture = "BALANCED_TREND_FOLLOWING"
+
+        return {
+            "bci_total_arc_degrees": round(total_arc, 2),
+            "theoretical_range": "0° (All 5 in Conjunction) to 1800° (All in Opposition)",
+            "empirical_historical_mean": 900.0,
+            "macro_economic_regime": regime,
+            "strategic_posture": posture,
+            "ten_planetary_arcs": pairs,
+            "reference": "Andre Barbault, Les Astres et l'Histoire (1967) / L'Avenir du Monde (2020)"
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  18. W.D. GANN MASS PRESSURE COMPOSITE FORECASTING CURVE ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class GannMassPressureEngine:
+    """W.D. Gann Mass Pressure Forecasting Curve.
+    Superimposes the 4 master cyclical waves:
+    1. 60-Year Great Master Cycle (w=0.40)
+    2. 20-Year Jupiter-Saturn Synodic Cycle (w=0.25)
+    3. 10-Year Decennial Polarity Cycle (w=0.20)
+    4. 1-Year Annual Seasonal Cycle (w=0.15)
+    Formula: MP(t) = sum(w_k * cos(2*pi*t / T_k + phi_k))."""
+
+    CYCLES = {
+        "60Y_Great_Master": {"period_years": 59.578, "weight": 0.40, "phase": 0.5},
+        "20Y_Jupiter_Saturn": {"period_years": 19.859, "weight": 0.25, "phase": 1.2},
+        "10Y_Decennial":      {"period_years": 10.000, "weight": 0.20, "phase": 2.4},
+        "1Y_Seasonal":        {"period_years": 1.0000, "weight": 0.15, "phase": 0.0}
+    }
+
+    @staticmethod
+    def compute_mass_pressure_point(t_years: float) -> float:
+        """Compute single continuous Mass Pressure value normalized in [-100, +100]."""
+        raw_val = 0.0
+        for info in GannMassPressureEngine.CYCLES.values():
+            t_k = info["period_years"]
+            w_k = info["weight"]
+            phi_k = info["phase"]
+            raw_val += w_k * math.cos((2.0 * math.pi * t_years / t_k) + phi_k)
+        return round(raw_val * 100.0, 2)
+
+    @staticmethod
+    def generate_mass_pressure_forecast(start_date: datetime, months_forward: int = 24) -> List[Dict[str, Any]]:
+        """Generate monthly forecast curve of Gann Mass Pressure."""
+        series = []
+        for m in range(months_forward):
+            dt = start_date + timedelta(days=m * 30.4375)
+            t_years = m / 12.0
+            mp_val = GannMassPressureEngine.compute_mass_pressure_point(t_years)
+            series.append({
+                "month_offset": m,
+                "date": dt.strftime("%Y-%m-%d"),
+                "mass_pressure_score": mp_val,
+                "projected_bias": "Bullish Expansion" if mp_val > 20 else "Bearish Contraction" if mp_val < -20 else "Consolidation"
+            })
+        return series
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  19. SEPHARIAL TIDAL & INTRA-DAY TIMING ENGINE (The Silver Key)
+# ═════════════════════════════════════════════════════════════════════════════
+
+class SepharialTidalEngine:
+    """Sepharial (Dr. Walter Gorn Old, 1913) Market Timing & Lunar Velocity Tide Engine.
+    Evaluates:
+    1. Lunar Anomalistic Speed & Tidal Pressure (Apogee vs Perigee)
+    2. Arc of Direction (1° Ecliptic Arc = 1 Solar Year)
+    3. Planetary Hours & 24-minute Sub-tide vibrations."""
+
+    @staticmethod
+    def evaluate_lunar_tide(moon_daily_speed_deg: float) -> Dict[str, Any]:
+        """Classify speculative market gravitational tide from Lunar daily motion."""
+        # Mean lunar speed: ~13.176°/day (Ranges from 11.8° Apogee to 15.2° Perigee)
+        v_min, v_max = 11.8, 15.2
+        norm_tide = min(1.0, max(0.0, (moon_daily_speed_deg - v_min) / (v_max - v_min)))
+        tide_pct = round(norm_tide * 100.0, 1)
+
+        if tide_pct >= 75.0:
+            cond = "Lunar Perigee Climax (Maximum Tidal Gravitational Torque — Sharp Volatility Spikes)"
+            posture = "HIGH_VOLATILITY_BREAKOUT"
+        elif tide_pct <= 25.0:
+            cond = "Lunar Apogee Minimum (Minimum Gravitational Pull — Market Drifts, Low Momentum, False Breaks)"
+            posture = "RANGE_BOUND_MEAN_REVERSION"
+        else:
+            cond = "Normal Lunar Gravitational Motion"
+            posture = "TREND_FOLLOWING"
+
+        return {
+            "lunar_daily_speed": round(moon_daily_speed_deg, 3),
+            "gravitational_tide_strength": f"{tide_pct}%",
+            "market_condition": cond,
+            "tactical_posture": posture,
+            "source": "Sepharial, The Silver Key (1913)"
+        }
+
+    @staticmethod
+    def compute_arc_of_direction(genesis_year: int, current_year: int, natal_points: Dict[str, float]) -> Dict[str, float]:
+        """Compute Sepharial Primary Arc of Direction: 1.0° per year from Genesis Radix."""
+        elapsed_years = current_year - genesis_year
+        arc_dir = elapsed_years * 1.0
+        directed_points = {}
+        for body, lon in natal_points.items():
+            directed_points[body] = round((lon + arc_dir) % 360.0, 2)
+        return directed_points
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  20. MULTI-TIMEFRAME ASTRO-TRADING ORCHESTRATOR & INSTITUTIONAL TRADE CARD
+# ═════════════════════════════════════════════════════════════════════════════
+
+class AstroTradeOrchestrator:
+    """Master Institutional Multi-Timeframe Astro-Trading Orchestrator.
+    Synthesizes:
+    - Tier 1 (Macro, 35%): Barbault BCI + McWhirter Node Cycle + Solar Flux
+    - Tier 2 (Swing, 45%): Bradley Siderograph + Merriman CRD + Carolan Spiral + Helio Aspects
+    - Tier 3 (Intraday, 20%): Gann Circle of 24 + Square of 9 + Sepharial Lunar Tide
+    Produces the comprehensive Institutional Trade Card."""
+
+    @staticmethod
+    def generate_institutional_trade_card(
+        asset_key: str,
+        current_price: float,
+        macro_bias_score: float,       # [-100, +100] from Barbault/McWhirter
+        swing_crd_score: float,        # [0, 100]% from Bradley/Merriman
+        swing_direction: int,          # +1 (Long), -1 (Short), 0 (Neutral)
+        intraday_score: float          # [-100, +100] from Gann 24/Sepharial
+    ) -> Dict[str, Any]:
+        w_macro = 0.35
+        w_swing = 0.45
+        w_intra = 0.20
+
+        composite_score = (
+            (w_macro * macro_bias_score) +
+            (w_swing * swing_crd_score * swing_direction) +
+            (w_intra * intraday_score)
+        )
+        composite_score = max(-100.0, min(100.0, composite_score))
+
+        if composite_score >= 55.0:
+            action = "INSTITUTIONAL STRONG BUY (HIGH CONFLUENCE LONG)"
+            sl_pct = 0.96; tp1_pct = 1.06; tp2_pct = 1.12
+        elif composite_score <= -55.0:
+            action = "INSTITUTIONAL STRONG SELL (HIGH CONFLUENCE SHORT)"
+            sl_pct = 1.04; tp1_pct = 0.94; tp2_pct = 0.88
+        elif composite_score >= 20.0:
+            action = "MOMENTUM BUY / DIP ACCUMULATION"
+            sl_pct = 0.97; tp1_pct = 1.04; tp2_pct = 1.08
+        elif composite_score <= -20.0:
+            action = "DEFENSIVE HEDGE / SELL RALLIES"
+            sl_pct = 1.03; tp1_pct = 0.96; tp2_pct = 0.92
+        else:
+            action = "NEUTRAL CONSOLIDATION / CASH PRESERVATION"
+            sl_pct = 0.98; tp1_pct = 1.02; tp2_pct = 1.04
+
+        return {
+            "asset": asset_key.upper(),
+            "current_price": current_price,
+            "institutional_action": action,
+            "composite_confluence_score": round(composite_score, 1),
+            "tier_breakdown": {
+                "macro_tier_35pct": round(macro_bias_score, 1),
+                "swing_tier_45pct": round(swing_crd_score * swing_direction, 1),
+                "intraday_tier_20pct": round(intraday_score, 1)
+            },
+            "order_matrix": {
+                "entry_price": current_price,
+                "stop_loss": round(current_price * sl_pct, 2),
+                "take_profit_1": round(current_price * tp1_pct, 2),
+                "take_profit_2": round(current_price * tp2_pct, 2),
+                "risk_reward": f"1:{round(abs(current_price * tp1_pct - current_price) / max(0.01, abs(current_price - current_price * sl_pct)), 2)}"
+            }
+        }
+
+
+

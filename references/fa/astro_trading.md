@@ -82,26 +82,44 @@ $$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
 ### ۳. هوروسکوپ بدو تأسیس دارایی‌ها (Asset Genesis Horoscopy)
 تحلیل کامل ترانزیت‌های لحظه‌ای به چارت پیدایش بیت‌کوین (۲۰۰۹)، اتریوم (۲۰۱۵)، بورس نیویورک (۱۷۹۲) و طلا (۱۹۷۱) و تطبیق زوایای کسوف با سیارات جنسیس.
 
+### ۴. شاخص چرخه‌ای جهانی آندره باربو (Andre Barbault BCI 1967)
+مجموع ۱۰ کمان کوتاه میان ۵ سیاره بیرونی برای تعیین رژیم‌های رونق جهانی ($BCI > 1100^\circ$) و بحران‌های ساختاری ($BCI < 550^\circ$).
+
+### ۵. منحنی فشار توده‌ای گن (W.D. Gann Mass Pressure Curve)
+برهم‌نهی امواج چرخه‌های ۶۰ ساله مستر، ۲۰ ساله سینویک، ۱۰ ساله دهه‌ای و ۱ ساله سالانه.
+
+### ۶. سرعت گرانشی و کلید سیمین سفاریال (Sepharial The Silver Key 1913)
+محاسبه کشش جزرومدی و سرعت ماه در حضیض (Perigee) و اوج (Apogee) برای تعیین روزهای شکست پرنوسان در برابر رنج‌های فرسایشی.
+
+### ۷. ارکستراتور چندتایم‌فریمه نهادی (Institutional Astro-Trading Orchestrator)
+ترکیب وزنی لایه کلان (۳۵٪)، لایه سوئینگ (۴۵٪) و لایه اینترادی (۲۰٪) و صدور رسمی کارت معاملاتی TradeCard با پارامترهای ورود، خروج و حد ضرر.
+
 ---
 
 ## ۴. دستورات CLI و خروجی‌های ساختاریافته موتور
 
 ```bash
-# ۱. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
+# ۱. تولید کارت معاملاتی نهادی (Institutional Trade Card)
+python scripts/astro_engine.py --json '{"mode":"trade_card","asset":"BTC","price":65000}'
+
+# ۲. شاخص چرخه‌ای جهانی آندره باربو (Barbault BCI)
+python scripts/astro_engine.py --json '{"mode":"barbault_bci"}'
+
+# ۳. منحنی پیش‌بینی فشار توده‌ای گن (Gann Mass Pressure)
+python scripts/astro_engine.py --json '{"mode":"gann_mass_pressure","months_forward":24}'
+
+# ۴. سرعت گرانشی و جذرومد ماه سفاریال (Sepharial Tide)
+python scripts/astro_engine.py --json '{"mode":"sepharial_tide"}'
+
+# ۵. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
 python scripts/astro_engine.py --json '{"mode":"terminal_dashboard","asset":"BTC","price":65000}'
 
-# ۲. استخراج موج هارمونیک ۳۰ روزه آینده بازار
-python scripts/astro_engine.py --json '{"mode":"harmonic_wave","days":30}'
+# ۶. تقویم مارپیچ کریستوفر کارولان (Carolan Spiral Calendar)
+python scripts/astro_engine.py --json '{"mode":"spiral_calendar","pivot_date":"2026-09-02"}'
 
-# ۳. محاسبه پیوت‌های ساعتی چرخ ۲۴ ساعته گان
-python scripts/astro_engine.py --json '{"mode":"gann_clock","price":65000,"hour_utc":13}'
+# ۷. دینامیک و زوایای خورشیدمرکزی (Heliocentric Trading)
+python scripts/astro_engine.py --json '{"mode":"helio_trading"}'
 
-# ۴. بررسی ترانزیت‌ها به چارت بدو تأسیس (Genesis Chart)
-python scripts/astro_engine.py --json '{"mode":"genesis_transits","asset":"BTC"}'
-
-# ۵. محاسبه سطوح مربع ۹ گن و خطوط قیمتی سیاره‌ای
-python scripts/astro_engine.py --json '{"mode":"gann_sq9","asset":"BTC","price":65000}'
-
-# ۶. استخراج پتانسیل سایدروگراف بردلی (Bradley Siderograph)
-python scripts/astro_engine.py --json '{"mode":"bradley","target_date":"2026-09-02"}'
+# ۸. چرخه‌های لکه‌های خورشیدی و ژئومغناطیس (Solar Cycles)
+python scripts/astro_engine.py --json '{"mode":"solar_cycles"}'
 ```
