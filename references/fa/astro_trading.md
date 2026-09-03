@@ -111,27 +111,30 @@ $$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
 ## ۴. دستورات CLI و خروجی‌های ساختاریافته موتور
 
 ```bash
-# ۱. تولید کارت معاملاتی نهادی (Institutional Trade Card)
+# ۱. تولید سیگنال ممیزی ۷ مرحله‌ای نهادی (Institutional 7-Step Master Signal)
+python scripts/astro_engine.py --json '{"mode":"master_signal","asset":"BTC","price":65000}'
+
+# ۲. تولید کارت معاملاتی چندتایم‌فریمه (Institutional Trade Card)
 python scripts/astro_engine.py --json '{"mode":"trade_card","asset":"BTC","price":65000}'
 
-# ۲. فریم‌های ۸/۸ مورِی‌مث گن (Murrey Math Octaves)
+# ۳. ارزیابی جامع تمام ۸ ستاپ تخصصی اساتید بزرگ
+python scripts/astro_engine.py --json '{"mode":"eight_masters","asset":"BTC","price":65000}'
+
+# ۴. فریم‌های ۸/۸ مورِی‌مث گن (Murrey Math Octaves)
 python scripts/astro_engine.py --json '{"mode":"murrey_math","price":65000}'
 
-# ۳. ساعت جهانی ۲۴ ساعته جین لانگ (Jeanne Long Universal Clock)
+# ۵. ساعت جهانی ۲۴ ساعته جین لانگ (Jeanne Long Universal Clock)
 python scripts/astro_engine.py --json '{"mode":"universal_clock","price":65000,"hour_utc":14,"minute_utc":30}'
 
-# ۴. فرمول تجمع قمری لری ویلیامز (Larry Williams Lunar Edge)
+# ۶. فرمول تجمع قمری لری ویلیامز (Larry Williams Lunar Edge)
 python scripts/astro_engine.py --json '{"mode":"larry_williams","days_since_new_moon":2.0}'
 
-# ۵. شتاب‌دهنده مریخ جنسیس بیت‌کوین (Crypto Genesis Accelerator)
+# ۷. شتاب‌دهنده مریخ جنسیس بیت‌کوین (Crypto Genesis Accelerator)
 python scripts/astro_engine.py --json '{"mode":"crypto_accelerator"}'
 
-# ۶. تریگر سقوط آرچ کرافورد (Crawford Crash Trigger)
+# ۸. تریگر سقوط آرچ کرافورد (Crawford Crash Trigger)
 python scripts/astro_engine.py --json '{"mode":"crawford_crash","is_lunar_perigee":true}'
 
-# ۷. تسویه زاویه-قیمت مایکل جنکینز (Jenkins Squaring)
-python scripts/astro_engine.py --json '{"mode":"jenkins_squaring","pivot_price":65000,"harmonic_degree":90}'
-
-# ۸. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
+# ۹. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
 python scripts/astro_engine.py --json '{"mode":"terminal_dashboard","asset":"BTC","price":65000}'
 ```

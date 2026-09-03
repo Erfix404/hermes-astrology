@@ -363,6 +363,33 @@ class TestUndergroundAndAdvancedMasters(unittest.TestCase):
         self.assertTrue(acc["has_crypto_acceleration_trigger"])
         self.assertGreater(acc["active_triggers_count"], 0)
 
+    def test_institutional_master_signal_7step(self):
+        t_lons = {"Sun": 160.0, "Moon": 162.0, "Mars": 283.57, "Jupiter": 120.0, "Saturn": 10.0, "Uranus": 60.0, "Neptune": 0.0, "Pluto": 300.0, "North Node": 92.0}
+        speeds = {"Mars": 0.02, "Mercury": 1.2, "Venus": 1.0}
+        decls = {"Moon": 0.10, "Mars": 15.0}
+        sig = ate.InstitutionalMasterSignalEngine.generate_master_signal(
+            asset_key="BTC",
+            current_price=65000.0,
+            target_date=datetime(2026, 9, 3, 12, 0),
+            planetary_lons=t_lons,
+            planetary_speeds=speeds,
+            planetary_decls=decls,
+            atr14=1200.0,
+            is_moon_voc=False
+        )
+        self.assertEqual(sig["asset"], "BTC")
+        self.assertIn(sig["directional_signal"], ("INSTITUTIONAL STRONG BUY", "BUY / ACCUMULATE", "HOLD / CASH PRESERVATION", "SELL / SHORT"))
+        self.assertGreaterEqual(sig["confluence_score"], 25.0)
+        self.assertIn("entry_price", sig["order_parameters"])
+        self.assertIn("stop_loss", sig["order_parameters"])
+        self.assertIn("take_profit_1", sig["order_parameters"])
+        self.assertIn("take_profit_2", sig["order_parameters"])
+        self.assertIn("take_profit_3", sig["order_parameters"])
+        self.assertIn("narrative_fa", sig)
+        # Check CLI mode
+        res_cli = ae.calculate_full_profile({"mode": "master_signal", "asset": "BTC", "price": 65000.0})
+        self.assertIn("institutional_master_signal", res_cli)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

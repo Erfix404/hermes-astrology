@@ -3737,9 +3737,9 @@ def calculate_full_profile(data):
                 "sepharial_tide", "silver_key", "trade_card", "institutional_card",
                 "crawford_crash", "crash_hazard", "jenkins_squaring", "jenkins",
                 "ferrera_panic", "ferrera", "olga_intraday", "olga_clock", "lavoie_asteroid", "asteroid_prob",
-                "eight_masters", "master_setups", "murrey_math", "murrey",
-                "universal_clock", "jeanne_long", "larry_williams", "lunar_edge",
-                "bayer_polarity", "crypto_accelerator",
+                "eight_masters", "master_setups", "master_signal", "quant_signal",
+                "murrey_math", "murrey", "universal_clock", "jeanne_long",
+                "larry_williams", "lunar_edge", "bayer_polarity", "crypto_accelerator",
                 "harmonic_wave", "composite_wave", "genesis_transits", "terminal_dashboard",
                 "bayer", "mercury_speed", "crd_calendar", "geocosmic_crd",
                 "mcwhirter", "node_cycle", "financial", "crypto"):
@@ -4054,6 +4054,26 @@ def calculate_full_profile(data):
             import astro_trading_engine as ate
             t_lons, _, _ = body_longitudes(tjd)
             result["crypto_genesis_acceleration"] = ate.CryptoGenesisAcceleratorEngine.evaluate_crypto_inception_trigger(t_lons)
+            return result
+        if mode=="master_signal" or mode=="quant_signal":
+            import astro_trading_engine as ate
+            asset = data.get("asset", "BTC")
+            price = float(data.get("price", 65000.0 if asset.upper()=="BTC" else 2500.0))
+            atr_val = float(data.get("atr14", 1200.0 if asset.upper()=="BTC" else 80.0))
+            t_lons, t_speed, _ = body_longitudes(tjd)
+            decls = body_declinations(tjd)
+            voc = void_of_course_moon(tjd, tlat, tlng, True)
+            is_voc = bool(voc.get("is_void", False))
+            result["institutional_master_signal"] = ate.InstitutionalMasterSignalEngine.generate_master_signal(
+                asset_key=asset,
+                current_price=price,
+                target_date=tdt,
+                planetary_lons=t_lons,
+                planetary_speeds=t_speed,
+                planetary_decls=decls,
+                atr14=atr_val,
+                is_moon_voc=is_voc
+            )
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate

@@ -1838,6 +1838,186 @@ class CryptoGenesisAcceleratorEngine:
         }
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+#  32. 7-STEP INSTITUTIONAL MASTER SIGNAL DECISION ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class InstitutionalMasterSignalEngine:
+    """7-Step Institutional Quantitative Astro-Trading Decision & Signal Engine.
+    Executes an exhaustive, multi-dimensional trade audit:
+    Step 1: Macro Planetary Regime [-100 to +100] (Barbault BCI + McWhirter + Solar)
+    Step 2: Cyclical Timing Window [0 to 100] (Merriman CRD + Carolan Spiral + Bradley + Larry Williams)
+    Step 3: Asset Genesis Natal Catalyst [0 to 100] (Transits to Inception Points)
+    Step 4: Operational Risk & Volatility Regime (Moon VOC / Mercury Rx / Bayer 0° Declination)
+    Step 5: Structural Price-Time Geometry (Murrey Math 8/8ths + Gann Square of Nine)
+    Step 6: Mathematical Trade Execution, Risk-Reward & Sizing (Entry, SL, TP1, TP2, TP3)
+    Step 7: Confluence Score (0-100%) & Dual-Language Narrative (FA / EN)"""
+
+    @staticmethod
+    def generate_master_signal(
+        asset_key: str,
+        current_price: float,
+        target_date: datetime,
+        planetary_lons: Dict[str, float],
+        planetary_speeds: Dict[str, float],
+        planetary_decls: Dict[str, float],
+        atr14: float = 1200.0,
+        is_moon_voc: bool = False
+    ) -> Dict[str, Any]:
+        root_p = math.sqrt(current_price)
+
+        # ── STEP 1: MACRO REGIME ─────────────────────────────────────────────
+        bci_res = BarbaultCyclicalIndexEngine.compute_bci(planetary_lons)
+        bci_arc = bci_res["bci_total_arc_degrees"]
+        # Normalize BCI around 900 mean: [-100, +100]
+        s_bci = max(-100.0, min(100.0, (bci_arc - 900.0) / 4.5))
+
+        node_lon = planetary_lons.get("North Node", 90.0)
+        # McWhirter: Cancer 90° = +100 (Peak), Capricorn 270° = -100 (Bottom)
+        s_node = math.sin(math.radians(node_lon - 0.0)) * 100.0
+
+        solar_res = SolarGeomagneticCycleEngine.evaluate_solar_regime(target_date)
+        s_solar = 50.0 if "Maximum" in solar_res["macro_liquidity_regime"] else -30.0 if "Minimum" in solar_res["macro_liquidity_regime"] else 10.0
+
+        macro_bias_score = round((0.45 * s_bci) + (0.35 * s_node) + (0.20 * s_solar), 1)
+
+        # ── STEP 2: CYCLICAL TIMING ──────────────────────────────────────────
+        crd_sigs = []
+        for p in ("Mars", "Mercury", "Venus"):
+            spd = planetary_speeds.get(p, 1.0)
+            if abs(spd) <= 0.05:
+                crd_sigs.append({"level": 1, "description": f"{p} Station Turning Point"})
+        for p in ("Sun", "Mars"):
+            lon = planetary_lons.get(p, 0.0)
+            if (lon % 90.0) <= 1.0 or (lon % 90.0) >= 89.0:
+                crd_sigs.append({"level": 1, "description": f"{p} Cardinal Ingress (0° World Axis)"})
+        crd_eval = MerrimanCRDEngine.evaluate_crd_cluster(crd_sigs)
+        s_crd = crd_eval["crd_score"] * 5.0 # Max ~100
+
+        spiral_projs = CarolanSpiralCalendarEngine.compute_spiral_projections(target_date, max_index=6)
+        s_spiral = min(100.0, len(spiral_projs) * 15.0)
+
+        # Larry Williams Lunar Phase
+        sun_lon = planetary_lons.get("Sun", 0.0)
+        moon_lon = planetary_lons.get("Moon", 0.0)
+        lunar_phase_deg = (moon_lon - sun_lon) % 360.0
+        days_from_nm = (lunar_phase_deg / 360.0) * 29.530588
+        lunar_edge = LarryWilliamsLunarEdgeEngine.evaluate_lunar_phase_edge(days_from_nm)
+        s_lunar = float(lunar_edge["historical_win_rate"].replace("%", ""))
+
+        timing_score = round(min(100.0, (0.40 * s_crd) + (0.30 * s_spiral) + (0.30 * s_lunar)), 1)
+
+        # ── STEP 3: ASSET GENESIS NATAL CATALYSTS ────────────────────────────
+        genesis_eval = AssetGenesisHoroscopyEngine.evaluate_genesis_transits(asset_key, planetary_lons)
+        transits_count = genesis_eval["active_transits_count"]
+        catalyst_score = round(min(100.0, transits_count * 20.0 + (35.0 if genesis_eval["eclipse_triggers"] else 0.0)), 1)
+
+        # ── STEP 4: OPERATIONAL RISK & REGIME FILTER ─────────────────────────
+        merc_spd = planetary_speeds.get("Mercury", 1.2)
+        is_merc_rx = merc_spd < 0
+        moon_decl = planetary_decls.get("Moon", 0.0)
+        is_decl_flip = abs(moon_decl) <= 0.25
+
+        if is_moon_voc or is_merc_rx:
+            operational_regime = "MEAN_REVERSION_ONLY (Inhibit Breakouts / Range-Bound Mode)"
+        elif is_decl_flip or crd_eval["is_critical_reversal_date"]:
+            operational_regime = "VOLATILITY_ALERT (Expansion / Breakout Allowed with Tight Stops)"
+        else:
+            operational_regime = "BREAKOUT_ALLOWED (Standard Trend Following)"
+
+        # ── STEP 5: PRICE-TIME GEOMETRY (S/R LADDER) ─────────────────────────
+        murrey_res = MurreyMathGannOctavesEngine.calculate_murrey_frame(current_price)
+        sq9_res = GannSquare9Engine.compute_harmonics(current_price)
+        sup_ladder = [v for k, v in murrey_res["murrey_levels"].items() if v <= current_price]
+        res_ladder = [v for k, v in murrey_res["murrey_levels"].items() if v >= current_price]
+        nearest_sup = max(sup_ladder) if sup_ladder else current_price - (1.5 * atr14)
+        nearest_res = min(res_ladder) if res_ladder else current_price + (1.5 * atr14)
+
+        # ── STEP 6: TRADE EXECUTION, SIZING & TARGETS ────────────────────────
+        raw_direction = 1 if macro_bias_score >= 0 else -1
+        confluence = round(min(98.0, max(25.0, (0.30 * abs(macro_bias_score)) + (0.40 * timing_score) + (0.30 * catalyst_score))), 1)
+
+        if confluence >= 75.0:
+            decision = "INSTITUTIONAL STRONG BUY" if raw_direction > 0 else "INSTITUTIONAL STRONG SELL"
+            rec_risk_pct = 2.0
+        elif confluence >= 55.0:
+            decision = "BUY / ACCUMULATE" if raw_direction > 0 else "SELL / SHORT"
+            rec_risk_pct = 1.0
+        else:
+            decision = "HOLD / CASH PRESERVATION"
+            rec_risk_pct = 0.5
+
+        if raw_direction > 0:
+            entry_p = current_price
+            sl_p = round(max(nearest_sup - (0.25 * atr14), current_price - (1.5 * atr14)), 2)
+            tp1_p = round((root_p + 0.25) ** 2, 2)  # +45° Octile
+            tp2_p = round((root_p + 0.50) ** 2, 2)  # +90° Square
+            tp3_p = round((root_p + 1.00) ** 2, 2)  # +180° Opposition
+        else:
+            entry_p = current_price
+            sl_p = round(min(nearest_res + (0.25 * atr14), current_price + (1.5 * atr14)), 2)
+            tp1_p = round((root_p - 0.25) ** 2, 2)
+            tp2_p = round((root_p - 0.50) ** 2, 2)
+            tp3_p = round((root_p - 1.00) ** 2, 2)
+
+        risk_val = max(1.0, abs(entry_p - sl_p))
+        reward_val = abs(tp2_p - entry_p)
+        rr_ratio = round(reward_val / risk_val, 2)
+
+        invalidation = f"Daily close beyond SL ${sl_p} or violation of Gann 1x1 angle ray."
+
+        # ── STEP 7: BILINGUAL COMPREHENSIVE NARRATIVE ────────────────────────
+        narrative_en = (
+            f"Step 1-7 Institutional Audit for {asset_key.upper()} at ${current_price:.2f}:\n"
+            f"• Macro Planetary Bias: {macro_bias_score:+.1f}/100 (Barbault BCI {bci_arc:.0f}° | Solar Regime: {solar_res['strategic_posture']})\n"
+            f"• Cyclical Timing Score: {timing_score:.1f}/100 (CRD Power {s_crd:.0f} | Lunar Phase Win Rate: {lunar_edge['historical_win_rate']})\n"
+            f"• Genesis Radix Catalyst: {catalyst_score:.1f}/100 ({transits_count} active transits to Inception Points)\n"
+            f"• Operational Filter: {operational_regime}\n"
+            f"• Confluence Score: {confluence}% -> Action: {decision}\n"
+            f"• Order Matrix: Entry ${entry_p:.2f} | SL ${sl_p:.2f} | TP1 ${tp1_p:.2f} | TP2 ${tp2_p:.2f} | TP3 ${tp3_p:.2f} (R:R 1:{rr_ratio})"
+        )
+
+        narrative_fa = (
+            f"گزارش ممیزی ۷ مرحله‌ای نهادی برای {asset_key.upper()} در قیمت ${current_price:.2f}:\n"
+            f"۱. رژیم ماکرو کیهانی: {macro_bias_score:+.1f}/۱۰۰ (شاخص باربو {bci_arc:.0f}° | رژیم خورشیدی: {solar_res['strategic_posture']})\n"
+            f"۲. امتیاز زمان‌بندی چرخه‌ای: {timing_score:.1f}/۱۰۰ (قدرت CRD مریمن {s_crd:.0f} | وین‌ریت فاز ماه لری ویلیامز: {lunar_edge['historical_win_rate']})\n"
+            f"۳. کاتالیزور جنسیس دارایی: {catalyst_score:.1f}/۱۰۰ ({transits_count} ترانزیت فعال به چارت پیدایش)\n"
+            f"۴. فیلتر عملیاتی: {operational_regime}\n"
+            f"۵. سطوح هندسی مورِی‌مث: فریم {murrey_res['current_octave_zone']} (حمایت ${nearest_sup:.2f} / مقاومت ${nearest_res:.2f})\n"
+            f"۶. ضریب اطمینان نهایی: {confluence}٪ -> سیگنال معاملاتی: {decision}\n"
+            f"۷. ماتریس اوردر: ورود ${entry_p:.2f} | حد ضرر ${sl_p:.2f} | تارگت ۱ ${tp1_p:.2f} (۴۵°) | تارگت ۲ ${tp2_p:.2f} (۹۰°) | تارگت ۳ ${tp3_p:.2f} (۱۸۰°) با نسبت سود به ریسک ۱:{rr_ratio}"
+        )
+
+        return {
+            "asset": asset_key.upper(),
+            "evaluation_timestamp": target_date.strftime("%Y-%m-%d %H:%M UTC"),
+            "current_price": current_price,
+            "directional_signal": decision,
+            "confluence_score": confluence,
+            "recommended_account_risk_pct": f"{rec_risk_pct}%",
+            "operational_regime": operational_regime,
+            "step_scores": {
+                "step1_macro_bias": macro_bias_score,
+                "step2_timing_score": timing_score,
+                "step3_catalyst_score": catalyst_score,
+                "step4_regime_state": operational_regime,
+                "step5_murrey_zone": murrey_res["current_octave_zone"]
+            },
+            "order_parameters": {
+                "entry_price": entry_p,
+                "stop_loss": sl_p,
+                "take_profit_1": tp1_p,
+                "take_profit_2": tp2_p,
+                "take_profit_3": tp3_p,
+                "risk_reward_ratio": f"1:{rr_ratio}",
+                "invalidation_criteria": invalidation
+            },
+            "narrative_fa": narrative_fa,
+            "narrative_en": narrative_en
+        }
+
+
+
 
 
 
