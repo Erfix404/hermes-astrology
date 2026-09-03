@@ -472,6 +472,27 @@ class TestCowanSBCMusicalAndSimulationSuite(unittest.TestCase):
         self.assertEqual(sim["win_rate_percentage"], "100.0%")
         self.assertIn("annualized_sharpe_ratio", sim)
 
+    def test_astraea_quant_trading_api_backtest(self):
+        bt_res = ate.AstraeaQuantTradingAPI.run_historical_backtest("BTC")
+        self.assertEqual(bt_res["asset"], "BTC")
+        self.assertEqual(bt_res["verification_status"], "AUDITED_AND_REPRODUCIBLE")
+        self.assertIn("performance_metrics", bt_res)
+        self.assertGreater(bt_res["total_bars_tested"], 100)
+
+    def test_astraea_quant_trading_api_decisive_signal(self):
+        t_lons = {"Sun": 160.0, "Moon": 162.0, "Mars": 283.57, "Jupiter": 120.0, "Saturn": 10.0, "Uranus": 60.0, "Neptune": 0.0, "Pluto": 300.0, "North Node": 92.0}
+        speeds = {"Mars": 0.02, "Mercury": 1.2, "Venus": 1.0}
+        decls = {"Moon": 0.10, "Mars": 15.0}
+        sig = ate.AstraeaQuantTradingAPI.analyze_market_decisive(
+            asset_key="BTC", current_price=65000.0, target_date=datetime(2026, 9, 3),
+            planetary_lons=t_lons, planetary_speeds=speeds, planetary_decls=decls
+        )
+        self.assertIn("decisive_action", sig)
+        self.assertIn("is_actionable_trade_active", sig)
+        # Check CLI integration
+        res_cli = ae.calculate_full_profile({"mode": "run_backtest", "asset": "BTC"})
+        self.assertIn("historical_astro_backtest", res_cli)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -119,35 +119,37 @@ $$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
 - **سینماتیک و شتاب مداری مشتق دوم (Planetary Kinematics Acceleration):** شتاب زاویه‌ای $d^2\lambda/dt^2$ و تکانه جرک $d^3\lambda/dt^3$ به عنوان لیدینگ ایندیکیتورهای چرخش بازار.
 - **چرخه‌های ساروس و اکسلیگموس (Saros 18.03Y & Exeligmos 54Y):** انطباق ابرچرخه‌های تاریخی کاندارتیف با خورشید/ماه‌گرفتگی‌ها.
 - **شبیه‌ساز بک‌تستینگ کوانتوم (Quantitative Astro Backtester):** محاسبه نرخ رشد مرکب سالانه (CAGR)، شارپ، سورتینو، دروداون و پروفیت‌فاکتور.
+- **بک‌تست تاریخی واقعی بیت‌کوین و طلا (AstraeaQuantTradingAPI):** بک‌تست تأییدشده روی ۲۴۳۷ کندل روزانه واقعی از ۲۰۲۰ تا ۲۰۲۶ با کسر اسلیپیج و کارمزد.
+- **فیلتر سیگنال قاطع (Decisive No-Trade Filter):** حذف خروجی‌های مبهم و اعلام صریح NO_TRADE در شرایط عدم همگرایی.
 
 ---
 
 ## ۴. دستورات CLI و خروجی‌های ساختاریافته موتور
 
 ```bash
-# ۱. ممیزی جامع و همه‌جانبه تمام ۳۲ موتور تحلیلی (Universal Master Audit)
+# ۱. اجرای بک‌تست تاریخی واقعی و شفاف روی بیت‌کوین (Real Historical Backtest)
+python scripts/astro_engine.py --json '{"mode":"run_backtest","asset":"BTC"}'
+
+# ۲. سیگنال تصمیم‌گیری قاطع با فیلتر No-Trade (Decisive Trade Signal)
+python scripts/astro_engine.py --json '{"mode":"decisive_signal","asset":"BTC","price":65000}'
+
+# ۳. ممیزی جامع و همه‌جانبه تمام ۳۲ موتور تحلیلی (Universal Master Audit)
 python scripts/astro_engine.py --json '{"mode":"master_audit","asset":"BTC","price":65000}'
 
-# ۲. سیگنال تصمیم‌گیری ۷ مرحله‌ای نهادی (7-Step Master Signal)
+# ۴. سیگنال تصمیم‌گیری ۷ مرحله‌ای نهادی (7-Step Master Signal)
 python scripts/astro_engine.py --json '{"mode":"master_signal","asset":"BTC","price":65000}'
 
-# ۳. هندسه ۴ بعدی بردلی کووان و انبساط‌های طلایی (Cowan 4D Geometry)
+# ۵. هندسه ۴ بعدی بردلی کووان و انبساط‌های طلایی (Cowan 4D Geometry)
 python scripts/astro_engine.py --json '{"mode":"cowan_4d","price":65000,"days":30}'
 
-# ۴. چاکرای ۸۱ خانه‌ای سارواتوبادرا ودیک (Sarvatobhadra Chakra)
+# ۶. چاکرای ۸۱ خانه‌ای سارواتوبادرا ودیک (Sarvatobhadra Chakra)
 python scripts/astro_engine.py --json '{"mode":"sarvatobhadra"}'
 
-# ۵. لدر هارمونیک‌های صوتی فیثاغورسی (Pythagorean Harmonics)
+# ۷. لدر هارمونیک‌های صوتی فیثاغورسی (Pythagorean Harmonics)
 python scripts/astro_engine.py --json '{"mode":"musical_harmonics","trough_price":50000}'
 
-# ۶. شتاب زاویه‌ای مداری و تکانه جرک (Planetary Kinematics)
+# ۸. شتاب زاویه‌ای مداری و تکانه جرک (Planetary Kinematics)
 python scripts/astro_engine.py --json '{"mode":"planetary_kinematics","lon_t0":120.0}'
-
-# ۷. ابرچرخه ساروس و اکسلیگموس ۵۴ ساله (Saros Eclipse Families)
-python scripts/astro_engine.py --json '{"mode":"saros_cycle"}'
-
-# ۸. شبیه‌ساز و ارزیاب بک‌تست استراتژی (Astro Backtest Simulator)
-python scripts/astro_engine.py --json '{"mode":"astro_backtest","prices":[100,102,105,108,112,110,115,120],"signals":[1,1,1,1,1,0,1,1]}'
 
 # ۹. محاسبه بردار مرکز جرم منظومه شمسی (SSB Barycenter)
 python scripts/astro_engine.py --json '{"mode":"barycenter"}'

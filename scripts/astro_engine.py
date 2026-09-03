@@ -3738,6 +3738,7 @@ def calculate_full_profile(data):
                 "crawford_crash", "crash_hazard", "jenkins_squaring", "jenkins",
                 "ferrera_panic", "ferrera", "olga_intraday", "olga_clock", "lavoie_asteroid", "asteroid_prob",
                 "eight_masters", "master_setups", "master_signal", "quant_signal",
+                "run_backtest", "historical_backtest", "decisive_signal",
                 "cowan_4d", "platonic", "sarvatobhadra", "sbc", "musical_harmonics",
                 "planetary_kinematics", "saros_cycle", "astro_backtest",
                 "murrey_math", "murrey", "universal_clock", "jeanne_long",
@@ -4160,6 +4161,25 @@ def calculate_full_profile(data):
             p_series = data.get("prices", [100.0, 102.0, 105.0, 103.0, 108.0, 112.0, 110.0, 115.0, 118.0, 122.0, 120.0, 125.0])
             sigs = data.get("signals", [1, 1, 1, 0, 1, 1, -1, 1, 1, 1, 0, 1])
             result["quantitative_astro_backtest"] = ate.QuantitativeAstroBacktestSimulator.simulate_strategy_performance(p_series, sigs)
+            return result
+        if mode=="run_backtest" or mode=="historical_backtest":
+            import astro_trading_engine as ate
+            asset = data.get("asset", "BTC")
+            cap = float(data.get("initial_capital", 100000.0))
+            result["historical_astro_backtest"] = ate.AstraeaQuantTradingAPI.run_historical_backtest(asset, cap)
+            return result
+        if mode=="decisive_signal":
+            import astro_trading_engine as ate
+            asset = data.get("asset", "BTC")
+            price = float(data.get("price", 65000.0 if asset.upper()=="BTC" else 2500.0))
+            atr_val = float(data.get("atr14", 1200.0 if asset.upper()=="BTC" else 80.0))
+            t_lons, t_speed, _ = body_longitudes(tjd)
+            decls = body_declinations(tjd)
+            voc = void_of_course_moon(tjd, tlat, tlng, True)
+            is_voc = bool(voc.get("is_void", False))
+            result["decisive_trade_signal"] = ate.AstraeaQuantTradingAPI.analyze_market_decisive(
+                asset, price, tdt, t_lons, t_speed, decls, atr_val, is_voc
+            )
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate
