@@ -94,6 +94,13 @@ $$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
 ### ۷. ارکستراتور چندتایم‌فریمه نهادی (Institutional Astro-Trading Orchestrator)
 ترکیب وزنی لایه کلان (۳۵٪)، لایه سوئینگ (۴۵٪) و لایه اینترادی (۲۰٪) و صدور رسمی کارت معاملاتی TradeCard با پارامترهای ورود، خروج و حد ضرر.
 
+### ۸. ستاپ‌های معاصر ۵ استاد بزرگ (Contemporary Masters Setups)
+- **آرچ کرافورد (Arch Crawford):** فرمول تریگر سقوط با زوایای سخت مریخ-اورانوس و هم‌زمانی ابَرماه/کسوف.
+- **مایکل جنکینز (Michael Jenkins):** تسویه زاویه-قیمت $P = (\sqrt{P} \pm \theta/180)^2$ و بردار شیب سرعت روزانه سیارات.
+- **دان فررا (Dan Ferrera):** فازبندی چرخه‌های ۲۰ ساله ژوپیتر-ساتورن و ۸۴ ماهه اورانوس.
+- **اولگا مورالس (Olga Morales):** قانون چرخش زمانی هر ۴ دقیقه ۱ درجه و خطوط قیمتی هلیوسنتریک.
+- **آلفی لاووا و کی شینکر (Alphee Lavoie & Kaye Shinker):** هارمونیک‌های آستروئیدی (سرس، وستا، پالاس، جونو) و جدول احتمالات آماری با $Z \ge 2.0$.
+
 ---
 
 ## ۴. دستورات CLI و خروجی‌های ساختاریافته موتور
@@ -102,24 +109,24 @@ $$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
 # ۱. تولید کارت معاملاتی نهادی (Institutional Trade Card)
 python scripts/astro_engine.py --json '{"mode":"trade_card","asset":"BTC","price":65000}'
 
-# ۲. شاخص چرخه‌ای جهانی آندره باربو (Barbault BCI)
+# ۲. تریگر سقوط آرچ کرافورد (Crawford Crash Trigger)
+python scripts/astro_engine.py --json '{"mode":"crawford_crash","is_lunar_perigee":true}'
+
+# ۳. تسویه زاویه-قیمت مایکل جنکینز (Jenkins Squaring)
+python scripts/astro_engine.py --json '{"mode":"jenkins_squaring","pivot_price":65000,"harmonic_degree":90}'
+
+# ۴. چرخه ۸۴ ماهه پنیک دان فررا (Ferrera Panic Cycle)
+python scripts/astro_engine.py --json '{"mode":"ferrera_panic","months_from_major_low":42}'
+
+# ۵. ساعت ۴ دقیقه‌ای اینترادی اولگا مورالس (Olga Morales Intraday)
+python scripts/astro_engine.py --json '{"mode":"olga_intraday","minutes_from_open":360}'
+
+# ۶. احتمال آماری آستروئیدهای آلفی لاووا (Lavoie Asteroid Probabilities)
+python scripts/astro_engine.py --json '{"mode":"lavoie_asteroid","asteroid":"PALLAS"}'
+
+# ۷. شاخص چرخه‌ای جهانی آندره باربو (Barbault BCI)
 python scripts/astro_engine.py --json '{"mode":"barbault_bci"}'
 
-# ۳. منحنی پیش‌بینی فشار توده‌ای گن (Gann Mass Pressure)
-python scripts/astro_engine.py --json '{"mode":"gann_mass_pressure","months_forward":24}'
-
-# ۴. سرعت گرانشی و جذرومد ماه سفاریال (Sepharial Tide)
-python scripts/astro_engine.py --json '{"mode":"sepharial_tide"}'
-
-# ۵. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
+# ۸. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
 python scripts/astro_engine.py --json '{"mode":"terminal_dashboard","asset":"BTC","price":65000}'
-
-# ۶. تقویم مارپیچ کریستوفر کارولان (Carolan Spiral Calendar)
-python scripts/astro_engine.py --json '{"mode":"spiral_calendar","pivot_date":"2026-09-02"}'
-
-# ۷. دینامیک و زوایای خورشیدمرکزی (Heliocentric Trading)
-python scripts/astro_engine.py --json '{"mode":"helio_trading"}'
-
-# ۸. چرخه‌های لکه‌های خورشیدی و ژئومغناطیس (Solar Cycles)
-python scripts/astro_engine.py --json '{"mode":"solar_cycles"}'
 ```

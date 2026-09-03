@@ -287,5 +287,36 @@ class TestAstroTradingInstitutionalMasterTier(unittest.TestCase):
         self.assertIn("stop_loss", card["order_matrix"])
 
 
+class TestContemporaryMastersSetups(unittest.TestCase):
+    """Test Arch Crawford, Michael Jenkins, Dan Ferrera, Olga Morales, Alphee Lavoie."""
+
+    def test_crawford_crash_trigger(self):
+        res_crash = ate.CrawfordCrashTriggerEngine.evaluate_crash_hazard(
+            mars_lon=60.0, uranus_lon=60.5, is_lunar_perigee=True, is_eclipse_window=True
+        )
+        self.assertTrue(res_crash["is_crash_warning_active"])
+        self.assertIn("CRITICAL CRASH", res_crash["status"])
+
+    def test_jenkins_price_time_squaring(self):
+        res_j = ate.JenkinsGeometryEngine.calculate_price_time_square(pivot_price=6400.0, harmonic_deg=90.0, direction=1)
+        self.assertEqual(res_j["target_price"], 6480.25) # (80 + 0.5)^2 = 80.5^2
+        self.assertEqual(res_j["natural_time_squaring_bars"], 80)
+
+    def test_ferrera_panic_cycle(self):
+        res_f = ate.FerreraMasterCycleEngine.evaluate_panic_cycle_node(months_from_major_low=42)
+        self.assertIn("Month 42 (180° Opposition)", res_f["cycle_stage"])
+        self.assertEqual(res_f["tactical_action"], "HIGH_VOLATILITY_REVERSAL_BUY")
+
+    def test_olga_morales_4min_clock(self):
+        res_o = ate.OlgaMoralesIntradayEngine.calculate_4min_turning_trigger(minutes_since_session_open=360.0) # 360 min = 90 deg
+        self.assertEqual(res_o["current_diurnal_degree"], 90.0)
+        self.assertTrue(res_o["is_intraday_turning_trigger"])
+
+    def test_lavoie_asteroid_metrics(self):
+        res_ast = ate.LavoieAsteroidHarmonicsEngine.get_asteroid_probability_metric("PALLAS")
+        self.assertEqual(res_ast["asteroid"], "PALLAS")
+        self.assertTrue(res_ast["is_statistically_actionable"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

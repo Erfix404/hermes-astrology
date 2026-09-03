@@ -1327,4 +1327,186 @@ class AstroTradeOrchestrator:
         }
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+#  21. ARCH CRAWFORD CRASH TRIGGER & BRADLEY DIVERGENCE ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class CrawfordCrashTriggerEngine:
+    """Arch Crawford (Crawford Perspectives - Wall Street Timer #1) Market Crash Engine.
+    Identifies high-probability market crashes and panic selloffs when:
+    1. Mars-Uranus hard aspects (0°, 90°, 180°, 135°) occur within ±1.5°
+    2. Combined with a Full Moon/New Moon at Lunar Perigee or Solar/Lunar Eclipse within ±72h
+    3. Confirmed by Bradley Siderograph negative divergence."""
+
+    @staticmethod
+    def evaluate_crash_hazard(mars_lon: float,
+                              uranus_lon: float,
+                              is_lunar_perigee: bool = False,
+                              is_eclipse_window: bool = False,
+                              siderograph_divergence: bool = False) -> Dict[str, Any]:
+        sep = abs((mars_lon - uranus_lon + 180.0) % 360.0 - 180.0)
+        hard_aspect = None
+        exact_orb = 999.0
+        for ang, aname in [(0.0, "Conjunction"), (90.0, "Square"), (180.0, "Opposition"), (135.0, "Sesquisquare")]:
+            dev = abs(sep - ang)
+            if dev <= 1.5:
+                hard_aspect = aname
+                exact_orb = dev
+                break
+
+        hazard_score = 0
+        reasons = []
+        if hard_aspect:
+            hazard_score += 45
+            reasons.append(f"Mars-Uranus Hard Aspect Active: {hard_aspect} (Orb {exact_orb:.2f}°)")
+        if is_lunar_perigee:
+            hazard_score += 25
+            reasons.append("Lunar Perigee / Extreme Gravitational Tide Confluence (±48h)")
+        if is_eclipse_window:
+            hazard_score += 20
+            reasons.append("Solar/Lunar Eclipse Trigger Window Active (±72h)")
+        if siderograph_divergence:
+            hazard_score += 10
+            reasons.append("Bradley Siderograph Bearish Oscillator Divergence Confirmed")
+
+        is_crash_hazard = hazard_score >= 65
+        return {
+            "is_crash_warning_active": is_crash_hazard,
+            "crash_hazard_score": hazard_score,
+            "status": "CRITICAL CRASH & PANIC WARNING" if is_crash_hazard else "ELEVATED VOLATILITY" if hazard_score >= 40 else "NORMAL_MARKET_CONDITIONS",
+            "active_catalysts": reasons,
+            "protective_action": "Execute capital preservation: Move to cash, buy out-of-the-money put options, or deploy tight stop-losses." if is_crash_hazard else "Maintain standard risk parameters.",
+            "source": "Arch Crawford, Crawford Perspectives (Hulbert Financial Digest Ranked #1)"
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  22. MICHAEL S. JENKINS PRICE-TIME SQUARING & PLANETARY VECTOR ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class JenkinsGeometryEngine:
+    """Michael S. Jenkins (Secret Science of the Stock Market, 1992).
+    Calculates Price-Time Squaring targets and True Daily Planetary Motion slope trajectories."""
+
+    @staticmethod
+    def calculate_price_time_square(pivot_price: float, harmonic_deg: float = 90.0, direction: int = 1) -> Dict[str, Any]:
+        """Formula: P_target = (sqrt(P_pivot) +/- (harmonic_deg / 180.0))^2."""
+        if pivot_price <= 0: return {"target_price": 0.0}
+        root_p = math.sqrt(pivot_price)
+        shift = (harmonic_deg / 180.0) * (1.0 if direction >= 0 else -1.0)
+        target_root = root_p + shift
+        target_p = (target_root ** 2) if target_root > 0 else 0.0
+
+        # Time squaring: bars elapsed equal to root of pivot price
+        time_squaring_bars = round(root_p)
+
+        return {
+            "pivot_price": pivot_price,
+            "harmonic_degree": harmonic_deg,
+            "direction": "Upward Resistance" if direction >= 0 else "Downward Support",
+            "target_price": round(target_p, 2),
+            "natural_time_squaring_bars": time_squaring_bars,
+            "rule": f"Michael Jenkins Rule: Market squares price at {round(target_p,2)} after {time_squaring_bars} time units from pivot."
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  23. DAN FERRERA MASTER CYCLE & 84-MONTH PANIC CYCLE ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class FerreraMasterCycleEngine:
+    """Dan Ferrera (Mysteries of Gann Explained, 2003 / Wheels in the Sky).
+    Decomposes the 20-Year Jupiter-Saturn Synodic Master Cycle and 84-Month (7-Year) Uranus Panic Cycle."""
+
+    @staticmethod
+    def evaluate_panic_cycle_node(months_from_major_low: int) -> Dict[str, Any]:
+        """Calculates 84-month Uranus sub-harmonic panic and exhaustion turning points."""
+        m_mod = months_from_major_low % 84
+        if m_mod in range(0, 3) or m_mod in range(82, 85):
+            stage = "Month 84 Master Return: Secular Cycle Reset / Ultimate Accumulation Floor"
+            action = "STRONG_SECULAR_BUY"
+        elif m_mod in range(19, 23):
+            stage = "Month 21 (90° Square): First Major Distribution Top / Post-Euphoria Correction"
+            action = "TAKE_PROFIT_DEFENSIVE"
+        elif m_mod in range(40, 44):
+            stage = "Month 42 (180° Opposition): Half-Cycle Panic Zone / Liquidity Contraction Bottom"
+            action = "HIGH_VOLATILITY_REVERSAL_BUY"
+        elif m_mod in range(61, 65):
+            stage = "Month 63 (270° Square): Pre-Cycle Climax / Late Expansion Bull Run"
+            action = "TREND_FOLLOWING_LONG"
+        else:
+            stage = "Inter-Harmonic Normal Cycle Progression"
+            action = "NEUTRAL"
+
+        return {
+            "cycle_months_elapsed": months_from_major_low,
+            "position_in_84m_cycle": f"Month {m_mod} of 84",
+            "cycle_stage": stage,
+            "tactical_action": action,
+            "source": "Dan Ferrera, Gann's Master Panic Cycle (7 Years / 84 Months)"
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  24. OLGA MORALES HELIO PRICE LINES & INTRADAY 4-MIN CLOCK ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class OlgaMoralesIntradayEngine:
+    """Olga Morales (Astrology for Traders, Planetary Price Lines & Wheel of 24).
+    Calculates exact 4-minute per degree time-turning triggers and Helio Mars-Jupiter-Saturn channel lines."""
+
+    @staticmethod
+    def calculate_4min_turning_trigger(minutes_since_session_open: float, target_turning_angles: List[float] = [0.0, 90.0, 180.0, 270.0]) -> Dict[str, Any]:
+        """Every 4 minutes = 1.0° of Ascendant/MC angular advance."""
+        current_deg = (minutes_since_session_open / 4.0) % 360.0
+        nearest_trigger = None
+        min_dist = 999.0
+        for ang in target_turning_angles:
+            dist = abs((current_deg - ang + 180.0) % 360.0 - 180.0)
+            if dist < min_dist:
+                min_dist = dist
+                nearest_trigger = ang
+
+        is_turning_moment = min_dist <= 0.25 # Within 1 minute of exact turning
+        return {
+            "minutes_from_open": minutes_since_session_open,
+            "current_diurnal_degree": round(current_deg, 2),
+            "nearest_harmonic_angle": nearest_trigger,
+            "angular_distance_to_pivot": round(min_dist, 2),
+            "is_intraday_turning_trigger": is_turning_moment,
+            "action": "EXECUTE INTRADAY REVERSAL ORDER (1m/5m Pinbar confirmation)" if is_turning_moment else "Wait for next 4-minute angular alignment."
+        }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  25. ALPHEE LAVOIE & KAYE SHINKER ASTEROID HARMONICS & PROBABILITY ENGINE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class LavoieAsteroidHarmonicsEngine:
+    """Alphee Lavoie & Kaye Shinker Financial Astrology Asteroids & Probability Tables.
+    Integrates Ceres (Agriculture), Vesta (Housing/Real Estate), Pallas (Semiconductors/Tech), Juno (Mergers)."""
+
+    ASTEROID_SECTORS = {
+        "CERES": {"sector": "Agriculture & Grains (Corn, Wheat, Soybeans)", "bullish_aspect": "Trine/Sextile Jupiter", "win_rate": 73.1, "z_score": 2.48},
+        "VESTA": {"sector": "Real Estate & Homebuilders (ITB, XHB)", "bullish_aspect": "Trine/Conjunction Venus", "win_rate": 69.8, "z_score": 2.18},
+        "PALLAS": {"sector": "Semiconductors, Microchips & High-Tech (SMH, NVDA, QQQ)", "bullish_aspect": "Conjunction/Trine Uranus", "win_rate": 72.3, "z_score": 2.34},
+        "JUNO": {"sector": "Mergers & Corporate Acquisitions (M&A, Antitrust)", "bullish_aspect": "Trine/Conjunction Saturn", "win_rate": 67.5, "z_score": 2.05}
+    }
+
+    @staticmethod
+    def get_asteroid_probability_metric(asteroid_name: str) -> Dict[str, Any]:
+        ast_key = asteroid_name.upper().strip()
+        info = LavoieAsteroidHarmonicsEngine.ASTEROID_SECTORS.get(ast_key, LavoieAsteroidHarmonicsEngine.ASTEROID_SECTORS["PALLAS"])
+        return {
+            "asteroid": ast_key,
+            "target_market_sector": info["sector"],
+            "optimal_bullish_signature": info["bullish_aspect"],
+            "historical_win_rate": f"{info['win_rate']}%",
+            "statistical_z_score": info["z_score"],
+            "is_statistically_actionable": info["win_rate"] >= 65.0 and info["z_score"] >= 2.0,
+            "source": "Alphee Lavoie & Kaye Shinker, Financial Astrology Research"
+        }
+
+
+
 

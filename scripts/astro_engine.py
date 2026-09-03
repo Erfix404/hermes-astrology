@@ -3735,6 +3735,8 @@ def calculate_full_profile(data):
                 "gann_matrices", "sector_astro", "astro_stats",
                 "barbault_bci", "bci", "gann_mass_pressure", "mass_pressure",
                 "sepharial_tide", "silver_key", "trade_card", "institutional_card",
+                "crawford_crash", "crash_hazard", "jenkins_squaring", "jenkins",
+                "ferrera_panic", "ferrera", "olga_intraday", "olga_clock", "lavoie_asteroid", "asteroid_prob",
                 "harmonic_wave", "composite_wave", "genesis_transits", "terminal_dashboard",
                 "bayer", "mercury_speed", "crd_calendar", "geocosmic_crd",
                 "mcwhirter", "node_cycle", "financial", "crypto"):
@@ -3976,6 +3978,42 @@ def calculate_full_profile(data):
             result["institutional_trade_card"] = ate.AstroTradeOrchestrator.generate_institutional_trade_card(
                 asset, price, macro_score, swing_prob, swing_dir, intra_score
             )
+            return result
+        if mode=="crawford_crash" or mode=="crash_hazard":
+            import astro_trading_engine as ate
+            t_lons, _, _ = body_longitudes(tjd)
+            m_lon = t_lons.get("Mars", 0.0)
+            u_lon = t_lons.get("Uranus", 0.0)
+            perigee_flag = bool(data.get("is_lunar_perigee", False))
+            eclipse_flag = bool(data.get("is_eclipse_window", False))
+            div_flag = bool(data.get("siderograph_divergence", False))
+            result["crawford_crash_evaluation"] = ate.CrawfordCrashTriggerEngine.evaluate_crash_hazard(
+                m_lon, u_lon, perigee_flag, eclipse_flag, div_flag
+            )
+            return result
+        if mode=="jenkins_squaring" or mode=="jenkins":
+            import astro_trading_engine as ate
+            p_price = float(data.get("pivot_price", 65000.0))
+            h_deg = float(data.get("harmonic_degree", 90.0))
+            dir_val = int(data.get("direction", 1))
+            result["jenkins_price_time_squaring"] = ate.JenkinsGeometryEngine.calculate_price_time_square(
+                p_price, h_deg, dir_val
+            )
+            return result
+        if mode=="ferrera_panic" or mode=="ferrera":
+            import astro_trading_engine as ate
+            m_elapsed = int(data.get("months_from_major_low", 42))
+            result["ferrera_panic_cycle"] = ate.FerreraMasterCycleEngine.evaluate_panic_cycle_node(m_elapsed)
+            return result
+        if mode=="olga_intraday" or mode=="olga_clock":
+            import astro_trading_engine as ate
+            m_open = float(data.get("minutes_from_open", 60.0))
+            result["olga_morales_intraday"] = ate.OlgaMoralesIntradayEngine.calculate_4min_turning_trigger(m_open)
+            return result
+        if mode=="lavoie_asteroid" or mode=="asteroid_prob":
+            import astro_trading_engine as ate
+            ast_name = data.get("asteroid", "PALLAS")
+            result["lavoie_asteroid_metric"] = ate.LavoieAsteroidHarmonicsEngine.get_asteroid_probability_metric(ast_name)
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate
