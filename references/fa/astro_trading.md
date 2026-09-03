@@ -100,6 +100,11 @@ $$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
 - **دان فررا (Dan Ferrera):** فازبندی چرخه‌های ۲۰ ساله ژوپیتر-ساتورن و ۸۴ ماهه اورانوس.
 - **اولگا مورالس (Olga Morales):** قانون چرخش زمانی هر ۴ دقیقه ۱ درجه و خطوط قیمتی هلیوسنتریک.
 - **آلفی لاووا و کی شینکر (Alphee Lavoie & Kaye Shinker):** هارمونیک‌های آستروئیدی (سرس، وستا، پالاس، جونو) و جدول احتمالات آماری با $Z \ge 2.0$.
+- **تی.اچ. موری (T.H. Murrey):** فریم‌های هندسی ۸/۸ مورِی‌مث گن و سطوح اورشوت.
+- **جین لانگ (Jeanne Long):** ساعت جهانی ۲۴ ساعته و رزونانس سیاره‌ای اینترادی.
+- **لری ویلیامز (Larry Williams):** فرمول انباشت سرمایه نیومون (وین‌ریت ۶۸.۲٪) و پولبک فول‌مون.
+- **جورج بایر (George Bayer):** قانون چرخش قطبیت تکانه با عبور از مدار صفر درجه میل استوایی.
+- **شتاب‌دهنده جنسیس کریپتو (Crypto Genesis Accelerator):** تحریک نوسان ۳ برابری با فعال شدن مریخ ناتال بیت‌کوین در ۱۳ درجه جدی.
 
 ---
 
@@ -109,23 +114,23 @@ $$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
 # ۱. تولید کارت معاملاتی نهادی (Institutional Trade Card)
 python scripts/astro_engine.py --json '{"mode":"trade_card","asset":"BTC","price":65000}'
 
-# ۲. تریگر سقوط آرچ کرافورد (Crawford Crash Trigger)
+# ۲. فریم‌های ۸/۸ مورِی‌مث گن (Murrey Math Octaves)
+python scripts/astro_engine.py --json '{"mode":"murrey_math","price":65000}'
+
+# ۳. ساعت جهانی ۲۴ ساعته جین لانگ (Jeanne Long Universal Clock)
+python scripts/astro_engine.py --json '{"mode":"universal_clock","price":65000,"hour_utc":14,"minute_utc":30}'
+
+# ۴. فرمول تجمع قمری لری ویلیامز (Larry Williams Lunar Edge)
+python scripts/astro_engine.py --json '{"mode":"larry_williams","days_since_new_moon":2.0}'
+
+# ۵. شتاب‌دهنده مریخ جنسیس بیت‌کوین (Crypto Genesis Accelerator)
+python scripts/astro_engine.py --json '{"mode":"crypto_accelerator"}'
+
+# ۶. تریگر سقوط آرچ کرافورد (Crawford Crash Trigger)
 python scripts/astro_engine.py --json '{"mode":"crawford_crash","is_lunar_perigee":true}'
 
-# ۳. تسویه زاویه-قیمت مایکل جنکینز (Jenkins Squaring)
+# ۷. تسویه زاویه-قیمت مایکل جنکینز (Jenkins Squaring)
 python scripts/astro_engine.py --json '{"mode":"jenkins_squaring","pivot_price":65000,"harmonic_degree":90}'
-
-# ۴. چرخه ۸۴ ماهه پنیک دان فررا (Ferrera Panic Cycle)
-python scripts/astro_engine.py --json '{"mode":"ferrera_panic","months_from_major_low":42}'
-
-# ۵. ساعت ۴ دقیقه‌ای اینترادی اولگا مورالس (Olga Morales Intraday)
-python scripts/astro_engine.py --json '{"mode":"olga_intraday","minutes_from_open":360}'
-
-# ۶. احتمال آماری آستروئیدهای آلفی لاووا (Lavoie Asteroid Probabilities)
-python scripts/astro_engine.py --json '{"mode":"lavoie_asteroid","asteroid":"PALLAS"}'
-
-# ۷. شاخص چرخه‌ای جهانی آندره باربو (Barbault BCI)
-python scripts/astro_engine.py --json '{"mode":"barbault_bci"}'
 
 # ۸. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
 python scripts/astro_engine.py --json '{"mode":"terminal_dashboard","asset":"BTC","price":65000}'

@@ -3737,7 +3737,9 @@ def calculate_full_profile(data):
                 "sepharial_tide", "silver_key", "trade_card", "institutional_card",
                 "crawford_crash", "crash_hazard", "jenkins_squaring", "jenkins",
                 "ferrera_panic", "ferrera", "olga_intraday", "olga_clock", "lavoie_asteroid", "asteroid_prob",
-                "eight_masters", "master_setups",
+                "eight_masters", "master_setups", "murrey_math", "murrey",
+                "universal_clock", "jeanne_long", "larry_williams", "lunar_edge",
+                "bayer_polarity", "crypto_accelerator",
                 "harmonic_wave", "composite_wave", "genesis_transits", "terminal_dashboard",
                 "bayer", "mercury_speed", "crd_calendar", "geocosmic_crd",
                 "mcwhirter", "node_cycle", "financial", "crypto"):
@@ -4022,6 +4024,36 @@ def calculate_full_profile(data):
             price = float(data.get("price", 65000.0 if asset.upper()=="BTC" else 2500.0))
             atr_val = float(data.get("atr14", 1200.0 if asset.upper()=="BTC" else 80.0))
             result["eight_masters_exhaustive_setups"] = ate.EightMastersExhaustiveSetupsEngine.evaluate_all_eight_setups(asset, price, atr_val)
+            return result
+        if mode=="murrey_math" or mode=="murrey":
+            import astro_trading_engine as ate
+            price = float(data.get("price", 65000.0))
+            result["murrey_math_octaves"] = ate.MurreyMathGannOctavesEngine.calculate_murrey_frame(price)
+            return result
+        if mode=="universal_clock" or mode=="jeanne_long":
+            import astro_trading_engine as ate
+            price = float(data.get("price", 65000.0))
+            h_utc = int(data.get("hour_utc", tdt.hour))
+            m_utc = int(data.get("minute_utc", tdt.minute))
+            t_lons, _, _ = body_longitudes(tjd)
+            result["jeanne_long_universal_clock"] = ate.JeanneLongUniversalClockEngine.calculate_universal_clock_moment(h_utc, m_utc, price, t_lons)
+            return result
+        if mode=="larry_williams" or mode=="lunar_edge":
+            import astro_trading_engine as ate
+            days_nm = float(data.get("days_since_new_moon", 2.5))
+            result["larry_williams_lunar_edge"] = ate.LarryWilliamsLunarEdgeEngine.evaluate_lunar_phase_edge(days_nm)
+            return result
+        if mode=="bayer_polarity":
+            import astro_trading_engine as ate
+            curr_d = float(data.get("current_declination", 0.15))
+            prev_d = float(data.get("previous_declination", -0.20))
+            pl = data.get("planet", "Moon")
+            result["bayer_declination_polarity"] = ate.BayerDeclinationPolarityEngine.check_declination_polarity_flip(curr_d, prev_d, pl)
+            return result
+        if mode=="crypto_accelerator":
+            import astro_trading_engine as ate
+            t_lons, _, _ = body_longitudes(tjd)
+            result["crypto_genesis_acceleration"] = ate.CryptoGenesisAcceleratorEngine.evaluate_crypto_inception_trigger(t_lons)
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate

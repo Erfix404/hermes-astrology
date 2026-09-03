@@ -330,5 +330,39 @@ class TestContemporaryMastersSetups(unittest.TestCase):
         self.assertEqual(len(res_cli["eight_masters_exhaustive_setups"]), 8)
 
 
+class TestUndergroundAndAdvancedMasters(unittest.TestCase):
+    """Test Murrey Math, Jeanne Long Universal Clock, Larry Williams, Bayer Polarity & Crypto Accelerator."""
+
+    def test_murrey_math_octaves(self):
+        frame = ate.MurreyMathGannOctavesEngine.calculate_murrey_frame(65000.0)
+        self.assertEqual(frame["master_frame"], "[0.0 to 100000.0]")
+        self.assertEqual(frame["octave_step"], 12500.0)
+        self.assertIn("4/8_Major_Equilibrium_Mid", frame["murrey_levels"])
+        self.assertEqual(frame["murrey_levels"]["4/8_Major_Equilibrium_Mid"], 50000.0)
+
+    def test_jeanne_long_universal_clock(self):
+        lons = {"Mars": 90.0, "Jupiter": 180.0}
+        clock = ate.JeanneLongUniversalClockEngine.calculate_universal_clock_moment(hour_utc=6, minute_utc=0, current_price=65000.0, planetary_lons=lons)
+        self.assertEqual(clock["universal_clock_time_angle"], 90.0)
+        self.assertTrue(clock["has_intraday_reversal_trigger"])
+
+    def test_larry_williams_lunar_edge(self):
+        edge_nm = ate.LarryWilliamsLunarEdgeEngine.evaluate_lunar_phase_edge(days_since_new_moon=1.5)
+        self.assertEqual(edge_nm["tactical_bias"], "BULLISH_ACCUMULATION")
+        edge_fm = ate.LarryWilliamsLunarEdgeEngine.evaluate_lunar_phase_edge(days_since_new_moon=14.8)
+        self.assertEqual(edge_fm["tactical_bias"], "BEARISH_PULLBACK_CAUTION")
+
+    def test_bayer_declination_polarity(self):
+        flip = ate.BayerDeclinationPolarityEngine.check_declination_polarity_flip(current_decl=0.15, previous_decl=-0.20, planet="Moon")
+        self.assertTrue(flip["is_polarity_flip_active"])
+        self.assertIn("BULLISH_MOMENTUM_SURGE", flip["polarity_signal"])
+
+    def test_crypto_genesis_accelerator(self):
+        t_lons = {"Mars": 283.57} # Exact hit on BTC genesis Mars
+        acc = ate.CryptoGenesisAcceleratorEngine.evaluate_crypto_inception_trigger(t_lons)
+        self.assertTrue(acc["has_crypto_acceleration_trigger"])
+        self.assertGreater(acc["active_triggers_count"], 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
