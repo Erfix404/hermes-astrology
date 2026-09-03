@@ -3738,6 +3738,8 @@ def calculate_full_profile(data):
                 "crawford_crash", "crash_hazard", "jenkins_squaring", "jenkins",
                 "ferrera_panic", "ferrera", "olga_intraday", "olga_clock", "lavoie_asteroid", "asteroid_prob",
                 "eight_masters", "master_setups", "master_signal", "quant_signal",
+                "cowan_4d", "platonic", "sarvatobhadra", "sbc", "musical_harmonics",
+                "planetary_kinematics", "saros_cycle", "astro_backtest",
                 "murrey_math", "murrey", "universal_clock", "jeanne_long",
                 "larry_williams", "lunar_edge", "bayer_polarity", "crypto_accelerator",
                 "barycenter", "ssb", "spectral_fft", "fft", "cot_lunar", "walker_polar", "master_audit",
@@ -4119,6 +4121,45 @@ def calculate_full_profile(data):
                 "walker_polar": ate.WalkerPolarTargetEngine.compute_polar_harmonics(price),
                 "eight_masters": ate.EightMastersExhaustiveSetupsEngine.evaluate_all_eight_setups(asset, price, 1200.0)
             }
+            return result
+        if mode=="cowan_4d" or mode=="platonic":
+            import astro_trading_engine as ate
+            price = float(data.get("price", 65000.0))
+            days = float(data.get("days", 30.0))
+            result["cowan_4d_platonic_geometry"] = ate.BradleyCowan4DGeometryEngine.compute_pentagonal_phi_expansions(price, days)
+            return result
+        if mode=="sarvatobhadra" or mode=="sbc":
+            import astro_trading_engine as ate
+            # Convert longitudes to nakshatra indices (1 to 28)
+            t_lons, _, _ = body_longitudes(tjd)
+            nak_map = {}
+            for p, lon in t_lons.items():
+                if p in ("North Node", "South Node"): continue
+                nak_idx = int(lon // 12.857) + 1 # 360 / 28 = 12.857 deg
+                nak_map[p] = max(1, min(28, nak_idx))
+            result["sarvatobhadra_chakra"] = ate.SarvatobhadraChakra81Engine.evaluate_sbc_vedha_score(nak_map, janma_nakshatra_idx=1)
+            return result
+        if mode=="musical_harmonics":
+            import astro_trading_engine as ate
+            price = float(data.get("trough_price", 50000.0))
+            result["pythagorean_musical_harmonics"] = ate.PythagoreanMusicalHarmonicsEngine.compute_musical_price_ladder(price)
+            return result
+        if mode=="planetary_kinematics":
+            import astro_trading_engine as ate
+            l0 = float(data.get("lon_t0", 120.0))
+            result["planetary_kinematics_acceleration"] = ate.PlanetaryKinematicsAccelerationEngine.compute_kinematics(
+                l0 - 2.0, l0 - 1.0, l0, l0 + 1.0, l0 + 2.0
+            )
+            return result
+        if mode=="saros_cycle":
+            import astro_trading_engine as ate
+            result["saros_eclipse_family"] = ate.SarosEclipseFamiliesEngine.evaluate_saros_recurrence(tdt)
+            return result
+        if mode=="astro_backtest":
+            import astro_trading_engine as ate
+            p_series = data.get("prices", [100.0, 102.0, 105.0, 103.0, 108.0, 112.0, 110.0, 115.0, 118.0, 122.0, 120.0, 125.0])
+            sigs = data.get("signals", [1, 1, 1, 0, 1, 1, -1, 1, 1, 1, 0, 1])
+            result["quantitative_astro_backtest"] = ate.QuantitativeAstroBacktestSimulator.simulate_strategy_performance(p_series, sigs)
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate

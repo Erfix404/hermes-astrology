@@ -433,5 +433,45 @@ class TestApexMasterSuiteEngines(unittest.TestCase):
         self.assertIn("eight_masters", suite)
 
 
+class TestCowanSBCMusicalAndSimulationSuite(unittest.TestCase):
+    """Test Bradley Cowan 4D, Sarvatobhadra Chakra 81-grid, Musical Harmonics, Kinematics & Backtester."""
+
+    def test_cowan_4d_platonic(self):
+        phi_exp = ate.BradleyCowan4DGeometryEngine.compute_pentagonal_phi_expansions(100.0, 30.0)
+        self.assertIn("T_1 (1.618x)", phi_exp["pentagonal_time_nodes_days"])
+        self.assertEqual(phi_exp["pentagonal_time_nodes_days"]["T_1 (1.618x)"], 48.5)
+        self.assertEqual(phi_exp["pentagonal_price_expansions"]["P_1 (1.618x)"], 161.8)
+
+    def test_sarvatobhadra_chakra(self):
+        nak_map = {"Jupiter": 15, "Venus": 15, "Saturn": 28} # 15 casts front vedha on Janma 1
+        sbc = ate.SarvatobhadraChakra81Engine.evaluate_sbc_vedha_score(nak_map, janma_nakshatra_idx=1)
+        self.assertIn("sbc_composite_vedha_score", sbc)
+        self.assertIn("tactical_bias", sbc)
+
+    def test_pythagorean_musical_harmonics(self):
+        music = ate.PythagoreanMusicalHarmonicsEngine.compute_musical_price_ladder(100.0)
+        self.assertEqual(music["musical_overtone_levels"]["Octave (2:1)"], 200.0)
+        self.assertEqual(music["musical_overtone_levels"]["Perfect Fifth (3:2)"], 150.0)
+
+    def test_planetary_kinematics(self):
+        kin = ate.PlanetaryKinematicsAccelerationEngine.compute_kinematics(118.0, 119.0, 120.0, 121.0, 122.0)
+        self.assertEqual(kin["angular_velocity_deg_day"], 1.0)
+        self.assertEqual(kin["angular_acceleration_deg_day2"], 0.0)
+        self.assertTrue(kin["is_acceleration_inflection"])
+
+    def test_saros_eclipse_family(self):
+        saros = ate.SarosEclipseFamiliesEngine.evaluate_saros_recurrence(datetime(2026, 9, 3))
+        self.assertIn("saros_cycles_from_1929", saros)
+        self.assertGreater(saros["saros_cycles_from_1929"], 5.0)
+
+    def test_backtest_simulator(self):
+        prices = [100.0, 102.0, 105.0, 108.0, 112.0, 115.0, 120.0, 125.0]
+        signals = [1, 1, 1, 1, 1, 1, 1, 1]
+        sim = ate.QuantitativeAstroBacktestSimulator.simulate_strategy_performance(prices, signals)
+        self.assertGreater(sim["final_equity"], 100000.0)
+        self.assertEqual(sim["win_rate_percentage"], "100.0%")
+        self.assertIn("annualized_sharpe_ratio", sim)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

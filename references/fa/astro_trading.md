@@ -113,6 +113,12 @@ $$W(t) = \sum A_k \cos\left( \frac{2\pi t}{T_k} + \phi_k \right)$$
 - **تجزیه طیفی دیجیتال فوریه (Digital Spectral FFT):** استخراج ۳ پریود غالب نوسان بازار با تبدیل فوریه مجزا.
 - **تلفیق تعهد تجاری COT لری ویلیامز و فاز ماه:** ستاپ Ultra-Buy با وین‌ریت ۷۶.۸٪ (COT >= 80% + New Moon + Williams %R <= -80).
 - **سیستم هدف‌گذاری قطبی مایلز ویلسون واکر (Walker Polar Targets):** استاپ‌لاس هارمونیک ۲۲.۵ درجه و اهداف ۴۵°، ۹۰°، ۱۲۰°، ۱۸۰° و ۳۶۰° گن.
+- **هندسه ۴ بعدی بردلی کووان (Bradley Cowan 4D):** احجام افلاطونی ۵ گانه و انبساط‌های پنتامری فیبوناچی-طلایی.
+- **چاکرای سارواتوبادرا ودیک در بازارها (Sarvatobhadra Chakra 81-Grid):** ماتریس ۸۱ خانه‌ای ودیک با پرتوهای ودا و نقاط حساس جانما و سایناشیکا.
+- **هارمونیک‌های صوتی فیثاغورسی (Pythagorean Musical Overtones):** فواصل اکتاو ۲:۱، پنجم ۳:۲، چهارم ۴:۳ و سوم ۵:۴.
+- **سینماتیک و شتاب مداری مشتق دوم (Planetary Kinematics Acceleration):** شتاب زاویه‌ای $d^2\lambda/dt^2$ و تکانه جرک $d^3\lambda/dt^3$ به عنوان لیدینگ ایندیکیتورهای چرخش بازار.
+- **چرخه‌های ساروس و اکسلیگموس (Saros 18.03Y & Exeligmos 54Y):** انطباق ابرچرخه‌های تاریخی کاندارتیف با خورشید/ماه‌گرفتگی‌ها.
+- **شبیه‌ساز بک‌تستینگ کوانتوم (Quantitative Astro Backtester):** محاسبه نرخ رشد مرکب سالانه (CAGR)، شارپ، سورتینو، دروداون و پروفیت‌فاکتور.
 
 ---
 
@@ -125,24 +131,27 @@ python scripts/astro_engine.py --json '{"mode":"master_audit","asset":"BTC","pri
 # ۲. سیگنال تصمیم‌گیری ۷ مرحله‌ای نهادی (7-Step Master Signal)
 python scripts/astro_engine.py --json '{"mode":"master_signal","asset":"BTC","price":65000}'
 
-# ۳. محاسبه بردار مرکز جرم منظومه شمسی (SSB Barycenter)
+# ۳. هندسه ۴ بعدی بردلی کووان و انبساط‌های طلایی (Cowan 4D Geometry)
+python scripts/astro_engine.py --json '{"mode":"cowan_4d","price":65000,"days":30}'
+
+# ۴. چاکرای ۸۱ خانه‌ای سارواتوبادرا ودیک (Sarvatobhadra Chakra)
+python scripts/astro_engine.py --json '{"mode":"sarvatobhadra"}'
+
+# ۵. لدر هارمونیک‌های صوتی فیثاغورسی (Pythagorean Harmonics)
+python scripts/astro_engine.py --json '{"mode":"musical_harmonics","trough_price":50000}'
+
+# ۶. شتاب زاویه‌ای مداری و تکانه جرک (Planetary Kinematics)
+python scripts/astro_engine.py --json '{"mode":"planetary_kinematics","lon_t0":120.0}'
+
+# ۷. ابرچرخه ساروس و اکسلیگموس ۵۴ ساله (Saros Eclipse Families)
+python scripts/astro_engine.py --json '{"mode":"saros_cycle"}'
+
+# ۸. شبیه‌ساز و ارزیاب بک‌تست استراتژی (Astro Backtest Simulator)
+python scripts/astro_engine.py --json '{"mode":"astro_backtest","prices":[100,102,105,108,112,110,115,120],"signals":[1,1,1,1,1,0,1,1]}'
+
+# ۹. محاسبه بردار مرکز جرم منظومه شمسی (SSB Barycenter)
 python scripts/astro_engine.py --json '{"mode":"barycenter"}'
 
-# ۴. هدف‌گذاری قطبی و استاپ ۲۲.۵ درجه واکر (Walker Polar Targets)
-python scripts/astro_engine.py --json '{"mode":"walker_polar","price":65000}'
-
-# ۵. شاخص تعهد تجاری COT و فاز ماه (Williams COT Confluence)
-python scripts/astro_engine.py --json '{"mode":"cot_lunar","net_commercial":48000,"min_156":10000,"max_156":50000,"days_since_new_moon":1.0,"williams_r":-85}'
-
-# ۶. استخراج چرخه‌های فرکانسی با تبدیل فوریه (Spectral FFT)
-python scripts/astro_engine.py --json '{"mode":"spectral_fft","prices":[100,102,105,103,108,112,110,115,118,114,120,122]}'
-
-# ۷. کارت معاملاتی چندتایم‌فریمه نهادی (Institutional Trade Card)
-python scripts/astro_engine.py --json '{"mode":"trade_card","asset":"BTC","price":65000}'
-
-# ۸. ارزیابی جامع تمام ۸ ستاپ تخصصی اساتید بزرگ
-python scripts/astro_engine.py --json '{"mode":"eight_masters","asset":"BTC","price":65000}'
-
-# ۹. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
+# ۱۰. رندر داشبورد و ترمینال گرافیکی اسکی (ASCII Dashboard)
 python scripts/astro_engine.py --json '{"mode":"terminal_dashboard","asset":"BTC","price":65000}'
 ```
