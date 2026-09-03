@@ -3737,6 +3737,7 @@ def calculate_full_profile(data):
                 "sepharial_tide", "silver_key", "trade_card", "institutional_card",
                 "crawford_crash", "crash_hazard", "jenkins_squaring", "jenkins",
                 "ferrera_panic", "ferrera", "olga_intraday", "olga_clock", "lavoie_asteroid", "asteroid_prob",
+                "eight_masters", "master_setups",
                 "harmonic_wave", "composite_wave", "genesis_transits", "terminal_dashboard",
                 "bayer", "mercury_speed", "crd_calendar", "geocosmic_crd",
                 "mcwhirter", "node_cycle", "financial", "crypto"):
@@ -4014,6 +4015,13 @@ def calculate_full_profile(data):
             import astro_trading_engine as ate
             ast_name = data.get("asteroid", "PALLAS")
             result["lavoie_asteroid_metric"] = ate.LavoieAsteroidHarmonicsEngine.get_asteroid_probability_metric(ast_name)
+            return result
+        if mode=="eight_masters" or mode=="master_setups":
+            import astro_trading_engine as ate
+            asset = data.get("asset", "BTC")
+            price = float(data.get("price", 65000.0 if asset.upper()=="BTC" else 2500.0))
+            atr_val = float(data.get("atr14", 1200.0 if asset.upper()=="BTC" else 80.0))
+            result["eight_masters_exhaustive_setups"] = ate.EightMastersExhaustiveSetupsEngine.evaluate_all_eight_setups(asset, price, atr_val)
             return result
         if mode=="bayer" or mode=="mercury_speed":
             import astro_trading_engine as ate

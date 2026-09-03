@@ -317,6 +317,18 @@ class TestContemporaryMastersSetups(unittest.TestCase):
         self.assertEqual(res_ast["asteroid"], "PALLAS")
         self.assertTrue(res_ast["is_statistically_actionable"])
 
+    def test_eight_masters_exhaustive_setups(self):
+        all_8 = ate.EightMastersExhaustiveSetupsEngine.evaluate_all_eight_setups("BTC", 65000.0, atr14=1200.0)
+        self.assertEqual(len(all_8), 8)
+        self.assertEqual(all_8[0]["setup_id"], "GANN_SWING_SQ9")
+        self.assertIn("stop_loss", all_8[0])
+        self.assertIn("take_profit_1", all_8[0])
+        self.assertIn("take_profit_2", all_8[0])
+        # Check CLI integration
+        res_cli = ae.calculate_full_profile({"mode": "eight_masters", "asset": "BTC", "price": 65000.0})
+        self.assertIn("eight_masters_exhaustive_setups", res_cli)
+        self.assertEqual(len(res_cli["eight_masters_exhaustive_setups"]), 8)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

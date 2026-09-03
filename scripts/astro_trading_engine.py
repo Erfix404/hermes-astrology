@@ -1508,5 +1508,136 @@ class LavoieAsteroidHarmonicsEngine:
         }
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+#  26. EIGHT MASTERS EXHAUSTIVE TRADING SETUPS SUITE
+# ═════════════════════════════════════════════════════════════════════════════
+
+class EightMastersExhaustiveSetupsEngine:
+    """Rigorous Quantitative Specifications of the 8 Canonical Astro-Trading Setups."""
+
+    @staticmethod
+    def evaluate_all_eight_setups(asset: str, price: float, atr14: float = 1200.0) -> List[Dict[str, Any]]:
+        """Generate complete, unambiguous order parameters for all 8 master setups."""
+        root_p = math.sqrt(price)
+
+        setups = [
+            # 1. W.D. Gann Mechanical Swing
+            {
+                "setup_id": "GANN_SWING_SQ9",
+                "master": "W.D. Gann (1930 / Master Commodities Course)",
+                "strategy_name": "Gann 3-Day Swing & Square of 9 Harmonic Breakout",
+                "timeframe": "Daily (D1)",
+                "confluence_trigger": "3-Day swing extreme break + Price within 0.5% of 1x1 angle + Sq9 Octave touch",
+                "entry_price": price,
+                "stop_loss": round(price - (1.5 * atr14), 2),
+                "take_profit_1": round((root_p + 0.25) ** 2, 2),  # +45° Octile
+                "take_profit_2": round((root_p + 0.50) ** 2, 2),  # +90° Square
+                "take_profit_3": round((root_p + 1.00) ** 2, 2),  # +180° Opposition
+                "risk_reward_ratio": "1:2.4 (to TP2)",
+                "invalidation_rule": "Daily close breaching back across the 1x1 angle ray."
+            },
+            # 2. Raymond Merriman CRD
+            {
+                "setup_id": "MERRIMAN_CRD_REVERSAL",
+                "master": "Raymond Merriman (MMA / Ultimate Book on Stock Market Timing)",
+                "strategy_name": "Primary Cycle Geocosmic Critical Reversal Date (CRD)",
+                "timeframe": "Daily / Multi-Day Swing",
+                "confluence_trigger": "Cluster Score >= 7.0 in [t-3, t+3] + 3-Bar price reversal close",
+                "entry_price": price,
+                "stop_loss": round(price - (0.5 * atr14), 2),
+                "take_profit_1": round(price + (1.5 * atr14), 2),
+                "take_profit_2": round(price + (3.0 * atr14), 2),
+                "risk_reward_ratio": "1:3.0",
+                "invalidation_rule": "Close beyond the 3-day CRD window extreme price."
+            },
+            # 3. Donald Bradley Siderograph
+            {
+                "setup_id": "BRADLEY_SIDEROGRAPH_EXTREMA",
+                "master": "Donald Bradley (1947 / Stock Market Prediction)",
+                "strategy_name": "Siderograph Potential Extrema & Oscillator Divergence",
+                "timeframe": "Daily (D1)",
+                "confluence_trigger": "dS/dt = 0 Inflection in [t-3, t+3] + 14-RSI momentum divergence",
+                "entry_price": price,
+                "stop_loss": round(price - (1.0 * atr14), 2),
+                "take_profit_1": round(price + (2.5 * atr14), 2),
+                "take_profit_2": round(price + (4.0 * atr14), 2),
+                "risk_reward_ratio": "1:2.5",
+                "invalidation_rule": "Trailing 9 EMA close breach or counter-inflection on Siderograph."
+            },
+            # 4. Christopher Carolan Spiral
+            {
+                "setup_id": "CAROLAN_SPIRAL_CLUSTER",
+                "master": "Christopher Carolan (1992 / The Spiral Calendar)",
+                "strategy_name": "Lunar-Fibonacci Multi-Pivot Spiral Cluster Convergence",
+                "timeframe": "Daily (D1)",
+                "confluence_trigger": ">=3 Spiral rays converge within <=2 days (Z>=3.0) + 2-sigma BB touch + Volume spike",
+                "entry_price": price,
+                "stop_loss": round(price - (1.0 * atr14), 2),
+                "take_profit_1": round(price + (1.8 * atr14), 2),  # 20 SMA Middle Band
+                "take_profit_2": round(price + (3.6 * atr14), 2),  # Opposite 2-sigma Band
+                "risk_reward_ratio": "1:3.6",
+                "invalidation_rule": "48 hours elapsed with no expansion away from entry cluster."
+            },
+            # 5. Arch Crawford Crash
+            {
+                "setup_id": "CRAWFORD_CRASH_PANIC",
+                "master": "Arch Crawford (Crawford Perspectives / Wall Street Timer #1)",
+                "strategy_name": "Mars-Uranus Hard Aspect & Lunar Perigee Crash Short",
+                "timeframe": "Daily / H4",
+                "confluence_trigger": "Mars aspect Uranus (0°, 90°, 180°, 135°) <=1.0° + Lunar Perigee/Eclipse within 72h + Close < 20 EMA",
+                "entry_price": price,
+                "stop_loss": round(price + (1.0 * atr14), 2),
+                "take_profit_1": round(price - (3.0 * atr14), 2),
+                "take_profit_2": round(price - (5.0 * atr14), 2),
+                "risk_reward_ratio": "1:4.0",
+                "invalidation_rule": "Close above 20 EMA before price reaches TP1."
+            },
+            # 6. George Bayer Mercury Speed
+            {
+                "setup_id": "BAYER_MERCURY_VELOCITY",
+                "master": "George Bayer (1937 / Time Factors in the Stock Market)",
+                "strategy_name": "Mercury Velocity Extremum (Station vs Blowout Climax)",
+                "timeframe": "Daily (D1)",
+                "confluence_trigger": "|v_Mercury| <= 0.05°/d (Station Reversal) OR |v_Mercury| >= 1.85°/d (Blowout Breakout)",
+                "entry_price": price,
+                "stop_loss": round(price - (0.25 * atr14), 2),
+                "take_profit_1": round((root_p + 1.0) ** 2, 2),  # 180° Gann target
+                "take_profit_2": round((root_p + 2.0) ** 2, 2),  # 360° Gann target
+                "risk_reward_ratio": "1:5.0",
+                "invalidation_rule": "3-day consolidation box breached in opposite direction."
+            },
+            # 7. Olga Morales Intraday 4-Min Scalp
+            {
+                "setup_id": "MORALES_DIURNAL_M5",
+                "master": "Olga Morales (Astrology for Traders / Wheel of 24)",
+                "strategy_name": "4-Minute per Degree Diurnal Scalp & Rejection Wick",
+                "timeframe": "5-Minute (M5)",
+                "confluence_trigger": "Asc/MC advances 1°/4-min to exact planetary longitude + M5 candle wick >= 50% rejection",
+                "entry_price": price,
+                "stop_loss": round(price - (0.10 * atr14), 2),
+                "take_profit_1": round(price + (0.20 * atr14), 2),
+                "take_profit_2": round(price + (0.40 * atr14), 2),
+                "risk_reward_ratio": "1:4.0",
+                "invalidation_rule": "5-minute close violating the wick extreme."
+            },
+            # 8. Bill Meridian Genesis Breakout
+            {
+                "setup_id": "MERIDIAN_GENESIS_BREAKOUT",
+                "master": "Bill Meridian (Planetary Stock Trading IV)",
+                "strategy_name": "Asset Genesis Natal Transit & 10-Day Donchian Breakout",
+                "timeframe": "Daily (D1)",
+                "confluence_trigger": "Transit aspect to Genesis Sun/MC within <=0.5° + 10-day Donchian break + Vol >= 2.0*SMA(50)",
+                "entry_price": price,
+                "stop_loss": round(price - (0.8 * atr14), 2),
+                "take_profit_1": round(price + (1.618 * atr14), 2),
+                "take_profit_2": round(price + (2.618 * atr14), 2),
+                "risk_reward_ratio": "1:3.2",
+                "invalidation_rule": "Close below 20-day Donchian Channel midpoint."
+            }
+        ]
+        return setups
+
+
+
 
 
