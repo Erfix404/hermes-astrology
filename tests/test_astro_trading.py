@@ -477,7 +477,8 @@ class TestCowanSBCMusicalAndSimulationSuite(unittest.TestCase):
         self.assertEqual(bt_res["asset"], "BTC")
         self.assertEqual(bt_res["verification_status"], "AUDITED_AND_REPRODUCIBLE")
         self.assertIn("performance_metrics", bt_res)
-        self.assertGreater(bt_res["total_bars_tested"], 100)
+        self.assertGreater(bt_res["total_bars_evaluated"], 100)
+        self.assertGreaterEqual(bt_res["performance_metrics"]["profit_factor"], 2.0)
 
     def test_astraea_quant_trading_api_decisive_signal(self):
         t_lons = {"Sun": 160.0, "Moon": 162.0, "Mars": 283.57, "Jupiter": 120.0, "Saturn": 10.0, "Uranus": 60.0, "Neptune": 0.0, "Pluto": 300.0, "North Node": 92.0}
